@@ -12,32 +12,32 @@ import           Data.VectorSpace
 
 type R = Float
 
-data DV v a = DF a v
+data DV v a = DV a v
 
 type Reverse s a = DV (L a s) a
 
 newtype L a b = L { runL :: a -> b -> b }
 
 runReverse :: a -> s -> Reverse s a -> (a, s)
-runReverse y z (DF x f) = (x, runL f y z)
+runReverse y z (DV x f) = (x, runL f y z)
 
 instance (Scalar s ~ a, VectorSpace s, Num a) => Num (DV s a) where
-  (+) (DF x dx) (DF y dy) = DF (x + y) (dx ^+^ dy)
-  (*) (DF x dx) (DF y dy) = DF (x * y) (y *^ dx ^+^ x *^ dy)
-  (-) (DF x dx) (DF y dy) = DF (x - y) (dx ^-^ dy)
-  abs (DF x l) = undefined
+  (+) (DV x dx) (DV y dy) = DV (x + y) (dx ^+^ dy)
+  (*) (DV x dx) (DV y dy) = DV (x * y) (y *^ dx ^+^ x *^ dy)
+  (-) (DV x dx) (DV y dy) = DV (x - y) (dx ^-^ dy)
+  abs (DV x l) = undefined
   signum = undefined
-  fromInteger n = DF (fromInteger n) zeroV
+  fromInteger n = DV (fromInteger n) zeroV
 
 instance (Scalar s ~ a, VectorSpace s, Fractional a) => Fractional (DV s a) where
-  (/) (DF x dx) (DF y dy) =
-    DF (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
-  fromRational r = DF (fromRational r) zeroV
+  (/) (DV x dx) (DV y dy) =
+    DV (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
+  fromRational r = DV (fromRational r) zeroV
 
 instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (DV s a) where
-  (**) (DF x dx) (DF y dy) =
+  (**) (DV x dx) (DV y dy) =
     let z = x ** y
-    in  DF z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
+    in  DV z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
 
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
@@ -104,7 +104,7 @@ foo = grad' mapit1 mapit2 mait f
   mait   = modifyAllT
 
 wrap :: Num a => (a, (a -> a) -> s -> s) -> Reverse s a
-wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
+wrap = \(a, s) -> DV a (L (\a -> s (+ a)))
 
 modifyAllT
   :: Num b
