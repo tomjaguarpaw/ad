@@ -78,7 +78,15 @@ type Reverse s a = D (L a s) a
 newtype L a b = L { runL :: a -> b -> b }
 
 -- It has the structure of a VectorSpace [1].  This structure is
--- rather intriguing and the key to implementing reverse mode.
+-- rather intriguing and the key to implementing reverse mode.  As
+-- evaluation of the reverse mode derivative proceeds we pass values
+-- of type `a` to our `L a b` which gives us a `b -> b`.  This is
+-- essentially an entry on the Wengert list.  The implementation of
+-- `^+^` composes these entries together, essentially writing entries
+-- onto the list.  When we have finished building the "list" we apply
+-- our function `b -> b` to a value of type `b` which corresponds to
+-- performing the backward pass, walking back down the list and
+-- accumulating the derivatives.
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
   negateV v = L (\a -> runL v (-a))
