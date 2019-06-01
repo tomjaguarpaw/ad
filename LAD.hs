@@ -94,7 +94,7 @@ fhand x y =
       dα_dy = dα_dp * dp_dy + dα_dq * dq_dy + dα_dr * dr_dy + dα_dv * dv_dy
   in  (dα_dx, dα_dy)
 
-foo :: (Float, Float) -> (Float, (Float, Float))
+foo :: Fractional a => (a, a) -> (a, (a, a))
 foo = grad' mapit1 mapit2 mait f
  where
   mapit1 = mapT
