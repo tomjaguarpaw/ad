@@ -191,7 +191,7 @@ adExample3 =
   jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
 
 adExample4 :: [(Float, Float)]
-adExample4 = diffF'G fmap (\a -> [sin a, cos a]) 0
+adExample4 = diffF' (\a -> [sin a, cos a]) 0
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
