@@ -13,16 +13,17 @@ import           Data.VectorSpace
 -- An extremely general and simple presentation of automatic
 -- differentiation
 
--- Define a type that allows us to attach a vector to a value.
+-- We define a type that allows us to attach a vector to a value.
 -- Mathematical operations on `D`s will operate on the value and also
--- on the vector attached to it.  The operations on the vector will
--- amount to different ways of calculating the derivative.
+-- on the vector attached to it.  Different choices for the type of
+-- the vector will amount to different ways of calculating the
+-- derivative.
 data D v a = D a v
 
--- Implement mathematical functions for `D`.  This amounts to
--- reimplementing the original function and additionally providing its
--- derivative.  We're using the VectorSpace operations from the
--- vector-space package.
+-- The implementation of mathematical functions for `D` encodes the
+-- rules of differentiation.  We reimplement the original function and
+-- additionally provide its derivative.  We're using the VectorSpace
+-- operations from the vector-space package.
 instance (Scalar s ~ a, VectorSpace s, Num a) => Num (D s a) where
   (+) (D x dx) (D y dy) = D (x + y) (dx ^+^ dy)
   (*) (D x dx) (D y dy) = D (x * y) (y *^ dx ^+^ x *^ dy)
@@ -47,26 +48,25 @@ instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (D s a) where
 -- Automatic differentiation
 
 -- The vector attached to `D` is completely abstract so we can
--- interpret it in different ways.  Both forward and reverse mode AD
--- fall straight out of this setup by instantiating the vector at
--- different types.
+-- interpret it in whichever way we choose.  Both forward and reverse
+-- mode AD fall straight out of this setup by instantiating the vector
+-- at an appropriate type.
 
 -- Forward mode
 
--- A type to carry around the necessary data for forward mode.  This
--- is equivalent to the "dual number" from classical presentations of
--- forward mode AD.
-type Forward s a = D (I s) a
+-- We choose the type of attached vector to be the same as the type of
+-- values `a`.  This is equivalent to the "dual number" approach from
+-- classical presentations of forward mode AD.  (For slightly annoying
+-- typeclass-related reasons we need an auxiliary wrapper type `I`.)
+type Forward a = D (I a) a
 
--- For slightly annoying typeclass-related reasons we need an
--- auxiliary wrapper type.
 newtype I a = I { unI :: a } deriving Num
 
 -- The implementation of ad's `diffF'` is straightforward
 
 -- cf. https://hackage.haskell.org/package/ad-4.3.6/docs/Numeric-AD.html#v:diffF-39-
 diffF'
-  :: (Functor f, Num a) => ((Forward a a -> f (Forward a a)) -> a -> f (a, a))
+  :: (Functor f, Num a) => ((Forward a -> f (Forward a)) -> a -> f (a, a))
 diffF' f a = fmap (\(D b1 b2) -> (b1, unI b2)) (f (D a 1))
 
 diffF'example :: Floating a => [(a, a)]
@@ -87,13 +87,12 @@ instance Num a => VectorSpace (I a) where
 
 -- Reverse mode
 
--- Suprisingly, reverse mode also falls straight out of this setup.
+-- Surprisingly, reverse mode also falls straight out of this setup.
 
--- A type to carry around the necessary data for reverse mode.  Recall
--- that the first parameter to D can be an arbitrary vector space.
+-- We choose the attached vector to come from a type called `L a s`.
 type Reverse s a = D (L a s) a
 
--- What is the `L a s` parameter?  It's this somewhat mysterious
+-- What is the definition of `L a s`?  It's this somewhat mysterious
 -- construction.
 newtype L a b = L { runL :: a -> b -> b }
 
