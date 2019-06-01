@@ -132,7 +132,11 @@ fhand x y =
   in  (dα_dx, dα_dy)
 
 foo :: (Float, Float) -> (Float, (Float, Float))
-foo t = (runDF 1 (mapT (const 0) t) . f . mapT wrap . modifyAllT) t
+foo = grad' mapit1 mapit2 mait f
+ where
+  mapit1 = mapT
+  mapit2 = mapT
+  mait   = modifyAllT
 
 wrap :: (Float, (Float -> Float) -> a -> a) -> DF a
 wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
@@ -148,6 +152,10 @@ modifyAllT (a, b) = ((a, first), (a, second))
 modifyAllSeq :: S.Seq t -> S.Seq (t, (a -> a) -> S.Seq a -> S.Seq a)
 modifyAllSeq = fmap (\(i, a) -> (a, flip S.adjust i)) . enumerate
 
+modifyAllList :: [t] -> [(t, (a -> a) -> [a] -> [a])]
+modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
+  where modifyAt i f xs = zipWith (\j x -> if i == j then f x else x) [0 ..] xs
+
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
 
@@ -155,7 +163,30 @@ prod :: S.Seq (DF a) -> DF a
 prod = foldl (*) 1
 
 runProd :: S.Seq Float -> (Float, S.Seq Float)
-runProd t = (runDF 1 (fmap (const 0) t) . prod . fmap wrap . modifyAllSeq) t
+runProd = grad' mapit1 mapit2 mait prod
+ where
+  mapit1 = fmap
+  mapit2 = fmap
+  mait   = modifyAllSeq
+
+grad'
+  :: ((float -> Float) -> ffloat -> ffloat')
+  -> (  ((Float, (Float -> Float) -> ffloat'' -> ffloat'') -> DF ffloat'')
+     -> ffloatselect
+     -> fdffloat
+     )
+  -> (ffloat -> ffloatselect)
+  -> (fdffloat -> DF ffloat')
+  -> ffloat
+  -> (Float, ffloat')
+grad' mapit1 mapit2 mait f t =
+  (runDF 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
+
+adExample :: (Float, [Float])
+adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
+
+adExample2 :: (Float, [Float])
+adExample2 = grad' fmap fmap modifyAllList (\[x, y] -> x ** y) [0, 2]
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
