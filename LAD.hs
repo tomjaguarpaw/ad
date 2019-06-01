@@ -48,7 +48,7 @@ newtype I a = I { unI :: a } deriving Num
 -- The implementation of ad's `diffF'` is straightforward
 diffF'
   :: (Functor f, Num a) => ((Forward a a -> f (Forward a a)) -> a -> f (a, a))
-diffF' f a = fmap (\(D a a') -> (a, unI a')) (f (D a 1))
+diffF' f a = fmap (\(D a1 a') -> (a1, unI a')) (f (D a 1))
 
 diffF'example :: Floating a => [(a, a)]
 diffF'example = diffF' (\a -> [sin a, cos a]) 0
@@ -128,9 +128,9 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
  where
   zeros = mapit1 (const 0) t
-  wrap  = \(a, s) -> D a (L (\a -> s (+ a)))
+  wrap  = \(a, s) -> D a (L (\b -> s (+ b)))
   runReverse :: a -> s -> Reverse s a -> (a, s)
-  runReverse y z (D x f) = (x, runL f y z)
+  runReverse y z (D x g) = (x, runL g y z)
 
 grad'Example1 :: Num a => (a, [a])
 grad'Example1 =
@@ -160,7 +160,7 @@ jacobian'Example3 =
 -- Take the gradient of a function single variable, single output
 -- function
 grad1 :: Num a => (Reverse a a -> Reverse a a) -> a -> a
-grad1 x = snd . grad' id id (\x -> (x, id)) x
+grad1 x = snd . grad' id id (\y -> (y, id)) x
 
 square :: Num a => a -> a
 square x = x * x
@@ -215,8 +215,7 @@ gradProdOn n = snd (gradProd (S.replicate n 1)) `seq` ()
 
 
 modifyAllT
-  :: Num b
-  => (a, a)
+  :: (a, a)
   -> ( (a, (b -> b) -> (b, b) -> (b, b))
      , (a, (b -> b) -> (b, b) -> (b, b))
      )
@@ -227,13 +226,13 @@ modifyAllSeq = fmap (\(i, a) -> (a, flip S.adjust i)) . enumerate
 
 modifyAllList :: [t] -> [(t, (a -> a) -> [a] -> [a])]
 modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
-  where modifyAt i f xs = zipWith (\j x -> if i == j then f x else x) [0 ..] xs
+  where modifyAt i f xs = zipWith (\j x -> if i == j then f x else x) [0 :: Integer ..] xs
 
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
 
-f :: Fractional a => (a, a) -> a
-f (x, y) =
+fprimal :: Fractional a => (a, a) -> a
+fprimal (x, y) =
   let p = 7 * x
       r = 1 / y
       q = p * x * 5
@@ -241,7 +240,7 @@ f (x, y) =
   in  v
 
 
-fhand :: Fractional a => (a, a) -> (a, a)
+fhand :: Fractional a => (a, a) -> (a, (a, a))
 fhand (x, y) =
   let dα_dv = 1
 
@@ -279,17 +278,17 @@ fhand (x, y) =
 
       dα_dx = dα_dp * dp_dx + dα_dq * dq_dx + dα_dr * dr_dx + dα_dv * dv_dx
       dα_dy = dα_dp * dp_dy + dα_dq * dq_dy + dα_dr * dr_dy + dα_dv * dv_dy
-  in  (dα_dx, dα_dy)
+  in  (v, (dα_dx, dα_dy))
 
 foo :: Fractional a => (a, a) -> (a, (a, a))
-foo = grad' mapit1 mapit2 mait f
+foo = grad' mapit1 mapit2 mait fprimal
  where
   mapit1 = mapT
   mapit2 = mapT
   mait   = modifyAllT
 
 testf :: Fractional a => (a, a) -> ((a, a), (a, a))
-testf t = (snd (foo t), fhand t)
+testf t = (snd (foo t), snd (fhand t))
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
