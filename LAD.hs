@@ -113,7 +113,7 @@ modifyAllT
   -> ( (a, (b -> b) -> (b, b) -> (b, b))
      , (a, (b -> b) -> (b, b) -> (b, b))
      )
-modifyAllT (a, b) = ((a, first), (a, second))
+modifyAllT (a, b) = ((a, first), (b, second))
 
 modifyAllSeq :: S.Seq t -> S.Seq (t, (a -> a) -> S.Seq a -> S.Seq a)
 modifyAllSeq = fmap (\(i, a) -> (a, flip S.adjust i)) . enumerate
