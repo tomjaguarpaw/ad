@@ -13,9 +13,9 @@ import Data.Monoid
 
 type R = Float
 
-data DF s a = DF a (L a s)
+data DF s a = DF a (L a (Endo s))
 
-newtype L a b = L { runL :: a -> Endo b }
+newtype L a b = L { runL :: a -> b }
 
 runDF :: a -> s -> DF s a -> (a, s)
 runDF y z (DF x f) = (x, appEndo (runL f y) z)
@@ -38,12 +38,12 @@ instance Floating a => Floating (DF s a) where
     let z = x ** y
     in  DF z ((y * x ** (y - 1)) *^ ddx ^+^ (log x * z) *^ ddy)
 
-instance Num a => AdditiveGroup (L a b) where
+instance (Monoid b, Num a) => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (runL v1 <> runL v2)
   negateV v = L (\a -> runL v (-a))
   zeroV = L mempty
 
-instance Num a => VectorSpace (L a b) where
+instance (Monoid b, Num a) => VectorSpace (L a b) where
   type Scalar (L a b) = a
   r *^ v = L (\a -> runL v (r * a))
 
