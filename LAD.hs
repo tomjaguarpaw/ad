@@ -183,7 +183,7 @@ instance Num a => VectorSpace (I a) where
 diffF'
   :: (Functor f, Num a)
   => ((Forward (I a) a -> f (Forward (I a) a)) -> a -> f (a, a))
-diffF' f a = fmap (second unI) (fmap (\(D a a') -> (a, a')) (f (D a 1)))
+diffF' f a = fmap (\(D a a') -> (a, unI a')) (f (D a 1))
 
 adExample :: Num a => (a, [a])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
