@@ -18,9 +18,13 @@ newtype L a b = L { runL :: a -> b -> b }
 runDF :: s -> a -> DF s a -> (s, a)
 runDF y z (DF x f) = (x, runL f y z)
 
+infixl 6 .+
+infixl 6 .-
+infixl 7 .*
+
 instance Num s => Num (DF s a) where
   (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx .+ ddy)
-  (*) (DF x ddx) (DF y ddy) = DF (x * y) ((y .* ddx) .+ (x .* ddy))
+  (*) (DF x ddx) (DF y ddy) = DF (x * y) (y .* ddx .+ x .* ddy)
   (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx .- ddy)
   abs (DF x l) = undefined
   signum = undefined
@@ -28,13 +32,13 @@ instance Num s => Num (DF s a) where
 
 instance Fractional s => Fractional (DF s a) where
   (/) (DF x ddx) (DF y ddy) =
-    DF (x / y) (((1 / y) .* ddx) .- ((x / (y * y)) .* ddy))
+    DF (x / y) (1 / y .* ddx .- x / (y * y) .* ddy)
   fromRational r = DF (fromRational r) zero
 
 instance Floating s => Floating (DF s a) where
   (**) (DF x ddx) (DF y ddy) =
     let z = x ** y
-    in  DF z (((y * x ** (y - 1)) .* ddx) .+ ((log x * z) .* ddy))
+    in  DF z (y * x ** (y - 1) .* ddx .+ log x * z .* ddy)
 
 instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
