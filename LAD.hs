@@ -21,7 +21,8 @@ data D v a = D a v
 
 -- Implement mathematical functions for `D`.  This amounts to
 -- reimplementing the original function and additionally providing its
--- derivative.
+-- derivative.  We're using the VectorSpace operations from the
+-- vector-space package.
 instance (Scalar s ~ a, VectorSpace s, Num a) => Num (D s a) where
   (+) (D x dx) (D y dy) = D (x + y) (dx ^+^ dy)
   (*) (D x dx) (D y dy) = D (x * y) (y *^ dx ^+^ x *^ dy)
@@ -195,8 +196,8 @@ jacobian'Example3 = jacobian'List (\[x, y] -> [y, x, x * y]) [2, 1]
 -- We can take the results of differentiating and differentiate
 -- further, calculating higher order derivatives.
 
--- Here's a function to take the gradient of a function single
--- variable, single output function.
+-- grad1 takes the gradient of a single variable, single output
+-- function.
 grad1 :: Num a => (Reverse a a -> Reverse a a) -> a -> a
 grad1 x = snd . grad' id id (\y -> (y, id)) x
 
@@ -218,11 +219,11 @@ square'' = grad1 square'
 -- > map square'' [0..10]
 -- [2,2,2,2,2,2,2,2,2,2,2]
 
--- ad and backprop use an ST-like higher-rank running function for two
--- reasons.  Firstly, it's supposedly safer and stops variables
--- escaping to places they shouldn't be, but secondly, I think they
--- are forced to by their implementation.  We aren't.  This allows us
--- to express strange things.
+-- The ad and backprop packages use an ST-like higher-rank run
+-- function for two reasons.  Firstly, it's supposedly safer and stops
+-- variables escaping to places they shouldn't be, but secondly, I
+-- think they are forced to by their implementation.  We aren't.  This
+-- allows us to express strange things.
 --
 -- Will it lead to perturbation confusion?  Perhaps not, because we
 -- don't have any way of combining a `Reverse a a` with an `a`.
