@@ -49,8 +49,7 @@ newtype I a = I { unI :: a } deriving Num
 
 -- The implementation of ad's `diffF'` is straightforward
 diffF'
-  :: (Functor f, Num a)
-  => ((Forward a a -> f (Forward a a)) -> a -> f (a, a))
+  :: (Functor f, Num a) => ((Forward a a -> f (Forward a a)) -> a -> f (a, a))
 diffF' f a = fmap (\(D a a') -> (a, unI a')) (f (D a 1))
 
 diffF'example :: Floating a => [(a, a)]
@@ -121,11 +120,13 @@ jacobian'
   -> g (a, fa)
 jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
-  where zeros = mapit1 (const 0) t
-        wrap = \(a, s) -> D a (L (\a -> s (+ a)))
+ where
+  zeros = mapit1 (const 0) t
+  wrap  = \(a, s) -> D a (L (\a -> s (+ a)))
 
 grad'Example1 :: Num a => (a, [a])
-grad'Example1 = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
+grad'Example1 =
+  grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
 
 grad'Example2 :: Floating a => (a, [a])
 grad'Example2 = grad' fmap fmap modifyAllList (\[x, y] -> x ** y) [0, 2]
