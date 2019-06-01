@@ -12,32 +12,32 @@ import           Data.VectorSpace
 
 type R = Float
 
-data DV v a = DV a v
+data D v a = D a v
 
-type Reverse s a = DV (L a s) a
+type Reverse s a = D (L a s) a
 
 newtype L a b = L { runL :: a -> b -> b }
 
 runReverse :: a -> s -> Reverse s a -> (a, s)
-runReverse y z (DV x f) = (x, runL f y z)
+runReverse y z (D x f) = (x, runL f y z)
 
-instance (Scalar s ~ a, VectorSpace s, Num a) => Num (DV s a) where
-  (+) (DV x dx) (DV y dy) = DV (x + y) (dx ^+^ dy)
-  (*) (DV x dx) (DV y dy) = DV (x * y) (y *^ dx ^+^ x *^ dy)
-  (-) (DV x dx) (DV y dy) = DV (x - y) (dx ^-^ dy)
-  abs (DV x l) = undefined
+instance (Scalar s ~ a, VectorSpace s, Num a) => Num (D s a) where
+  (+) (D x dx) (D y dy) = D (x + y) (dx ^+^ dy)
+  (*) (D x dx) (D y dy) = D (x * y) (y *^ dx ^+^ x *^ dy)
+  (-) (D x dx) (D y dy) = D (x - y) (dx ^-^ dy)
+  abs (D x l) = undefined
   signum = undefined
-  fromInteger n = DV (fromInteger n) zeroV
+  fromInteger n = D (fromInteger n) zeroV
 
-instance (Scalar s ~ a, VectorSpace s, Fractional a) => Fractional (DV s a) where
-  (/) (DV x dx) (DV y dy) =
-    DV (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
-  fromRational r = DV (fromRational r) zeroV
+instance (Scalar s ~ a, VectorSpace s, Fractional a) => Fractional (D s a) where
+  (/) (D x dx) (D y dy) =
+    D (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
+  fromRational r = D (fromRational r) zeroV
 
-instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (DV s a) where
-  (**) (DV x dx) (DV y dy) =
+instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (D s a) where
+  (**) (D x dx) (D y dy) =
     let z = x ** y
-    in  DV z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
+    in  D z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
 
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
@@ -104,7 +104,7 @@ foo = grad' mapit1 mapit2 mait f
   mait   = modifyAllT
 
 wrap :: Num a => (a, (a -> a) -> s -> s) -> Reverse s a
-wrap = \(a, s) -> DV a (L (\a -> s (+ a)))
+wrap = \(a, s) -> D a (L (\a -> s (+ a)))
 
 modifyAllT
   :: Num b
