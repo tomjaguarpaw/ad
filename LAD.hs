@@ -19,8 +19,8 @@ instance (Scalar s ~ a, VectorSpace s, Num a) => Num (D s a) where
   (+) (D x dx) (D y dy) = D (x + y) (dx ^+^ dy)
   (*) (D x dx) (D y dy) = D (x * y) (y *^ dx ^+^ x *^ dy)
   (-) (D x dx) (D y dy) = D (x - y) (dx ^-^ dy)
-  abs = undefined
-  signum = undefined
+  abs (D x dx) = D (abs x) (signum x *^ dx)
+  signum (D x _) = D (signum x) zeroV
   fromInteger n = D (fromInteger n) zeroV
 
 instance (Scalar s ~ a, VectorSpace s, Fractional a) => Fractional (D s a) where
