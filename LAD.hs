@@ -30,7 +30,7 @@ instance VectorSpace a => VectorSpace (L a b) where
   r ..* v = L (\a -> runL v (r ..* a))
   zero = L (const id)
 
-instance VectorSpace a => Fractional (DF a) where
+instance Fractional (DF a) where
   (/) = (./)
   fromRational r = DF (fromRational r) zero
 
