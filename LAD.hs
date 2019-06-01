@@ -180,17 +180,8 @@ instance Num a => VectorSpace (I a) where
   type Scalar (I a) = a
   r *^ (I v) = I (r * v)
 
--- The derived type signature is much more general
-diffF'G
-  :: (Num a, Num s)
-  => ((Forward s a -> (a, s)) -> fForwardsa -> faa)
-  -> (Forward s a -> fForwardsa)
-  -> a
-  -> faa
-diffF'G mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
-
 diffF' :: Num a => ((Forward (I a) a -> [Forward (I a) a]) -> a -> [(a, a)])
-diffF' f a = map (second (\(I x) -> x)) (diffF'G fmap f a)
+diffF' f a = map (second (\(I x) -> x)) (fmap (\(D a a') -> (a, a')) (f (D a 1)))
 
 adExample :: Num a => (a, [a])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
