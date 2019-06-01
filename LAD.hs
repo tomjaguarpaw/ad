@@ -186,7 +186,7 @@ square'' = grad1 square'
 -- Will it lead to perturbation confusion?  Perhaps not, because we
 -- don't have any way of combining a `Reverse a a` with an `a`.
 perturbationConfusion :: Num a => Reverse a a -> a -> a
-perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
+perturbationConfusion y = grad1 (\x -> x * y)
 
 -- Performance
 
