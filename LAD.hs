@@ -86,7 +86,7 @@ instance Num a => VectorSpace (I a) where
 
 -- Reverse mode
 
--- Suprisingly, reverse mode also falls straight out of this setup
+-- Suprisingly, reverse mode also falls straight out of this setup.
 
 -- A type to carry around the necessary data for reverse mode.  Recall
 -- that the first parameter to D can be an arbitrary vector space.
@@ -196,7 +196,7 @@ jacobian'Example3 = jacobian'List (\[x, y] -> [y, x, x * y]) [2, 1]
 -- further, calculating higher order derivatives.
 
 -- Here's a function to take the gradient of a function single
--- variable, single output function
+-- variable, single output function.
 grad1 :: Num a => (Reverse a a -> Reverse a a) -> a -> a
 grad1 x = snd . grad' id id (\y -> (y, id)) x
 
