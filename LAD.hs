@@ -9,15 +9,16 @@ import           Control.Arrow                  ( first
                                                 , second
                                                 )
 import           Data.VectorSpace
+import Data.Monoid
 
 type R = Float
 
 data DF s a = DF a (L a s)
 
-newtype L a b = L { runL :: a -> b -> b }
+newtype L a b = L { runL :: a -> Endo b }
 
 runDF :: a -> s -> DF s a -> (a, s)
-runDF y z (DF x f) = (x, runL f y z)
+runDF y z (DF x f) = (x, appEndo (runL f y) z)
 
 instance Num a => Num (DF s a) where
   (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ^+^ ddy)
@@ -38,9 +39,9 @@ instance Floating a => Floating (DF s a) where
     in  DF z ((y * x ** (y - 1)) *^ ddx ^+^ (log x * z) *^ ddy)
 
 instance Num a => AdditiveGroup (L a b) where
-  v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
+  v1 ^+^ v2 = L (runL v1 <> runL v2)
   negateV v = L (\a -> runL v (-a))
-  zeroV = L (const id)
+  zeroV = L mempty
 
 instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
@@ -102,7 +103,7 @@ foo = grad' mapit1 mapit2 mait f
   mait   = modifyAllT
 
 wrap :: Num a => (a, (a -> a) -> s -> s) -> DF s a
-wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
+wrap = \(a, s) -> DF a (L (\a -> Endo (s (+ a))))
 
 modifyAllT
   :: Num b
