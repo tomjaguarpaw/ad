@@ -10,6 +10,9 @@ import           Control.Arrow                  ( first
                                                 )
 import           Data.VectorSpace
 
+-- An extremely general and simple presentation of automatic
+-- differentiation
+
 -- Define a type that allows us to attach a vector to a value.
 -- Mathematical operations on `D`s will operate on the value and also
 -- on the vector attached to it.  The operations on the vector will
