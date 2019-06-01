@@ -19,12 +19,22 @@ runDF :: s -> a -> DF s a -> (s, a)
 runDF y z (DF x f) = (x, runL f y z)
 
 instance Num s => Num (DF s a) where
-  (+) = (.+)
-  (*) = (.*)
-  (-) = (.-)
-  abs = undefined
+  (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ..+ ddy)
+  (*) (DF x ddx) (DF y ddy) = DF (x * y) ((y ..* ddx) ..+ (x ..* ddy))
+  (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ..- ddy)
+  abs (DF x l) = undefined
   signum = undefined
   fromInteger n = DF (fromInteger n) zero
+
+instance Fractional s => Fractional (DF s a) where
+  (/) (DF x ddx) (DF y ddy) =
+    DF (x / y) (((1 / y) ..* ddx) ..- ((x / (y * y)) ..* ddy))
+  fromRational r = DF (fromRational r) zero
+
+instance Floating s => Floating (DF s a) where
+  (**) (DF x ddx) (DF y ddy) =
+    let z = x ** y
+    in  DF z (((y * x ** (y - 1)) ..* ddx) ..+ ((log x * z) ..* ddy))
 
 instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
@@ -32,13 +42,6 @@ instance Num a => VectorSpace (L a b) where
   negateV v = L (\a -> runL v (-a))
   r ..* v = L (\a -> runL v (r * a))
   zero = L (const id)
-
-instance Fractional s => Fractional (DF s a) where
-  (/) = (./)
-  fromRational r = DF (fromRational r) zero
-
-instance Floating s => Floating (DF s a) where
-  (**) = (.**)
 
 class VectorSpace v where
   type Scalar v
@@ -70,24 +73,6 @@ instance (Scalar a ~ Scalar b, VectorSpace a, VectorSpace b) => VectorSpace (a, 
   (v1a, v1b) ..- (v2a, v2b) = (v1a ..- v2a, v1b ..- v2b)
   r ..* (v2a, v2b) = (r ..* v2a, r ..* v2b)
   zero = (zero, zero)
-
-(.+) :: Num s => DF s a -> DF s a -> DF s a
-(.+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ..+ ddy)
-
-(.*) :: Num s => DF s a -> DF s a -> DF s a
-(.*) (DF x ddx) (DF y ddy) = DF (x * y) ((y ..* ddx) ..+ (x ..* ddy))
-
-(.-) :: Num s => DF s a -> DF s a -> DF s a
-(.-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ..- ddy)
-
-(./) :: Fractional s => DF s a -> DF s a -> DF s a
-(./) (DF x ddx) (DF y ddy) =
-  DF (x / y) (((1 / y) ..* ddx) ..- ((x / (y * y)) ..* ddy))
-
-(.**) :: Floating s => DF s a -> DF s a -> DF s a
-(.**) (DF x ddx) (DF y ddy) =
-  let z = x ** y
-  in  DF z (((y * x ** (y - 1)) ..* ddx) ..+ ((log x * z) ..* ddy))
 
 f :: (Fractional s, VectorSpace a) => (DF s a, DF s a) -> DF s a
 f (x, y) =
