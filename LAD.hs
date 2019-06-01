@@ -181,8 +181,10 @@ square'' = grad1 square'
 -- reasons.  Firstly, it's safer and stops variables escaping to
 -- places they shouldn't be, but secondly, I think they are forced to
 -- by their implementation.  We aren't.  This allows us to express
--- strange things.  Will it lead to perturbation confusion?
-
+-- strange things.
+--
+-- Will it lead to perturbation confusion?  Perhaps not, because we
+-- don't have any way of combining a `Reverse a a` with an `a`.
 perturbationConfusion :: Num a => Reverse a a -> a -> a
 perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
 
