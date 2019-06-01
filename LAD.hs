@@ -3,7 +3,6 @@
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 
-import           Control.Applicative
 import qualified Data.Functor.Identity         as I
 import qualified Data.Sequence                 as S
 import           Control.Arrow                  ( first
