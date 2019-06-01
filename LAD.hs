@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# OPTIONS_GHC -Wno-missing-methods #-}
 
 
 import           Control.Applicative
@@ -33,6 +34,9 @@ instance VectorSpace a => VectorSpace (L a b) where
 instance Fractional (DF a) where
   (/) = (./)
   fromRational r = DF (fromRational r) zero
+
+instance Floating (DF a) where
+  (**) = (.**)
 
 class VectorSpace v where
   (..+)   :: v -> v -> v
@@ -74,6 +78,11 @@ instance (VectorSpace a, VectorSpace b) => VectorSpace (a, b) where
 (./) :: DF a -> DF a -> DF a
 (./) (DF x ddx) (DF y ddy) =
   DF (x / y) (((1 / y) ..* ddx) ..- ((x / (y * y)) ..* ddy))
+
+(.**) :: DF a -> DF a -> DF a
+(.**) (DF x ddx) (DF y ddy) =
+  let z = x ** y
+  in  DF z (((y * x ** (y - 1)) ..* ddx) ..+ ((log x * z) ..* ddy))
 
 f :: VectorSpace a => (DF a, DF a) -> DF a
 f (x, y) =
