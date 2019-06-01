@@ -20,22 +20,22 @@ runDF :: a -> s -> DF s a -> (a, s)
 runDF y z (DF x f) = (x, runL f y z)
 
 instance Num a => Num (DF s a) where
-  (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ^+^ ddy)
-  (*) (DF x ddx) (DF y ddy) = DF (x * y) (y *^ ddx ^+^ x *^ ddy)
-  (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ^-^ ddy)
+  (+) (DF x dx) (DF y dy) = DF (x + y) (dx ^+^ dy)
+  (*) (DF x dx) (DF y dy) = DF (x * y) (y *^ dx ^+^ x *^ dy)
+  (-) (DF x dx) (DF y dy) = DF (x - y) (dx ^-^ dy)
   abs (DF x l) = undefined
   signum = undefined
   fromInteger n = DF (fromInteger n) zeroV
 
 instance Fractional a => Fractional (DF s a) where
-  (/) (DF x ddx) (DF y ddy) =
-    DF (x / y) ((1 / y) *^ ddx ^-^ (x / (y * y)) *^ ddy)
+  (/) (DF x dx) (DF y dy) =
+    DF (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
   fromRational r = DF (fromRational r) zeroV
 
 instance Floating a => Floating (DF s a) where
-  (**) (DF x ddx) (DF y ddy) =
+  (**) (DF x dx) (DF y dy) =
     let z = x ** y
-    in  DF z ((y * x ** (y - 1)) *^ ddx ^+^ (log x * z) *^ ddy)
+    in  DF z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
 
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
