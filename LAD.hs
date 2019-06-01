@@ -14,12 +14,12 @@ type R = Float
 
 data DV v a = DF a v
 
-type DF s a = DV (L a s) a
+type Reverse s a = DV (L a s) a
 
 newtype L a b = L { runL :: a -> b -> b }
 
-runDF :: a -> s -> DF s a -> (a, s)
-runDF y z (DF x f) = (x, runL f y z)
+runReverse :: a -> s -> Reverse s a -> (a, s)
+runReverse y z (DF x f) = (x, runL f y z)
 
 instance (Scalar s ~ a, VectorSpace s, Num a) => Num (DV s a) where
   (+) (DF x dx) (DF y dy) = DF (x + y) (dx ^+^ dy)
@@ -103,7 +103,7 @@ foo = grad' mapit1 mapit2 mait f
   mapit2 = mapT
   mait   = modifyAllT
 
-wrap :: Num a => (a, (a -> a) -> s -> s) -> DF s a
+wrap :: Num a => (a, (a -> a) -> s -> s) -> Reverse s a
 wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
 
 modifyAllT
@@ -136,35 +136,32 @@ runProd = grad' mapit1 mapit2 mait prod
 
 grad'
   :: Num a
-  => ((a_ -> a) -> ffloat -> ffloat')
-  -> (  ((a, (a -> a) -> ffloat'' -> ffloat'') -> DF ffloat'' a)
-     -> ffloatselect
-     -> fdffloat
+  => ((a_ -> a) -> fs -> fs')
+  -> (  ((a, (a -> a) -> s'' -> s'') -> Reverse s'' a)
+     -> fsselect
+     -> fReversefs'a
      )
-  -> (ffloat -> ffloatselect)
-  -> (fdffloat -> DF ffloat' a)
-  -> ffloat
-  -> (a, ffloat')
+  -> (fs -> fsselect)
+  -> (fReversefs'a -> Reverse fs' a)
+  -> fs
+  -> (a, fs')
 grad' mapit1 mapit2 mait f t =
-  (runDF 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
+  (runReverse 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
 
 jacobian'
   :: Num a
-  => ((float -> a) -> ffloat -> ffloat')
-  -> (  ((a, (a -> a) -> ffloat'' -> ffloat'') -> DF ffloat'' a)
-     -> ffloatselect
-     -> fdffloat
+  => ((s -> a) -> fs -> fs')
+  -> (  ((a, (a -> a) -> fs'' -> fs'') -> Reverse fs'' a)
+     -> fsselect
+     -> fReversefs'a
      )
-  -> (  (DF ffloat' a -> (a, ffloat'))
-     -> g (DF ffloat' a)
-     -> g (a, ffloat')
-     )
-  -> (ffloat -> ffloatselect)
-  -> (fdffloat -> g (DF ffloat' a))
-  -> ffloat
-  -> g (a, ffloat')
+  -> ((Reverse fs' a -> (a, fs')) -> g (Reverse fs' a) -> g (a, fs'))
+  -> (fs -> fsselect)
+  -> (fReversefs'a -> g (Reverse fs' a))
+  -> fs
+  -> g (a, fs')
 jacobian' mapit1 mapit2 mapit3 mait f t =
-  (mapit3 (runDF 1 zeros) . f . mapit2 wrap . mait) t
+  (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
 
 adExample :: (Float, [Float])
