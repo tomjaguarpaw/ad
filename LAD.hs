@@ -10,8 +10,6 @@ import           Control.Arrow                  ( first
                                                 )
 import           Data.VectorSpace
 
-type R = Float
-
 data D v a = D a v
 
 type Reverse s a = D (L a s) a
