@@ -197,3 +197,6 @@ once = snd . grad' id id (\x -> (x, id)) (\x -> x * x)
 
 twice :: Num a => a -> a
 twice = snd . grad' id id (\x -> (x, id)) once
+
+perturbationConfusion :: Num a => Reverse a a -> a -> a
+perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
