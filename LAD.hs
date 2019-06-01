@@ -23,7 +23,7 @@ instance (Scalar s ~ a, VectorSpace s, Num a) => Num (D s a) where
   (+) (D x dx) (D y dy) = D (x + y) (dx ^+^ dy)
   (*) (D x dx) (D y dy) = D (x * y) (y *^ dx ^+^ x *^ dy)
   (-) (D x dx) (D y dy) = D (x - y) (dx ^-^ dy)
-  abs (D x l) = undefined
+  abs = undefined
   signum = undefined
   fromInteger n = D (fromInteger n) zeroV
 
