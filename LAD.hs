@@ -140,38 +140,39 @@ runProd = grad' mapit1 mapit2 mait prod
 
 grad'
   :: Num a
-  => ((a_ -> a) -> fs -> fs')
-  -> (  ((a, (a -> a) -> s'' -> s'') -> Reverse s'' a)
+  => ((s_ -> a) -> fs -> fa)
+  -> (  ((a, (a -> a) -> s' -> s') -> Reverse s' a)
      -> fsselect
-     -> fReversefs'a
+     -> fReversefaa
      )
   -> (fs -> fsselect)
-  -> (fReversefs'a -> Reverse fs' a)
+  -> (fReversefaa -> Reverse fa a)
   -> fs
-  -> (a, fs')
+  -> (a, fa)
 grad' mapit1 mapit2 mait f t =
   (runReverse 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
 
 jacobian'
   :: Num a
-  => ((s -> a) -> fs -> fs')
-  -> (  ((a, (a -> a) -> fs'' -> fs'') -> Reverse fs'' a)
+  => ((s -> a) -> fs -> fa)
+  -> (  ((a, (a -> a) -> fs' -> fs') -> Reverse fs' a)
      -> fsselect
-     -> fReversefs'a
+     -> fReversefaa
      )
-  -> ((Reverse fs' a -> (a, fs')) -> g (Reverse fs' a) -> g (a, fs'))
+  -> ((Reverse fa a -> (a, fa)) -> g (Reverse fa a) -> g (a, fa))
   -> (fs -> fsselect)
-  -> (fReversefs'a -> g (Reverse fs' a))
+  -> (fReversefaa -> g (Reverse fa a))
   -> fs
-  -> g (a, fs')
+  -> g (a, fa)
 jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
 
+-- The derived type signature is much more general
 diffF'
-  :: Num a'
-  => ((D t4 t -> (t, t4)) -> fDa'a -> faa)
-  -> (D a' a -> fDa'a)
+  :: Num a
+  => ((Forward a -> (a, a)) -> fForwarda -> faa)
+  -> (Forward a -> fForwarda)
   -> a
   -> faa
 diffF' mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
