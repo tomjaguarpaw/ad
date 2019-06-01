@@ -169,7 +169,7 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
 
-newtype I a = I a deriving Num
+newtype I a = I { unI :: a } deriving Num
 
 instance Num a => AdditiveGroup (I a) where
   I v1 ^+^ I v2 = I (v1 + v2)
@@ -181,7 +181,7 @@ instance Num a => VectorSpace (I a) where
   r *^ (I v) = I (r * v)
 
 diffF' :: Num a => ((Forward (I a) a -> [Forward (I a) a]) -> a -> [(a, a)])
-diffF' f a = map (second (\(I x) -> x)) (fmap (\(D a a') -> (a, a')) (f (D a 1)))
+diffF' f a = map (second unI) (fmap (\(D a a') -> (a, a')) (f (D a 1)))
 
 adExample :: Num a => (a, [a])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
