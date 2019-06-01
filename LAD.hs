@@ -1,5 +1,6 @@
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 
@@ -13,7 +14,7 @@ import           Data.VectorSpace
 data D v a = D a v
 
 type Reverse s a = D (L a s) a
-type Forward a = D a a
+type Forward s a = D s a
 
 newtype L a b = L { runL :: a -> b -> b }
 
@@ -168,17 +169,28 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
 
+newtype I a = I a deriving Num
+
+instance Num a => AdditiveGroup (I a) where
+  I v1 ^+^ I v2 = I (v1 + v2)
+  negateV (I v) = I (-v)
+  zeroV = I 0
+
+instance Num a => VectorSpace (I a) where
+  type Scalar (I a) = a
+  r *^ (I v) = I (r * v)
+
 -- The derived type signature is much more general
 diffF'G
-  :: Num a
-  => ((Forward a -> (a, a)) -> fForwarda -> faa)
-  -> (Forward a -> fForwarda)
+  :: (Num a, Num s)
+  => ((Forward s a -> (a, s)) -> fForwardsa -> faa)
+  -> (Forward s a -> fForwardsa)
   -> a
   -> faa
 diffF'G mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
 
-diffF' :: (Num a, Functor f) => (Forward a -> f (Forward a)) -> a -> f (a, a)
-diffF' = diffF'G fmap
+diffF' :: Num a => ((Forward (I a) a -> [Forward (I a) a]) -> a -> [(a, a)])
+diffF' f a = map (second (\(I x) -> x)) (diffF'G fmap f a)
 
 adExample :: Num a => (a, [a])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
@@ -190,7 +202,7 @@ adExample3 :: Num a => [(a, [a])]
 adExample3 =
   jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
 
-adExample4 :: [(Float, Float)]
+adExample4 :: Floating a => [(a, a)]
 adExample4 = diffF' (\a -> [sin a, cos a]) 0
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
