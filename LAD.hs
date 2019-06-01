@@ -48,7 +48,7 @@ instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
   r *^ v = L (\a -> runL v (r * a))
 
-f :: (Fractional a, VectorSpace s) => (DF s a, DF s a) -> DF s a
+f :: Fractional a => (a, a) -> a
 f (x, y) =
   let p = 7 * x
       r = 1 / y
@@ -124,7 +124,7 @@ modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
 
-prod :: Num a => S.Seq (DF s a) -> DF s a
+prod :: Num a => S.Seq a -> a
 prod = foldl (*) 1
 
 runProd :: S.Seq Float -> (Float, S.Seq Float)
