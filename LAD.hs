@@ -13,6 +13,7 @@ import           Data.VectorSpace
 data D v a = D a v
 
 type Reverse s a = D (L a s) a
+type Forward a = D a a
 
 newtype L a b = L { runL :: a -> b -> b }
 
@@ -36,6 +37,8 @@ instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (D s a) where
   (**) (D x dx) (D y dy) =
     let z = x ** y
     in  D z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
+  sin (D x dx) = D (sin x) (cos x *^ dx)
+  cos (D x dx) = D (cos x) ((-sin x) *^ dx)
 
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
@@ -165,6 +168,14 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
 
+diffF'
+  :: Num a'
+  => ((D t4 t -> (t, t4)) -> fDa'a -> faa)
+  -> (D a' a -> fDa'a)
+  -> a
+  -> faa
+diffF' mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
+
 adExample :: (Float, [Float])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
 
@@ -173,6 +184,9 @@ adExample2 = grad' fmap fmap modifyAllList (\[x, y] -> x ** y) [0, 2]
 
 adExample3 =
   jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
+
+adExample4 :: [(Float, Float)]
+adExample4 = diffF' fmap (\a -> [sin a, cos a]) 0
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
