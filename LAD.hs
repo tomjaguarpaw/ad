@@ -218,3 +218,9 @@ adExample3 =
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
+
+once :: Num a => a -> a
+once = snd . grad' id id (\x -> (x, id)) (\x -> x * x)
+
+twice :: Num a => a -> a
+twice = snd . grad' id id (\x -> (x, id)) once
