@@ -159,9 +159,9 @@ jacobian'
      -> fsselect
      -> fReversefaa
      )
-  -> ((Reverse fa a -> (a, fa)) -> g (Reverse fa a) -> g (a, fa))
+  -> ((Reverse fa a -> (a, fa)) -> gReversefaa -> g (a, fa))
   -> (fs -> fsselect)
-  -> (fReversefaa -> g (Reverse fa a))
+  -> (fReversefaa -> gReversefaa)
   -> fs
   -> g (a, fa)
 jacobian' mapit1 mapit2 mapit3 mait f t =
