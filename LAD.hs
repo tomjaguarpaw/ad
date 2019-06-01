@@ -38,14 +38,18 @@ instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (D s a) where
 
 -- Forward mode falls straight out of this setup
 
--- A type to carry around the necessary data for forward mode 
+-- A type to carry around the necessary data for forward mode.  This
+-- is equivalent to the "dual number" from classical presentations of
+-- forward mode AD.
 type Forward s a = D (I s) a
 
--- We need to use this auxiliary type for slightly annoying
+-- We need to use this auxiliary wrapper type for slightly annoying
 -- typeclass-related reasons
 newtype I a = I { unI :: a } deriving Num
 
 -- The implementation of ad's `diffF'` is straightforward
+
+-- cf. https://hackage.haskell.org/package/ad-4.3.6/docs/Numeric-AD.html#v:diffF-39-
 diffF'
   :: (Functor f, Num a) => ((Forward a a -> f (Forward a a)) -> a -> f (a, a))
 diffF' f a = fmap (\(D a1 a') -> (a1, unI a')) (f (D a 1))
@@ -77,14 +81,17 @@ type Reverse s a = D (L a s) a
 newtype L a b = L { runL :: a -> b -> b }
 
 -- It has the structure of a VectorSpace [1].  This structure is
--- rather intriguing and the key to implementing reverse mode.  As
--- evaluation of the reverse mode derivative proceeds we pass values
--- of type `a` to our `L a b` which gives us a `b -> b`.  This is
--- essentially an entry on the Wengert list.  The implementation of
--- `^+^` composes these entries together, essentially writing entries
--- onto the list.  When we have finished building the "list" we apply
--- our function `b -> b` to a value of type `b` which corresponds to
--- performing the backward pass, walking back down the list and
+-- rather intriguing and the key to implementing reverse mode.
+--
+-- `L a b` plays the role of the "Wengert list" from classical
+-- presentations of reverse mode AD.  As evaluation proceeds we
+-- encounter values of type `L a b`.  We unwrap each and apply a value
+-- of type `a` giving us a `b -> b`.  This is essentially an entry to
+-- be written onto the Wengert list.  The implementation of `^+^`
+-- composes these entries together, essentially writing consecutive
+-- entries onto the list.  When we have finished building the "list"
+-- we apply our function `b -> b` to a value of type `b` which
+-- corresponds to performing the backward pass, walking the list and
 -- accumulating the derivatives.
 instance Num a => AdditiveGroup (L a b) where
   v1 ^+^ v2 = L (\a -> runL v1 a . runL v2 a)
@@ -98,6 +105,8 @@ instance Num a => VectorSpace (L a b) where
 -- The implementation of ad's `grad'` and `jacobian'` are
 -- straightforward.  I am complicating them slightly to keep them
 -- general whilst I work out the best way to proceed.
+
+-- cf. https://hackage.haskell.org/package/ad-4.3.6/docs/Numeric-AD.html#v:grad-39-
 grad'
   :: Num a
   => ((s_ -> a) -> fs -> fa)
@@ -112,6 +121,7 @@ grad'
 grad' mapit1 mapit2 mait f t =
   I.runIdentity (jacobian' mapit1 mapit2 fmap mait (I.Identity . f) t)
 
+-- cf. https://hackage.haskell.org/package/ad-4.3.6/docs/Numeric-AD.html#v:jacobian-39-
 jacobian'
   :: Num a
   => ((s -> a) -> fs -> fa)
