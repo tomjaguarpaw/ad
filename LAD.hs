@@ -180,12 +180,13 @@ diffF'G mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
 diffF' :: (Num a, Functor f) => (Forward a -> f (Forward a)) -> a -> f (a, a)
 diffF' = diffF'G fmap
 
-adExample :: (Float, [Float])
+adExample :: Num a => (a, [a])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
 
-adExample2 :: (Float, [Float])
+adExample2 :: Floating a => (a, [a])
 adExample2 = grad' fmap fmap modifyAllList (\[x, y] -> x ** y) [0, 2]
 
+adExample3 :: Num a => [(a, [a])]
 adExample3 =
   jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
 
