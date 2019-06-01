@@ -144,6 +144,23 @@ jacobian'Example3 =
 -- > jacobian'Example3
 -- [(1,[0,1]),(2,[1,0]),(2,[1,2])]
 
+-- Higher derivatives
+
+-- We can take the results of differentiating and differentiate
+-- further, calculating higher order derivatives.
+
+once :: Num a => a -> a
+once = snd . grad' id id (\x -> (x, id)) (\x -> x * x)
+
+twice :: Num a => a -> a
+twice = snd . grad' id id (\x -> (x, id)) once
+
+-- > map once [0..10]
+-- [0,2,4,6,8,10,12,14,16,18,20]
+
+-- > map twice [0..10]
+-- [2,2,2,2,2,2,2,2,2,2,2]
+
 modifyAllT
   :: Num b
   => (a, a)
@@ -236,12 +253,6 @@ testf t = (snd (foo t), fhand t)
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
-
-once :: Num a => a -> a
-once = snd . grad' id id (\x -> (x, id)) (\x -> x * x)
-
-twice :: Num a => a -> a
-twice = snd . grad' id id (\x -> (x, id)) once
 
 perturbationConfusion :: Num a => Reverse a a -> a -> a
 perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
