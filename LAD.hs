@@ -5,6 +5,7 @@
 
 
 import           Control.Applicative
+import qualified Data.Functor.Identity         as I
 import qualified Data.Sequence                 as S
 import           Control.Arrow                  ( first
                                                 , second
@@ -104,7 +105,7 @@ grad'
   -> fs
   -> (a, fa)
 grad' mapit1 mapit2 mait f t =
-  (runReverse 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
+  I.runIdentity (jacobian' mapit1 mapit2 fmap mait (I.Identity . f) t)
 
 jacobian'
   :: Num a
@@ -121,7 +122,7 @@ jacobian'
 jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runReverse 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
-
+        wrap = \(a, s) -> D a (L (\a -> s (+ a)))
 
 grad'Example1 :: Num a => (a, [a])
 grad'Example1 = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
@@ -141,9 +142,6 @@ jacobian'Example3 =
 
 -- > jacobian'Example3
 -- [(1,[0,1]),(2,[1,0]),(2,[1,2])]
-
-wrap :: Num a => (a, (a -> a) -> s -> s) -> Reverse s a
-wrap = \(a, s) -> D a (L (\a -> s (+ a)))
 
 modifyAllT
   :: Num b
