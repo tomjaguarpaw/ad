@@ -149,17 +149,62 @@ jacobian'Example3 =
 -- We can take the results of differentiating and differentiate
 -- further, calculating higher order derivatives.
 
-once :: Num a => a -> a
-once = snd . grad' id id (\x -> (x, id)) (\x -> x * x)
+-- Take the gradient of a function single variable, single output
+-- function
+grad1 :: Num a => (Reverse a a -> Reverse a a) -> a -> a
+grad1 x = snd . grad' id id (\x -> (x, id)) x
 
-twice :: Num a => a -> a
-twice = snd . grad' id id (\x -> (x, id)) once
+square :: Num a => a -> a
+square x = x * x
 
--- > map once [0..10]
+square' :: Num a => a -> a
+square' = grad1 square
+
+square'' :: Num a => a -> a
+square'' = grad1 square'
+
+-- > map square' [0..10]
 -- [0,2,4,6,8,10,12,14,16,18,20]
 
--- > map twice [0..10]
+-- > map square'' [0..10]
 -- [2,2,2,2,2,2,2,2,2,2,2]
+
+-- ad and backprop use an ST-like higher-rank running function for two
+-- reasons.  Firstly, it's safer and stops variables escaping to
+-- places they shouldn't be, but secondly, I think they are forced to
+-- by their implementation.  We aren't.  This allows us to express
+-- strange things.  Will it lead to perturbation confusion?
+
+perturbationConfusion :: Num a => Reverse a a -> a -> a
+perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
+
+-- Performance
+
+-- I believe we are doing genuine reverse mode AD because we seem to
+-- have run time linear in the number of inputs.  For example, we can
+-- take the product of a large number of variables.
+
+prod :: Num a => S.Seq a -> a
+prod = foldl (*) 1
+
+gradProd :: S.Seq Float -> (Float, S.Seq Float)
+gradProd = grad' mapit1 mapit2 mait prod
+ where
+  mapit1 = fmap
+  mapit2 = fmap
+  mait   = modifyAllSeq
+
+gradProdOn :: Int -> ()
+gradProdOn n = snd (gradProd (S.replicate n 1)) `seq` ()
+
+-- > gradProdOn 200000
+-- 2.52 secs
+-- > gradProdOn 800000
+-- 10.76 secs
+-- > gradProdOn 1600000
+-- 21.68 secs
+
+
 
 modifyAllT
   :: Num b
@@ -178,16 +223,6 @@ modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
 
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
-
-prod :: Num a => S.Seq a -> a
-prod = foldl (*) 1
-
-runProd :: S.Seq Float -> (Float, S.Seq Float)
-runProd = grad' mapit1 mapit2 mait prod
- where
-  mapit1 = fmap
-  mapit2 = fmap
-  mait   = modifyAllSeq
 
 runReverse :: a -> s -> Reverse s a -> (a, s)
 runReverse y z (D x f) = (x, runL f y z)
@@ -253,9 +288,6 @@ testf t = (snd (foo t), fhand t)
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
-
-perturbationConfusion :: Num a => Reverse a a -> a -> a
-perturbationConfusion y = snd . grad' id id (\x -> (x, id)) (\x -> x * y)
 
 -- [1] We need to restrict ourselves to a subset of `L a s` in order
 -- to ensure the vector space laws are followed.  I'll have to write
