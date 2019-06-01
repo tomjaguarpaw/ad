@@ -123,6 +123,8 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
  where
   zeros = mapit1 (const 0) t
   wrap  = \(a, s) -> D a (L (\a -> s (+ a)))
+  runReverse :: a -> s -> Reverse s a -> (a, s)
+  runReverse y z (D x f) = (x, runL f y z)
 
 grad'Example1 :: Num a => (a, [a])
 grad'Example1 =
@@ -223,9 +225,6 @@ modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
 
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
-
-runReverse :: a -> s -> Reverse s a -> (a, s)
-runReverse y z (D x f) = (x, runL f y z)
 
 f :: Fractional a => (a, a) -> a
 f (x, y) =
