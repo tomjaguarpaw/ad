@@ -12,14 +12,16 @@ import           Data.VectorSpace
 
 type R = Float
 
-data DF s a = DF a (L a s)
+data DV v a = DF a v
+
+type DF s a = DV (L a s) a
 
 newtype L a b = L { runL :: a -> b -> b }
 
 runDF :: a -> s -> DF s a -> (a, s)
 runDF y z (DF x f) = (x, runL f y z)
 
-instance Num a => Num (DF s a) where
+instance (Scalar s ~ a, VectorSpace s, Num a) => Num (DV s a) where
   (+) (DF x dx) (DF y dy) = DF (x + y) (dx ^+^ dy)
   (*) (DF x dx) (DF y dy) = DF (x * y) (y *^ dx ^+^ x *^ dy)
   (-) (DF x dx) (DF y dy) = DF (x - y) (dx ^-^ dy)
@@ -27,12 +29,12 @@ instance Num a => Num (DF s a) where
   signum = undefined
   fromInteger n = DF (fromInteger n) zeroV
 
-instance Fractional a => Fractional (DF s a) where
+instance (Scalar s ~ a, VectorSpace s, Fractional a) => Fractional (DV s a) where
   (/) (DF x dx) (DF y dy) =
     DF (x / y) ((1 / y) *^ dx ^-^ (x / (y * y)) *^ dy)
   fromRational r = DF (fromRational r) zeroV
 
-instance Floating a => Floating (DF s a) where
+instance (Scalar s ~ a, VectorSpace s, Floating a) => Floating (DV s a) where
   (**) (DF x dx) (DF y dy) =
     let z = x ** y
     in  DF z ((y * x ** (y - 1)) *^ dx ^+^ (log x * z) *^ dy)
