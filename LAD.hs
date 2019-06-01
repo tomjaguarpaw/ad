@@ -12,14 +12,14 @@ import           Data.VectorSpace
 
 type R = Float
 
-data DF s a = DF s (L s a)
+data DF s a = DF a (L a s)
 
 newtype L a b = L { runL :: a -> b -> b }
 
-runDF :: s -> a -> DF s a -> (s, a)
+runDF :: a -> s -> DF s a -> (a, s)
 runDF y z (DF x f) = (x, runL f y z)
 
-instance Num s => Num (DF s a) where
+instance Num a => Num (DF s a) where
   (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ^+^ ddy)
   (*) (DF x ddx) (DF y ddy) = DF (x * y) (y *^ ddx ^+^ x *^ ddy)
   (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ^-^ ddy)
@@ -27,12 +27,12 @@ instance Num s => Num (DF s a) where
   signum = undefined
   fromInteger n = DF (fromInteger n) zeroV
 
-instance Fractional s => Fractional (DF s a) where
+instance Fractional a => Fractional (DF s a) where
   (/) (DF x ddx) (DF y ddy) =
     DF (x / y) ((1 / y) *^ ddx ^-^ (x / (y * y)) *^ ddy)
   fromRational r = DF (fromRational r) zeroV
 
-instance Floating s => Floating (DF s a) where
+instance Floating a => Floating (DF s a) where
   (**) (DF x ddx) (DF y ddy) =
     let z = x ** y
     in  DF z ((y * x ** (y - 1)) *^ ddx ^+^ (log x * z) *^ ddy)
@@ -46,7 +46,7 @@ instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
   r *^ v = L (\a -> runL v (r * a))
 
-f :: (Fractional s, VectorSpace a) => (DF s a, DF s a) -> DF s a
+f :: (Fractional a, VectorSpace s) => (DF s a, DF s a) -> DF s a
 f (x, y) =
   let p = 7 * x
       r = 1 / y
@@ -101,7 +101,7 @@ foo = grad' mapit1 mapit2 mait f
   mapit2 = mapT
   mait   = modifyAllT
 
-wrap :: Num s => (s, (s -> s) -> a -> a) -> DF s a
+wrap :: Num a => (a, (a -> a) -> s -> s) -> DF s a
 wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
 
 modifyAllT
@@ -122,7 +122,7 @@ modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
 
-prod :: Num s => S.Seq (DF s a) -> DF s a
+prod :: Num a => S.Seq (DF s a) -> DF s a
 prod = foldl (*) 1
 
 runProd :: S.Seq Float -> (Float, S.Seq Float)
@@ -133,34 +133,34 @@ runProd = grad' mapit1 mapit2 mait prod
   mait   = modifyAllSeq
 
 grad'
-  :: Num s
-  => ((s_ -> s) -> ffloat -> ffloat')
-  -> (  ((s, (s -> s) -> ffloat'' -> ffloat'') -> DF s ffloat'')
+  :: Num a
+  => ((a_ -> a) -> ffloat -> ffloat')
+  -> (  ((a, (a -> a) -> ffloat'' -> ffloat'') -> DF ffloat'' a)
      -> ffloatselect
      -> fdffloat
      )
   -> (ffloat -> ffloatselect)
-  -> (fdffloat -> DF s ffloat')
+  -> (fdffloat -> DF ffloat' a)
   -> ffloat
-  -> (s, ffloat')
+  -> (a, ffloat')
 grad' mapit1 mapit2 mait f t =
   (runDF 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
 
 jacobian'
-  :: Num s
-  => ((float -> s) -> ffloat -> ffloat')
-  -> (  ((s, (s -> s) -> ffloat'' -> ffloat'') -> DF s ffloat'')
+  :: Num a
+  => ((float -> a) -> ffloat -> ffloat')
+  -> (  ((a, (a -> a) -> ffloat'' -> ffloat'') -> DF ffloat'' a)
      -> ffloatselect
      -> fdffloat
      )
-  -> (  (DF s ffloat' -> (s, ffloat'))
-     -> g (DF s ffloat')
-     -> g (s, ffloat')
+  -> (  (DF ffloat' a -> (a, ffloat'))
+     -> g (DF ffloat' a)
+     -> g (a, ffloat')
      )
   -> (ffloat -> ffloatselect)
-  -> (fdffloat -> g (DF s ffloat'))
+  -> (fdffloat -> g (DF ffloat' a))
   -> ffloat
-  -> g (s, ffloat')
+  -> g (a, ffloat')
 jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runDF 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
