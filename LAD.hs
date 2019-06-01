@@ -1,4 +1,5 @@
 {-# LANGUAGE TupleSections #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-missing-methods #-}
 
 
@@ -10,14 +11,14 @@ import           Control.Arrow                  ( first
 
 type R = Float
 
-data DF a = DF Float (L Float a)
+data DF s a = DF s (L s a)
 
 newtype L a b = L { runL :: a -> b -> b }
 
-runDF :: Float -> a -> DF a -> (Float, a)
+runDF :: s -> a -> DF s a -> (s, a)
 runDF y z (DF x f) = (x, runL f y z)
 
-instance Num (DF a) where
+instance Num s => Num (DF s a) where
   (+) = (.+)
   (*) = (.*)
   (-) = (.-)
@@ -25,29 +26,32 @@ instance Num (DF a) where
   signum = undefined
   fromInteger n = DF (fromInteger n) zero
 
-instance VectorSpace a => VectorSpace (L a b) where
+instance Num a => VectorSpace (L a b) where
+  type Scalar (L a b) = a
   v1 ..+ v2 = L (\a -> runL v1 a . runL v2 a)
-  negateV v = L (\a -> runL v (negateV a))
-  r ..* v = L (\a -> runL v (r ..* a))
+  negateV v = L (\a -> runL v (-a))
+  r ..* v = L (\a -> runL v (r * a))
   zero = L (const id)
 
-instance Fractional (DF a) where
+instance Fractional s => Fractional (DF s a) where
   (/) = (./)
   fromRational r = DF (fromRational r) zero
 
-instance Floating (DF a) where
+instance Floating s => Floating (DF s a) where
   (**) = (.**)
 
 class VectorSpace v where
+  type Scalar v
   (..+)   :: v -> v -> v
   (..-)   :: v -> v -> v
   (..-) v1 v2 = v1 ..+ negateV v2
-  (..*)   :: R -> v -> v
+  (..*)   :: Scalar v -> v -> v
   zero    :: v
   negateV :: v -> v
   negateV v = zero ..- v
 
 instance VectorSpace Float where
+  type Scalar Float = Float
   (..+) = (+)
   (..-) = (-)
   (..*) = (*)
@@ -60,31 +64,32 @@ instance VectorSpace b => VectorSpace (a -> b) where
   (..*) r = liftA ((..*) r)
   zero = pure zero
 -}
-instance (VectorSpace a, VectorSpace b) => VectorSpace (a, b) where
+instance (Scalar a ~ Scalar b, VectorSpace a, VectorSpace b) => VectorSpace (a, b) where
+  type Scalar (a, b) = Scalar a
   (v1a, v1b) ..+ (v2a, v2b) = (v1a ..+ v2a, v1b ..+ v2b)
   (v1a, v1b) ..- (v2a, v2b) = (v1a ..- v2a, v1b ..- v2b)
   r ..* (v2a, v2b) = (r ..* v2a, r ..* v2b)
   zero = (zero, zero)
 
-(.+) :: DF a -> DF a -> DF a
+(.+) :: Num s => DF s a -> DF s a -> DF s a
 (.+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ..+ ddy)
 
-(.*) :: DF a -> DF a -> DF a
+(.*) :: Num s => DF s a -> DF s a -> DF s a
 (.*) (DF x ddx) (DF y ddy) = DF (x * y) ((y ..* ddx) ..+ (x ..* ddy))
 
-(.-) :: DF a -> DF a -> DF a
+(.-) :: Num s => DF s a -> DF s a -> DF s a
 (.-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ..- ddy)
 
-(./) :: DF a -> DF a -> DF a
+(./) :: Fractional s => DF s a -> DF s a -> DF s a
 (./) (DF x ddx) (DF y ddy) =
   DF (x / y) (((1 / y) ..* ddx) ..- ((x / (y * y)) ..* ddy))
 
-(.**) :: DF a -> DF a -> DF a
+(.**) :: Floating s => DF s a -> DF s a -> DF s a
 (.**) (DF x ddx) (DF y ddy) =
   let z = x ** y
   in  DF z (((y * x ** (y - 1)) ..* ddx) ..+ ((log x * z) ..* ddy))
 
-f :: VectorSpace a => (DF a, DF a) -> DF a
+f :: (Fractional s, VectorSpace a) => (DF s a, DF s a) -> DF s a
 f (x, y) =
   let p = 7 * x
       r = 1 / y
@@ -138,7 +143,7 @@ foo = grad' mapit1 mapit2 mait f
   mapit2 = mapT
   mait   = modifyAllT
 
-wrap :: (Float, (Float -> Float) -> a -> a) -> DF a
+wrap :: Num s => (s, (s -> s) -> a -> a) -> DF s a
 wrap = \(a, s) -> DF a (L (\a -> s (+ a)))
 
 modifyAllT
@@ -159,7 +164,7 @@ modifyAllList = fmap (\(i, a) -> (a, modifyAt i)) . zip [0 ..]
 mapT :: (a -> b) -> (a, a) -> (b, b)
 mapT f (a, b) = (f a, f b)
 
-prod :: S.Seq (DF a) -> DF a
+prod :: Num s => S.Seq (DF s a) -> DF s a
 prod = foldl (*) 1
 
 runProd :: S.Seq Float -> (Float, S.Seq Float)
@@ -170,32 +175,34 @@ runProd = grad' mapit1 mapit2 mait prod
   mait   = modifyAllSeq
 
 grad'
-  :: ((float -> Float) -> ffloat -> ffloat')
-  -> (  ((Float, (Float -> Float) -> ffloat'' -> ffloat'') -> DF ffloat'')
+  :: Num s
+  => ((s_ -> s) -> ffloat -> ffloat')
+  -> (  ((s, (s -> s) -> ffloat'' -> ffloat'') -> DF s ffloat'')
      -> ffloatselect
      -> fdffloat
      )
   -> (ffloat -> ffloatselect)
-  -> (fdffloat -> DF ffloat')
+  -> (fdffloat -> DF s ffloat')
   -> ffloat
-  -> (Float, ffloat')
+  -> (s, ffloat')
 grad' mapit1 mapit2 mait f t =
   (runDF 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
 
 jacobian'
-  :: ((float -> Float) -> ffloat -> ffloat')
-  -> (  ((Float, (Float -> Float) -> ffloat'' -> ffloat'') -> DF ffloat'')
+  :: Num s
+  => ((float -> s) -> ffloat -> ffloat')
+  -> (  ((s, (s -> s) -> ffloat'' -> ffloat'') -> DF s ffloat'')
      -> ffloatselect
      -> fdffloat
      )
-  -> (  (DF ffloat' -> (Float, ffloat'))
-     -> g (DF ffloat')
-     -> g (Float, ffloat')
+  -> (  (DF s ffloat' -> (s, ffloat'))
+     -> g (DF s ffloat')
+     -> g (s, ffloat')
      )
   -> (ffloat -> ffloatselect)
-  -> (fdffloat -> g (DF ffloat'))
+  -> (fdffloat -> g (DF s ffloat'))
   -> ffloat
-  -> g (Float, ffloat')
+  -> g (s, ffloat')
 jacobian' mapit1 mapit2 mapit3 mait f t =
   (mapit3 (runDF 1 zeros) . f . mapit2 wrap . mait) t
   where zeros = mapit1 (const 0) t
