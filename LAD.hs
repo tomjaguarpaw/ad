@@ -101,6 +101,9 @@ foo = grad' mapit1 mapit2 mait f
   mapit2 = mapT
   mait   = modifyAllT
 
+testf :: Fractional a => (a, a) -> ((a, a), (a, a))
+testf t = (snd (foo t), fhand t)
+
 wrap :: Num a => (a, (a -> a) -> s -> s) -> Reverse s a
 wrap = \(a, s) -> D a (L (\a -> s (+ a)))
 
