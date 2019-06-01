@@ -19,59 +19,59 @@ runDF :: s -> a -> DF s a -> (s, a)
 runDF y z (DF x f) = (x, runL f y z)
 
 instance Num s => Num (DF s a) where
-  (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx ..+ ddy)
-  (*) (DF x ddx) (DF y ddy) = DF (x * y) ((y ..* ddx) ..+ (x ..* ddy))
-  (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx ..- ddy)
+  (+) (DF x ddx) (DF y ddy) = DF (x + y) (ddx .+ ddy)
+  (*) (DF x ddx) (DF y ddy) = DF (x * y) ((y .* ddx) .+ (x .* ddy))
+  (-) (DF x ddx) (DF y ddy) = DF (x - y) (ddx .- ddy)
   abs (DF x l) = undefined
   signum = undefined
   fromInteger n = DF (fromInteger n) zero
 
 instance Fractional s => Fractional (DF s a) where
   (/) (DF x ddx) (DF y ddy) =
-    DF (x / y) (((1 / y) ..* ddx) ..- ((x / (y * y)) ..* ddy))
+    DF (x / y) (((1 / y) .* ddx) .- ((x / (y * y)) .* ddy))
   fromRational r = DF (fromRational r) zero
 
 instance Floating s => Floating (DF s a) where
   (**) (DF x ddx) (DF y ddy) =
     let z = x ** y
-    in  DF z (((y * x ** (y - 1)) ..* ddx) ..+ ((log x * z) ..* ddy))
+    in  DF z (((y * x ** (y - 1)) .* ddx) .+ ((log x * z) .* ddy))
 
 instance Num a => VectorSpace (L a b) where
   type Scalar (L a b) = a
-  v1 ..+ v2 = L (\a -> runL v1 a . runL v2 a)
+  v1 .+ v2 = L (\a -> runL v1 a . runL v2 a)
   negateV v = L (\a -> runL v (-a))
-  r ..* v = L (\a -> runL v (r * a))
+  r .* v = L (\a -> runL v (r * a))
   zero = L (const id)
 
 class VectorSpace v where
   type Scalar v
-  (..+)   :: v -> v -> v
-  (..-)   :: v -> v -> v
-  (..-) v1 v2 = v1 ..+ negateV v2
-  (..*)   :: Scalar v -> v -> v
+  (.+)   :: v -> v -> v
+  (.-)   :: v -> v -> v
+  (.-) v1 v2 = v1 .+ negateV v2
+  (.*)   :: Scalar v -> v -> v
   zero    :: v
   negateV :: v -> v
-  negateV v = zero ..- v
+  negateV v = zero .- v
 
 instance VectorSpace Float where
   type Scalar Float = Float
-  (..+) = (+)
-  (..-) = (-)
-  (..*) = (*)
+  (.+) = (+)
+  (.-) = (-)
+  (.*) = (*)
   zero  = 0
   negateV = negate
 {-
 instance VectorSpace b => VectorSpace (a -> b) where
-  (..+) = liftA2 (..+)
-  (..-) = liftA2 (..-)
-  (..*) r = liftA ((..*) r)
+  (.+) = liftA2 (.+)
+  (.-) = liftA2 (.-)
+  (.*) r = liftA ((.*) r)
   zero = pure zero
 -}
 instance (Scalar a ~ Scalar b, VectorSpace a, VectorSpace b) => VectorSpace (a, b) where
   type Scalar (a, b) = Scalar a
-  (v1a, v1b) ..+ (v2a, v2b) = (v1a ..+ v2a, v1b ..+ v2b)
-  (v1a, v1b) ..- (v2a, v2b) = (v1a ..- v2a, v1b ..- v2b)
-  r ..* (v2a, v2b) = (r ..* v2a, r ..* v2b)
+  (v1a, v1b) .+ (v2a, v2b) = (v1a .+ v2a, v1b .+ v2b)
+  (v1a, v1b) .- (v2a, v2b) = (v1a .- v2a, v1b .- v2b)
+  r .* (v2a, v2b) = (r .* v2a, r .* v2b)
   zero = (zero, zero)
 
 f :: (Fractional s, VectorSpace a) => (DF s a, DF s a) -> DF s a
