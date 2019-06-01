@@ -54,8 +54,8 @@ f (x, y) =
       v = 2 * p * q + 3 * r
   in  v
 
-fhand :: Fractional a => a -> a -> (a, a)
-fhand x y =
+fhand :: Fractional a => (a, a) -> (a, a)
+fhand (x, y) =
   let dα_dv = 1
 
       p     = 7 * x
