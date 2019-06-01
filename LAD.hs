@@ -182,11 +182,32 @@ grad'
 grad' mapit1 mapit2 mait f t =
   (runDF 1 (mapit1 (const 0) t) . f . mapit2 wrap . mait) t
 
+jacobian'
+  :: ((float -> Float) -> ffloat -> ffloat')
+  -> (  ((Float, (Float -> Float) -> ffloat'' -> ffloat'') -> DF ffloat'')
+     -> ffloatselect
+     -> fdffloat
+     )
+  -> (  (DF ffloat' -> (Float, ffloat'))
+     -> g (DF ffloat')
+     -> g (Float, ffloat')
+     )
+  -> (ffloat -> ffloatselect)
+  -> (fdffloat -> g (DF ffloat'))
+  -> ffloat
+  -> g (Float, ffloat')
+jacobian' mapit1 mapit2 mapit3 mait f t =
+  (mapit3 (runDF 1 zeros) . f . mapit2 wrap . mait) t
+  where zeros = mapit1 (const 0) t
+
 adExample :: (Float, [Float])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
 
 adExample2 :: (Float, [Float])
 adExample2 = grad' fmap fmap modifyAllList (\[x, y] -> x ** y) [0, 2]
+
+adExample3 =
+  jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
