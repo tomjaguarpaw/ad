@@ -169,13 +169,16 @@ jacobian' mapit1 mapit2 mapit3 mait f t =
   where zeros = mapit1 (const 0) t
 
 -- The derived type signature is much more general
-diffF'
+diffF'G
   :: Num a
   => ((Forward a -> (a, a)) -> fForwarda -> faa)
   -> (Forward a -> fForwarda)
   -> a
   -> faa
-diffF' mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
+diffF'G mapit f a = mapit (\(D a a') -> (a, a')) (f (D a 1))
+
+diffF' :: (Num a, Functor f) => (Forward a -> f (Forward a)) -> a -> f (a, a)
+diffF' = diffF'G fmap
 
 adExample :: (Float, [Float])
 adExample = grad' fmap fmap modifyAllList (\[x, y, z] -> x * y + z) [1, 2, 3]
@@ -187,7 +190,7 @@ adExample3 =
   jacobian' fmap fmap fmap modifyAllList (\[x, y] -> [y, x, x * y]) [2, 1]
 
 adExample4 :: [(Float, Float)]
-adExample4 = diffF' fmap (\a -> [sin a, cos a]) 0
+adExample4 = diffF'G fmap (\a -> [sin a, cos a]) 0
 
 enumerate :: S.Seq a -> S.Seq (Int, a)
 enumerate = S.drop 1 . S.scanl (\(i, _) b -> (i + 1, b)) (-1, undefined)
