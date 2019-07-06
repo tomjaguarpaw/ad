@@ -4,8 +4,10 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Data.Kind                      ( Constraint )
 import           Data.Function                  ( on )
@@ -14,6 +16,7 @@ import           Data.Functor.Compose           ( Compose(Compose)
                                                 )
 import           Control.Arrow ((&&&))
 
+import Control.Applicative (liftA2)
 
 data SemigroupD a = SemigroupD {
   (.<>) :: a -> a -> a
@@ -133,19 +136,39 @@ data Foo a = Foo { foo1 :: Maybe a, foo2 :: [Int] }
 data Bar a = Bar1 (Maybe a)
            | Bar2 [Int]
 
+data Baz a = Baz { unBaz :: Maybe [a] }
+
 -- "Derived by compiler"
-deriveForFoo :: (Class f [Int], Class f (Maybe a), Preserves (,) f, Invariant f)
+deriveForFoo :: ( Class f [Int]
+                , Class f (Maybe a)
+                , Preserves (,) f
+                , Invariant (->) (->) f )
              => f (Foo a)
 deriveForFoo =
   mapInvariant (uncurry Foo) (foo1 &&& foo2) (preserve methods methods)
 
 -- "Derived by compiler"
-deriveForBar :: (Class f [Int], Class f (Maybe a), Preserves Either f, Invariant f)
+deriveForBar :: ( Class f [Int]
+                , Class f (Maybe a)
+                , Preserves Either f
+                , Invariant (->) (->) f)
              => f (Bar a)
 deriveForBar =
   mapInvariant
   (either Bar1 Bar2)
   (\case { Bar1 a -> Left a; Bar2 a -> Right a})
+  (preserve methods methods)
+
+deriveForBaz :: forall (f :: (* -> *) -> *).
+                ( Preserves Compose f
+                , Class f Maybe
+                , Class f []
+                , Invariant NatTrans (->) f)
+             => f Baz
+deriveForBaz =
+  mapInvariant
+  (NatTrans (Baz . getCompose))
+  (NatTrans (Compose . unBaz))
   (preserve methods methods)
 
 instance Class EqD a => Class EqD (Foo a) where
@@ -166,6 +189,12 @@ instance Class EqD a => Class EqD (Bar a) where
 instance Class OrdD a => Class OrdD (Bar a) where
   methods = deriveForBar
 
+instance Class FunctorD Baz where
+  methods = deriveForBaz
+
+instance Class ApplicativeD Baz where
+  methods = deriveForBaz
+
 -- { Library
 
 preserveClass :: (Preserves f d, Class d a, Class d b) => (d (f a b))
@@ -176,10 +205,10 @@ type family Subclasses (f :: k -> *) (a :: k) :: Constraint
 class Subclasses f a => Class (f :: k -> *) (a :: k) where
   methods :: f a
 
-class Invariant f where
-  mapInvariant :: (a -> b) -> (b -> a) -> f a -> f b
+class Invariant c c' f where
+  mapInvariant :: c a b -> c b a -> c' (f a) (f b)
 
-class Preserves p f where
+class Preserves (p :: k -> k -> k) (f :: k -> *) where
   preserve :: f a -> f b -> f (p a b)
 
 (.:) f g a b = f (g a b)
@@ -204,6 +233,24 @@ instance Class EqD a => Class EqD [a] where
                        (a':as, b':bs) -> (.==) methods a' b' && (.===) as bs
                    in (.===)
                }
+
+instance Class FunctorD [] where
+  methods = FunctorD { fmapD = fmap }
+
+instance Class ApplicativeD [] where
+  methods = ApplicativeD { pureD  = pure
+                         , (.<*>) = (<*>)
+                         , liftA2D = liftA2
+                         }
+
+instance Class FunctorD Maybe where
+  methods = FunctorD { fmapD = fmap }
+
+instance Class ApplicativeD Maybe where
+  methods = ApplicativeD { pureD   = pure
+                         , (.<*>)  = (<*>)
+                         , liftA2D = liftA2
+                         }
 
 instance Class OrdD a => Class OrdD [a] where
   methods = OrdD { (.<) = \a b -> case (a, b) of
@@ -249,24 +296,35 @@ instance Class SemigroupD a => Class SemigroupD (Maybe a) where
                           (Just a, Just b)   -> Just ((.<>) methods a b)
                           }
 
--- }
 
--- { Not used at the moment
+data NatTrans f g = NatTrans { runNatTrans :: forall a. f a -> g a }
 
-instance Invariant EqD where
+instance Invariant (->) (->) EqD where
   mapInvariant _ g e = EqD { (.==) = (.==) e `on` g }
 
-instance Invariant OrdD where
+instance Invariant (->) (->) OrdD where
   mapInvariant _ g e = OrdD { (.<) = (.<) e `on` g
                             , (..==) = (..==) e `on` g
                             }
 
-instance Invariant SemigroupD where
+instance Invariant (->) (->) SemigroupD where
   mapInvariant f g s =
     SemigroupD { (.<>) = f .: ((.<>) s `on` g) }
 
-instance Invariant MonoidD where
+instance Invariant (->) (->) MonoidD where
   mapInvariant f _ m = MonoidD { memptyD = f (memptyD m) }
 
--- }
+instance Invariant NatTrans (->) FunctorD where
+  mapInvariant g h f =
+    FunctorD { fmapD = \i -> runNatTrans g . fmapD f i . runNatTrans h }
 
+instance Invariant NatTrans (->) ApplicativeD where
+  mapInvariant g h f =
+    ApplicativeD { pureD  = runNatTrans g . pureD f
+                 , (.<*>) = \a b -> runNatTrans g ((.<*>) f (runNatTrans h a)
+                                                            (runNatTrans h b))
+                 , liftA2D = \i a b ->
+                     runNatTrans g (liftA2D f i (runNatTrans h a) (runNatTrans h b))
+                 }
+
+-- }
