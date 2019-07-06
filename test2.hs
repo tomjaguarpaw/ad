@@ -1,3 +1,4 @@
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
 {-# LANGUAGE PolyKinds #-}
@@ -55,31 +56,33 @@ type instance Subclasses FunctorD f = ()
 type instance Subclasses ApplicativeD f = Class FunctorD f
 
 instance Preserves Either EqD where
-  preserve e1 e2 = EqD { (.==) = \a b ->
-                           case (a, b) of
-                             (Left l1, Left l2) -> (.==) e1 l1 l2
-                             (Right r1, Right r2) -> (.==) e2 r1 r2
-                             (Left _, Right _) -> False
-                             (Right _, Left _) -> False
-                       }
+  preserve e1 e2 = EqD { (.==) = eitherPreserve (.==) e1 e2 }
 
 instance Preserves (,) EqD where
   preserve e1 e2 = EqD { (.==) = \(a1,a2) (b1,b2) ->
                            (.==) e1 a1 b1 && (.==) e2 a2 b2 }
 
+eitherPreserve :: Class f Int
+               => (forall z. f z -> z -> z -> t)
+               -> f a
+               -> f b
+               -> Either a b
+               -> Either a b
+               -> t
+eitherPreserve op e1 e2 a b =
+  case (a, b) of
+    (Left l1, Left l2) ->
+      op e1 l1 l2
+    (Right r1, Right r2) ->
+      op e2 r1 r2
+    (Left _, Right _) ->
+      op methods (1 :: Int) 2
+    (Right _, Left _) ->
+      op methods (2 :: Int) 1
+
 instance Preserves Either OrdD where
-  preserve e1 e2 = OrdD { (.<) = \a b ->
-                            case (a, b) of
-                              (Left l1, Left l2) -> (.<) e1 l1 l2
-                              (Right r1, Right r2) -> (.<) e2 r1 r2
-                              (Left _, Right _) -> True
-                              (Right _, Left _) -> False
-                        , (..==) = \a b ->
-                           case (a, b) of
-                             (Left l1, Left l2) -> (..==) e1 l1 l2
-                             (Right r1, Right r2) -> (..==) e2 r1 r2
-                             (Left _, Right _) -> False
-                             (Right _, Left _) -> False
+  preserve e1 e2 = OrdD { (.<)   = eitherPreserve (.<) e1 e2
+                        , (..==) = eitherPreserve (..==) e1 e2
                         }
 
 instance Preserves (,) OrdD where
