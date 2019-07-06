@@ -10,6 +10,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
 import           Data.Kind                      ( Constraint )
 import           Data.Function                  ( on )
@@ -24,6 +26,8 @@ import Data.Monoid (All(All), getAll)
 
 import Data.Functor.Product (Product(Pair))
 import Data.Functor.Sum (Sum(InL, InR))
+
+import Data.Semigroup (Semigroup, (<>))
 
 data SemigroupD a = SemigroupD {
   (.<>) :: a -> a -> a
@@ -278,19 +282,16 @@ class Preserves p f where
 -- { Standard library
 
 instance Class EqD Int where
-  methods = EqD { (.==) = (==) }
+  methods = fromOldClass
 
 instance Class OrdD Int where
-  methods = OrdD { compareD = compare
-                 , (.<)     = (<)
-                 , (..==)   = (.==) methods
-                 }
+  methods = fromOldClass
 
 instance Class EqD a => Class EqD [a] where
   methods = deriveListViaMaybe
 
 instance Class FunctorD (Const a) where
-  methods = FunctorD { fmapD = fmap }
+  methods = fromOldClass
 
 instance (Class FunctorD f, Class FunctorD g)
   => Class FunctorD (Sum f g) where
@@ -301,28 +302,22 @@ instance (Class FunctorD f, Class FunctorD g)
   methods = preserveClass
 
 instance Monoid a => Class ApplicativeD (Const a) where
-  methods = ApplicativeD { pureD = pure, (.<*>) = (<*>), liftA2D = liftA2 }
+  methods = fromOldClass
 
 instance Class ApplicativeD [] where
-  methods = ApplicativeD { pureD  = pure
-                         , (.<*>) = (<*>)
-                         , liftA2D = liftA2
-                         }
+  methods = fromOldClass
 
 instance Class FunctorD Identity where
-  methods = FunctorD { fmapD = fmap }
+  methods = fromOldClass
 
 instance Class FunctorD [] where
   methods = deriveListViaPair1
 
 instance Class FunctorD (Either e) where
-  methods = FunctorD { fmapD = fmap }
+  methods = fromOldClass
 
 instance Class ApplicativeD (Either e) where
-  methods = ApplicativeD { pureD   = pure
-                         , (.<*>)  = (<*>)
-                         , liftA2D = liftA2
-                         }
+  methods = fromOldClass
 
 instance Class FunctorD Maybe where
   methods = deriveMaybeViaEither1
@@ -331,13 +326,10 @@ instance Class ApplicativeD Maybe where
   methods = deriveMaybeViaEither1
 
 instance Class EqD () where
-  methods = EqD { (.==) = \() () -> True }
+  methods = fromOldClass
 
 instance Class OrdD () where
-  methods = OrdD { compareD = compare
-                 , (.<)     = (<)
-                 , (..==)   = (.==) methods
-                 }
+  methods = fromOldClass
 
 instance Class OrdD a => Class OrdD [a] where
   methods = deriveListViaMaybe
@@ -352,10 +344,10 @@ instance Class EqD a => Class EqD (Maybe a) where
   methods = deriveMaybeViaEither
 
 instance Class SemigroupD [a] where
-  methods = SemigroupD { (.<>) = (++) }
+  methods = fromOldClass
 
 instance Class MonoidD [a] where
-  methods = MonoidD { memptyD = [] }
+  methods = fromOldClass
 
 instance Class SemigroupD a => Class SemigroupD (Maybe a) where
   methods = SemigroupD { (.<>) = \a b -> case (a, b) of
@@ -436,3 +428,28 @@ deriveListViaPair1 =
                 (NatTrans (\case []     -> InL (Const ())
                                  (a:as) -> InR (Pair (Identity a) as)))
                 methods
+
+class FromOldClass c f | f -> c where
+  fromOldClass :: forall a. c a => f a
+
+instance FromOldClass Eq EqD where
+  fromOldClass = EqD { (.==) = (==) }
+
+instance FromOldClass Ord OrdD where
+  fromOldClass = OrdD {
+      compareD = compare
+    , (.<)     = (<)
+    , (..==)   = (==)
+    }
+
+instance FromOldClass Semigroup SemigroupD where
+  fromOldClass = SemigroupD { (.<>) = (<>) }
+
+instance FromOldClass Monoid MonoidD where
+  fromOldClass = MonoidD { memptyD = mempty }
+
+instance FromOldClass Functor FunctorD where
+  fromOldClass = FunctorD { fmapD = fmap }
+
+instance FromOldClass Applicative ApplicativeD where
+  fromOldClass = ApplicativeD { pureD = pure, (.<*>) = (<*>), liftA2D = liftA2 }
