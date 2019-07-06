@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -Wall #-}
+
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -211,6 +213,7 @@ class Invariant c c' f where
 class Preserves (p :: k -> k -> k) (f :: k -> *) where
   preserve :: f a -> f b -> f (p a b)
 
+(.:) :: (a -> b) -> (c1 -> c2 -> a) -> c1 -> c2 -> b
 (.:) f g a b = f (g a b)
 
 -- }
@@ -231,6 +234,8 @@ instance Class EqD a => Class EqD [a] where
                      case (a, b) of
                        ([],[]) -> True
                        (a':as, b':bs) -> (.==) methods a' b' && (.===) as bs
+                       (_:_, []) -> False
+                       ([], _:_) -> False
                    in (.===)
                }
 
@@ -268,7 +273,7 @@ instance Class OrdD a => Class OrdD (Maybe a) where
                        (Nothing,  Nothing) -> False
                        (Just _, Nothing)   -> False
                        (Nothing, Just _)   -> True
-                       (Just a, Just b)    -> (.<) methods a b
+                       (Just a', Just b')  -> (.<) methods a' b'
                  , (..==) = (.==) methods
                  }
 
@@ -280,6 +285,8 @@ instance Class EqD a => Class EqD (Maybe a) where
                      case (a, b) of
                        (Nothing, Nothing) -> True
                        (Just a', Just b') -> (.==) methods a' b'
+                       (Nothing, Just _)  -> False
+                       (Just _, Nothing)  -> False
                }
 
 instance Class SemigroupD [a] where
@@ -291,9 +298,9 @@ instance Class MonoidD [a] where
 instance Class SemigroupD a => Class SemigroupD (Maybe a) where
   methods = SemigroupD { (.<>) = \a b -> case (a, b) of
                           (Nothing, Nothing) -> Nothing
-                          (Nothing, Just b)  -> Just b
-                          (Just a, Nothing)  -> Just a
-                          (Just a, Just b)   -> Just ((.<>) methods a b)
+                          (Nothing, Just b') -> Just b'
+                          (Just a', Nothing) -> Just a'
+                          (Just a', Just b') -> Just ((.<>) methods a' b')
                           }
 
 
