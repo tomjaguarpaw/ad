@@ -7,11 +7,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
 import           Data.Kind                      ( Constraint )
 import           Data.Function                  ( on )
@@ -28,6 +30,9 @@ import Data.Functor.Product (Product(Pair))
 import Data.Functor.Sum (Sum(InL, InR))
 
 import Data.Semigroup (Semigroup, (<>))
+
+import qualified Data.Reflection as R
+import Data.Proxy (Proxy(Proxy))
 
 -- { Classes
 
@@ -473,5 +478,40 @@ instance FromOldClass Functor FunctorD where
 
 instance FromOldClass Applicative ApplicativeD where
   fromOldClass = ApplicativeD { pureD = pure, (.<*>) = (<*>), liftA2D = liftA2 }
+
+-- }
+
+-- { Reflection
+
+newtype Reflected f a s = Reflected { unReflect :: a }
+
+unreflected :: Reflected f a s -> proxy s -> a
+unreflected (Reflected a) _ = a
+
+instance ( Subclasses f (Reflected f a s)
+         , Invariant (->) (->) f
+         , R.Reifies s (f a) )
+        => Class f (Reflected f a s) where
+  methods = reflectedMethods
+
+reify :: f a
+      -> (forall (s :: *). R.Reifies s (f a) => t -> Reflected f a s)
+      -> t
+      -> a
+reify d m xs = R.reify d (unreflected (m xs))
+
+reflectedMethods :: (Invariant (->) (->) f, R.Reifies s (f a))
+                 => f (Reflected t a s)
+reflectedMethods = getCompose (reflectResult (Compose . mapReflected))
+
+mapReflected :: Invariant (->) (->) g => g a -> g (Reflected f a s)
+mapReflected = mapInvariant Reflected unReflect
+
+reflectResult :: forall f s a. R.Reifies s a => (a -> f s) -> f s
+reflectResult f = f (R.reflect (Proxy :: Proxy s))
+
+instance (R.Reifies s (SemigroupD a), Class SemigroupD a)
+      => Semigroup (Reflected SemigroupD a s) where
+  (<>)  = (.<>) methods
 
 -- }
