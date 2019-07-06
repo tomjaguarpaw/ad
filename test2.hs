@@ -29,18 +29,24 @@ import Data.Functor.Sum (Sum(InL, InR))
 
 import Data.Semigroup (Semigroup, (<>))
 
+-- { Classes
+
+type instance Subclasses SemigroupD a = ()
 data SemigroupD a = SemigroupD {
   (.<>) :: a -> a -> a
   }
 
+type instance Subclasses MonoidD a = Class SemigroupD a
 data MonoidD a = MonoidD {
     memptyD  :: a
   }
 
+type instance Subclasses EqD a = ()
 data EqD a = EqD {
   (.==) :: a -> a -> Bool
   }
 
+type instance Subclasses OrdD a = Class EqD a
 data OrdD a = OrdD {
     compareD :: a -> a -> Ordering
   , (.<)  :: a -> a -> Bool
@@ -49,22 +55,217 @@ data OrdD a = OrdD {
   , (..==) :: a -> a -> Bool
   }
 
+type instance Subclasses FunctorD f = ()
 data FunctorD f = FunctorD {
   fmapD :: forall a b. (a -> b) -> f a -> f b
   }
 
+type instance Subclasses ApplicativeD f = Class FunctorD f
 data ApplicativeD f = ApplicativeD {
     pureD   :: forall a. a -> f a
   , (.<*>)  :: forall a b. f (a -> b) -> f a -> f b
   , liftA2D :: forall a b c. (a -> b -> c) -> f a -> f b -> f c
   }
 
-type instance Subclasses SemigroupD a = ()
-type instance Subclasses MonoidD a = Class SemigroupD a
-type instance Subclasses EqD a = ()
-type instance Subclasses OrdD a = Class EqD a
-type instance Subclasses FunctorD f = ()
-type instance Subclasses ApplicativeD f = Class FunctorD f
+-- }
+
+-- { User-defined data types
+
+data Foo a = Foo { foo1 :: Maybe a, foo2 :: [Int] }
+
+data Bar a = Bar1 (Maybe a)
+           | Bar2 [Int]
+
+data Baz a = Baz { unBaz :: Maybe [a] }
+
+-- "Derived by compiler"
+deriveForFoo :: ( Class f [Int]
+                , Class f (Maybe a)
+                , Preserves (,) f
+                , Invariant (->) (->) f )
+             => f (Foo a)
+deriveForFoo =
+  mapInvariant (uncurry Foo) (foo1 &&& foo2) (preserve methods methods)
+
+-- "Derived by compiler"
+deriveForBar :: ( Class f [Int]
+                , Class f (Maybe a)
+                , Preserves Either f
+                , Invariant (->) (->) f)
+             => f (Bar a)
+deriveForBar =
+  mapInvariant
+  (either Bar1 Bar2)
+  (\case { Bar1 a -> Left a; Bar2 a -> Right a})
+  (preserve methods methods)
+
+-- "Derived by compiler"
+deriveForBaz :: forall (f :: (* -> *) -> *).
+                ( Preserves Compose f
+                , Class f Maybe
+                , Class f []
+                , Invariant NatTrans (->) f)
+             => f Baz
+deriveForBaz =
+  mapInvariant
+  (NatTrans (Baz . getCompose))
+  (NatTrans (Compose . unBaz))
+  (preserve methods methods)
+
+instance Class EqD a => Class EqD (Foo a) where
+  methods = deriveForFoo
+
+instance Class OrdD a => Class OrdD (Foo a) where
+  methods = deriveForFoo
+
+instance Class SemigroupD a => Class SemigroupD (Foo a) where
+  methods = deriveForFoo
+
+instance Class MonoidD a => Class MonoidD (Foo a) where
+  methods = deriveForFoo
+
+instance Class EqD a => Class EqD (Bar a) where
+  methods = deriveForBar
+
+instance Class OrdD a => Class OrdD (Bar a) where
+  methods = deriveForBar
+
+instance Class FunctorD Baz where
+  methods = deriveForBaz
+
+instance Class ApplicativeD Baz where
+  methods = deriveForBaz
+
+-- }
+
+-- { Library
+
+preserveClass :: (Preserves f d, Class d a, Class d b) => d (f a b)
+preserveClass = preserve methods methods
+
+type family Subclasses (f :: k -> *) (a :: k) :: Constraint
+
+class Subclasses f a => Class (f :: k -> *) (a :: k) where
+  methods :: f a
+
+class Invariant c c' f where
+  mapInvariant :: c a b -> c b a -> c' (f a) (f b)
+
+class Preserves p f where
+  preserve :: f a -> f b -> f (p a b)
+
+(.:) :: (a -> b) -> (c1 -> c2 -> a) -> c1 -> c2 -> b
+(.:) f g a b = f (g a b)
+
+-- }
+
+-- { Standard library instances
+
+instance (Class EqD a, Class EqD b) => Class EqD (Either a b) where
+  methods = preserveClass
+
+instance (Class EqD a, Class EqD b) => Class EqD (a, b) where
+  methods = preserveClass
+
+instance (Class SemigroupD a, Class SemigroupD b) => Class SemigroupD (a, b) where
+  methods = preserveClass
+
+instance (Class MonoidD a, Class MonoidD b) => Class MonoidD (a, b) where
+  methods = preserveClass
+
+instance (Class FunctorD f, Class FunctorD g)
+  => Class FunctorD (Compose f g) where
+  methods = preserveClass
+
+instance (Class ApplicativeD f, Class ApplicativeD g)
+  => Class ApplicativeD (Compose f g) where
+  methods = preserveClass
+
+instance (Class OrdD a, Class OrdD b) => Class OrdD (a, b) where
+  methods = preserveClass
+
+instance (Class OrdD a, Class OrdD b) => Class OrdD (Either a b) where
+  methods = preserveClass
+
+instance Class EqD Int where
+  methods = fromOldClass
+
+instance Class OrdD Int where
+  methods = fromOldClass
+
+instance Class EqD a => Class EqD [a] where
+  methods = deriveListViaMaybe
+
+instance Class FunctorD (Const a) where
+  methods = fromOldClass
+
+instance (Class FunctorD f, Class FunctorD g)
+  => Class FunctorD (Sum f g) where
+  methods = preserveClass
+
+instance (Class FunctorD f, Class FunctorD g)
+  => Class FunctorD (Product f g) where
+  methods = preserveClass
+
+instance Monoid a => Class ApplicativeD (Const a) where
+  methods = fromOldClass
+
+instance Class ApplicativeD [] where
+  methods = fromOldClass
+
+instance Class FunctorD Identity where
+  methods = fromOldClass
+
+instance Class FunctorD [] where
+  methods = deriveListViaPair1
+
+instance Class FunctorD (Either e) where
+  methods = fromOldClass
+
+instance Class ApplicativeD (Either e) where
+  methods = fromOldClass
+
+instance Class FunctorD Maybe where
+  methods = deriveMaybeViaEither1
+
+instance Class ApplicativeD Maybe where
+  methods = deriveMaybeViaEither1
+
+instance Class EqD () where
+  methods = fromOldClass
+
+instance Class OrdD () where
+  methods = fromOldClass
+
+instance Class OrdD a => Class OrdD [a] where
+  methods = deriveListViaMaybe
+
+instance Class OrdD a => Class OrdD (Maybe a) where
+  methods = deriveMaybeViaEither
+
+instance Class EqD a => Class EqD (Maybe a) where
+  methods = deriveMaybeViaEither
+
+instance Class SemigroupD [a] where
+  methods = fromOldClass
+
+instance Class MonoidD [a] where
+  methods = fromOldClass
+
+instance Class SemigroupD a => Class MonoidD (Maybe a) where
+  methods = MonoidD { memptyD = Nothing }
+
+instance Class SemigroupD a => Class SemigroupD (Maybe a) where
+  methods = SemigroupD { (.<>) = \a b -> case (a, b) of
+                          (Nothing, Nothing) -> Nothing
+                          (Nothing, Just b') -> Just b'
+                          (Just a', Nothing) -> Just a'
+                          (Just a', Just b') -> Just ((.<>) methods a' b')
+                          }
+
+-- }
+
+-- { Preservations
 
 eitherPreserve :: Class f Int
                => (forall z. f z -> z -> z -> t)
@@ -167,196 +368,9 @@ instance Preserves (,) EqD where
             e2
     }
 
-instance (Class EqD a, Class EqD b) => Class EqD (Either a b) where
-  methods = preserveClass
-
-instance (Class EqD a, Class EqD b) => Class EqD (a, b) where
-  methods = preserveClass
-
-instance (Class SemigroupD a, Class SemigroupD b) => Class SemigroupD (a, b) where
-  methods = preserveClass
-
-instance (Class MonoidD a, Class MonoidD b) => Class MonoidD (a, b) where
-  methods = preserveClass
-
-instance (Class FunctorD f, Class FunctorD g)
-  => Class FunctorD (Compose f g) where
-  methods = preserveClass
-
-instance (Class ApplicativeD f, Class ApplicativeD g)
-  => Class ApplicativeD (Compose f g) where
-  methods = preserveClass
-
-instance (Class OrdD a, Class OrdD b) => Class OrdD (a, b) where
-  methods = preserveClass
-
-instance (Class OrdD a, Class OrdD b) => Class OrdD (Either a b) where
-  methods = preserveClass
-
-data Foo a = Foo { foo1 :: Maybe a, foo2 :: [Int] }
-
-data Bar a = Bar1 (Maybe a)
-           | Bar2 [Int]
-
-data Baz a = Baz { unBaz :: Maybe [a] }
-
--- "Derived by compiler"
-deriveForFoo :: ( Class f [Int]
-                , Class f (Maybe a)
-                , Preserves (,) f
-                , Invariant (->) (->) f )
-             => f (Foo a)
-deriveForFoo =
-  mapInvariant (uncurry Foo) (foo1 &&& foo2) (preserve methods methods)
-
--- "Derived by compiler"
-deriveForBar :: ( Class f [Int]
-                , Class f (Maybe a)
-                , Preserves Either f
-                , Invariant (->) (->) f)
-             => f (Bar a)
-deriveForBar =
-  mapInvariant
-  (either Bar1 Bar2)
-  (\case { Bar1 a -> Left a; Bar2 a -> Right a})
-  (preserve methods methods)
-
--- "Derived by compiler"
-deriveForBaz :: forall (f :: (* -> *) -> *).
-                ( Preserves Compose f
-                , Class f Maybe
-                , Class f []
-                , Invariant NatTrans (->) f)
-             => f Baz
-deriveForBaz =
-  mapInvariant
-  (NatTrans (Baz . getCompose))
-  (NatTrans (Compose . unBaz))
-  (preserve methods methods)
-
-instance Class EqD a => Class EqD (Foo a) where
-  methods = deriveForFoo
-
-instance Class OrdD a => Class OrdD (Foo a) where
-  methods = deriveForFoo
-
-instance Class SemigroupD a => Class SemigroupD (Foo a) where
-  methods = deriveForFoo
-
-instance Class MonoidD a => Class MonoidD (Foo a) where
-  methods = deriveForFoo
-
-instance Class EqD a => Class EqD (Bar a) where
-  methods = deriveForBar
-
-instance Class OrdD a => Class OrdD (Bar a) where
-  methods = deriveForBar
-
-instance Class FunctorD Baz where
-  methods = deriveForBaz
-
-instance Class ApplicativeD Baz where
-  methods = deriveForBaz
-
--- { Library
-
-preserveClass :: (Preserves f d, Class d a, Class d b) => d (f a b)
-preserveClass = preserve methods methods
-
-type family Subclasses (f :: k -> *) (a :: k) :: Constraint
-
-class Subclasses f a => Class (f :: k -> *) (a :: k) where
-  methods :: f a
-
-class Invariant c c' f where
-  mapInvariant :: c a b -> c b a -> c' (f a) (f b)
-
-class Preserves p f where
-  preserve :: f a -> f b -> f (p a b)
-
-(.:) :: (a -> b) -> (c1 -> c2 -> a) -> c1 -> c2 -> b
-(.:) f g a b = f (g a b)
-
 -- }
 
--- { Standard library
-
-instance Class EqD Int where
-  methods = fromOldClass
-
-instance Class OrdD Int where
-  methods = fromOldClass
-
-instance Class EqD a => Class EqD [a] where
-  methods = deriveListViaMaybe
-
-instance Class FunctorD (Const a) where
-  methods = fromOldClass
-
-instance (Class FunctorD f, Class FunctorD g)
-  => Class FunctorD (Sum f g) where
-  methods = preserveClass
-
-instance (Class FunctorD f, Class FunctorD g)
-  => Class FunctorD (Product f g) where
-  methods = preserveClass
-
-instance Monoid a => Class ApplicativeD (Const a) where
-  methods = fromOldClass
-
-instance Class ApplicativeD [] where
-  methods = fromOldClass
-
-instance Class FunctorD Identity where
-  methods = fromOldClass
-
-instance Class FunctorD [] where
-  methods = deriveListViaPair1
-
-instance Class FunctorD (Either e) where
-  methods = fromOldClass
-
-instance Class ApplicativeD (Either e) where
-  methods = fromOldClass
-
-instance Class FunctorD Maybe where
-  methods = deriveMaybeViaEither1
-
-instance Class ApplicativeD Maybe where
-  methods = deriveMaybeViaEither1
-
-instance Class EqD () where
-  methods = fromOldClass
-
-instance Class OrdD () where
-  methods = fromOldClass
-
-instance Class OrdD a => Class OrdD [a] where
-  methods = deriveListViaMaybe
-
-instance Class OrdD a => Class OrdD (Maybe a) where
-  methods = deriveMaybeViaEither
-
-instance Class SemigroupD a => Class MonoidD (Maybe a) where
-  methods = MonoidD { memptyD = Nothing }
-
-instance Class EqD a => Class EqD (Maybe a) where
-  methods = deriveMaybeViaEither
-
-instance Class SemigroupD [a] where
-  methods = fromOldClass
-
-instance Class MonoidD [a] where
-  methods = fromOldClass
-
-instance Class SemigroupD a => Class SemigroupD (Maybe a) where
-  methods = SemigroupD { (.<>) = \a b -> case (a, b) of
-                          (Nothing, Nothing) -> Nothing
-                          (Nothing, Just b') -> Just b'
-                          (Just a', Nothing) -> Just a'
-                          (Just a', Just b') -> Just ((.<>) methods a' b')
-                          }
-
+-- { Invariances
 
 data NatTrans f g = NatTrans { runNatTrans :: forall a. f a -> g a }
 
@@ -390,6 +404,8 @@ instance Invariant NatTrans (->) ApplicativeD where
                  }
 
 -- }
+
+-- { Deriving strategies
 
 deriveListViaMaybe :: (Invariant (->) (->) f, Class f (Maybe (a, [a])))
                    => f [a]
@@ -429,6 +445,10 @@ deriveListViaPair1 =
                                  (a:as) -> InR (Pair (Identity a) as)))
                 methods
 
+-- }
+
+-- { FromOldClass
+
 class FromOldClass c f | f -> c where
   fromOldClass :: forall a. c a => f a
 
@@ -453,3 +473,5 @@ instance FromOldClass Functor FunctorD where
 
 instance FromOldClass Applicative ApplicativeD where
   fromOldClass = ApplicativeD { pureD = pure, (.<*>) = (<*>), liftA2D = liftA2 }
+
+-- }
