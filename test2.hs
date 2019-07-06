@@ -16,8 +16,10 @@ import           Data.Functor.Compose           ( Compose(Compose)
                                                 , getCompose
                                                 )
 import           Control.Arrow ((&&&))
+import Control.Monad.Identity (Identity(Identity), runIdentity)
 
-import Control.Applicative (liftA2)
+import Control.Applicative (liftA2, Const(Const), getConst)
+import Data.Monoid (All(All), getAll)
 
 data SemigroupD a = SemigroupD {
   (.<>) :: a -> a -> a
@@ -32,7 +34,8 @@ data EqD a = EqD {
   }
 
 data OrdD a = OrdD {
-    (.<)  :: a -> a -> Bool
+    compareD :: a -> a -> Ordering
+  , (.<)  :: a -> a -> Bool
   --- vv bit of a wart that we have to have this.  We need it to
   --- implement Preserves.
   , (..==) :: a -> a -> Bool
@@ -59,8 +62,13 @@ instance Preserves Either EqD where
   preserve e1 e2 = EqD { (.==) = eitherPreserve (.==) e1 e2 }
 
 instance Preserves (,) EqD where
-  preserve e1 e2 = EqD { (.==) = \(a1,a2) (b1,b2) ->
-                           (.==) e1 a1 b1 && (.==) e2 a2 b2 }
+  preserve e1 e2 = EqD {
+    (.==) = productPreserve
+            ((.==) `using` (Const . All))
+            (getAll . getConst)
+            e1
+            e2
+    }
 
 eitherPreserve :: Class f Int
                => (forall z. f z -> z -> z -> t)
@@ -80,22 +88,48 @@ eitherPreserve op e1 e2 a b =
     (Right _, Left _) ->
       op methods (2 :: Int) 1
 
+productPreserve :: Applicative g
+                => (forall z. f z -> z -> z -> g z)
+                -> (g (a, b) -> r)
+                -> f a
+                -> f b
+                -> (a, b)
+                -> (a, b)
+                -> r
+productPreserve op r e1 e2 (a1, b1) (a2, b2) =
+  r ((,) <$> op e1 a1 a2 <*> op e2 b1 b2)
+
+using :: (t2 -> t3 -> t4 -> t)
+      -> (t -> t1) -> t2 -> t3 -> t4 -> t1
+(op `using` g) d a b = g (op d a b)
+
 instance Preserves Either OrdD where
-  preserve e1 e2 = OrdD { (.<)   = eitherPreserve (.<) e1 e2
-                        , (..==) = eitherPreserve (..==) e1 e2
+  preserve e1 e2 = OrdD { compareD = eitherPreserve compareD e1 e2
+                        , (.<)     = eitherPreserve (.<) e1 e2
+                        , (..==)   = eitherPreserve (..==) e1 e2
                         }
 
 instance Preserves (,) OrdD where
-  preserve e1 e2 = OrdD { (.<) = \(a1,a2) (b1,b2) ->
-                            (.<) e1 a1 b1
-                            || ((..==) e1 a1 b1 && (.<) e2 a2 b2)
-                        , (..==) = \(a1,a2) (b1,b2) ->
-                           (..==) e1 a1 b1 && (..==) e2 a2 b2
-                        }
+  preserve e1 e2 = OrdD {
+      compareD = productPreserve
+                 (compareD `using` Const)
+                 getConst
+                 e1
+                 e2
+    , (.<) = \(a1,a2) (b1,b2) ->
+               (.<) e1 a1 b1
+               || ((..==) e1 a1 b1 && (.<) e2 a2 b2)
+    , (..==) = productPreserve
+               ((..==) `using` (Const . All))
+               (getAll . getConst)
+               e1
+               e2
+    }
 
 instance Preserves (,) SemigroupD where
-  preserve m1 m2 = SemigroupD { (.<>) = \(a1,a2) (b1,b2) ->
-                                  ((.<>) m1 a1 b1, (.<>) m2 a2 b2) }
+  preserve m1 m2 = SemigroupD {
+    (.<>) = productPreserve ((.<>) `using` Identity) runIdentity m1 m2
+ }
 
 instance Preserves (,) MonoidD where
   preserve s1 s2 = MonoidD { memptyD = (memptyD s1, memptyD s2) }
