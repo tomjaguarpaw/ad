@@ -5,6 +5,7 @@
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE LambdaCase #-}
 
 import           Data.Kind                      ( Constraint )
 import           Data.Function                  ( on )
@@ -127,24 +128,43 @@ instance (Class ApplicativeD f, Class ApplicativeD g)
   => Class ApplicativeD (Compose f g) where
   methods = preserveClass
 
-data Foo a = Foo { foo :: Maybe a, bar :: [Int] }
+data Foo a = Foo { foo1 :: Maybe a, foo2 :: [Int] }
+
+data Bar a = Bar1 (Maybe a)
+           | Bar2 [Int]
 
 -- "Derived by compiler"
 deriveForFoo :: (Class f [Int], Class f (Maybe a), Preserves (,) f, Invariant f)
              => f (Foo a)
-deriveForFoo = mapInvariant (uncurry Foo) (foo &&& bar) (preserve methods methods)
+deriveForFoo =
+  mapInvariant (uncurry Foo) (foo1 &&& foo2) (preserve methods methods)
+
+-- "Derived by compiler"
+deriveForBar :: (Class f [Int], Class f (Maybe a), Preserves Either f, Invariant f)
+             => f (Bar a)
+deriveForBar =
+  mapInvariant
+  (either Bar1 Bar2)
+  (\case { Bar1 a -> Left a; Bar2 a -> Right a})
+  (preserve methods methods)
 
 instance Class EqD a => Class EqD (Foo a) where
   methods = deriveForFoo
 
-instance Class SemigroupD a => Class MonoidD (Maybe a) where
-  methods = MonoidD { memptyD = Nothing }
+instance Class OrdD a => Class OrdD (Foo a) where
+  methods = deriveForFoo
 
 instance Class SemigroupD a => Class SemigroupD (Foo a) where
   methods = deriveForFoo
 
 instance Class MonoidD a => Class MonoidD (Foo a) where
   methods = deriveForFoo
+
+instance Class EqD a => Class EqD (Bar a) where
+  methods = deriveForBar
+
+instance Class OrdD a => Class OrdD (Bar a) where
+  methods = deriveForBar
 
 -- { Library
 
@@ -171,6 +191,11 @@ class Preserves p f where
 instance Class EqD Int where
   methods = EqD { (.==) = (==) }
 
+instance Class OrdD Int where
+  methods = OrdD { (.<)   = (<)
+                 , (..==) = (.==) methods
+                 }
+
 instance Class EqD a => Class EqD [a] where
   methods = EqD { (.==) = let
                    (.===) = \a b ->
@@ -179,6 +204,29 @@ instance Class EqD a => Class EqD [a] where
                        (a':as, b':bs) -> (.==) methods a' b' && (.===) as bs
                    in (.===)
                }
+
+instance Class OrdD a => Class OrdD [a] where
+  methods = OrdD { (.<) = \a b -> case (a, b) of
+                     ([],  []) -> False
+                     (_:_, []) -> False
+                     ([], _:_) -> True
+                     (a':as, b':bs) -> (.<) methods a' b'
+                                       || ((..==) methods a' b'
+                                          && (.<) methods as bs)
+                 , (..==) = (.==) methods
+                 }
+
+instance Class OrdD a => Class OrdD (Maybe a) where
+  methods = OrdD { (.<) = \a b -> case (a, b) of
+                       (Nothing,  Nothing) -> False
+                       (Just _, Nothing)   -> False
+                       (Nothing, Just _)   -> True
+                       (Just a, Just b)    -> (.<) methods a b
+                 , (..==) = (.==) methods
+                 }
+
+instance Class SemigroupD a => Class MonoidD (Maybe a) where
+  methods = MonoidD { memptyD = Nothing }
 
 instance Class EqD a => Class EqD (Maybe a) where
   methods = EqD { (.==) = \a b ->
