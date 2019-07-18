@@ -1,9 +1,12 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
 
 module GMM where
 
 import Runtime as R
 import Data.Vector as V
+import Data.Traversable
 
 logsumexp :: (Ord a, Floating a) => Vector a -> a
 logsumexp a =
@@ -66,7 +69,7 @@ log_wishart_prior p wishart_gamma wishart_m qs ls =
     in out - (fromIntegral kk)*cc
 
 -- GMM with prior
-gmm_with_prior x alphas means qs ls wishart_gamma wishart_m =
+gmm_with_prior x alphas means qs ls wishart_m wishart_gamma =
     gmm_objective x alphas means qs ls + 
     log_wishart_prior (size (x ! 0)) wishart_gamma wishart_m qs ls
 
@@ -78,3 +81,36 @@ let gmm_sample (rng: RNG) (alphas:Vec) (means:Vec[]) (qs:Vec[]) (ls:Vec[]) =
     let InvSqrtSigma = makeQ qs.[k] ls.[k]
     invSqrtGaussian_sample rng Q means.[k]   
 -}
+
+data Args a = Args (Mat a) (Vec a) (Mat a) (Mat a) (Mat a) a
+  deriving (Functor, Foldable, Show)
+
+instance Traversable Args where
+  traverse f (Args a1 a2 a3 a4 a5 aa) =
+    Args <$> (traverse . traverse) f a1
+         <*> traverse f a2
+         <*> (traverse . traverse) f a3
+         <*> (traverse . traverse) f a4
+         <*> (traverse . traverse) f a5
+         <*> f aa
+
+example :: (Floating a, Ord a)
+        => (Args a -> a, Args a)
+example =
+  let d = 10
+      n = 500
+      k = 10
+      unity = 1
+      small = 0.1
+
+      x = build n (\_ -> build d (\_ -> unity))
+      alphas = build k (\_ -> unity)
+      mus = build k (\_ -> build d (\_ -> unity))
+      qs = build k (\_ -> build d (\_ -> small))
+      ls = build k (\_ -> build (tri d) (\_ -> unity))
+      wishart_gamma = 3.1
+      wishart_m = 7
+
+  in (\(Args a1 a2 a3 a4 a5 aa) ->
+        gmm_with_prior a1 a2 a3 a4 a5 wishart_m aa,
+       Args x alphas mus qs ls wishart_gamma)
