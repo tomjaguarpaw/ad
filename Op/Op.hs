@@ -8,8 +8,15 @@
 import Control.Category
 import Prelude hiding (id, (.), (>>))
 
+class T arr s p tv | arr -> s p tv where
+  tsPush :: tv (s a b) `arr` s (tv a) (tv b)
+  tsPull :: s (tv a) (tv b) `arr` tv (s a b)
+
+  tpPush :: tv (p a b) `arr` p (tv a) (tv b)
+  tpPull :: p (tv a) (tv b) `arr` tv (p a b)
+
 class Category arr
-  => O arr m _1 v s p t tv | arr -> m v s p _1 t tv
+  => O arr tarr m _1 v s p t tv | arr -> tarr m v s p _1 t tv
   where
   assocR :: m (m a b) c
             `arr` m a (m b c)
@@ -61,19 +68,19 @@ class Category arr
 
   add :: (t a `m` t a) `arr` t a
 
-foo :: O arr m _1 v s p t tv
+foo :: O arr tarr m _1 v s p t tv
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
     -> arr ((a1 `m` b1) `m` c1) ((a2 `m` b2) `m` c2)
 foo l m r = assocR >>> ((l >>> m) |><| r) >>> assocL
 
-data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t
+data R arr tarr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t
        (tv :: * -> *) a b =
   forall r. R (a `arr` (r `m` b)) ((r `m` t b) `arr` t a)
 
-instance O arr m _1 v s p t tv
-  => Category (R arr m _1 v s p t tv) where
+instance O arr tarr m _1 v s p t tv
+  => Category (R arr tarr m _1 v s p t tv) where
   id = R (id >>> unitI) (unitE >>> id)
 
   f . g = case f of
@@ -81,7 +88,7 @@ instance O arr m _1 v s p t tv
       R g1 g2 -> R (assocL <<< (id |><| f1) <<< g1)
                    (assocR >>> (id |><| f2) >>> g2)
 
-instance O arr m _1 v s p t tv => O (R arr m _1 v s p t tv) m _1 v s p t tv where
+instance O arr tarr m _1 v s p t tv => O (R arr tarr m _1 v s p t tv) tarr m _1 v s p t tv where
   assocR = R (assocR >>> unitI)
              (unitE
               >>> tangentMu
