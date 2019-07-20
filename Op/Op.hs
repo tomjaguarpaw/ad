@@ -9,9 +9,7 @@ import Control.Category
 import Prelude hiding (id, (.), (>>))
 
 class Category arr
-  => O arr m _1 v s p t tv |
-  arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1,
-  arr -> t, arr -> tv
+  => O arr m _1 v s p t tv | arr -> m v s p _1 t tv
   where
   assocR :: m (m a b) c
             `arr` m a (m b c)
