@@ -23,6 +23,9 @@ class Category arr
   tJoin :: t (t a) `arr` t a
   tDup  :: t a `arr` t (t a)
 
+  tUnitE :: t _1 `arr` _1
+  tUnitI :: _1 `arr` t _1
+
   unitI :: a `arr` (_1 `m` a)
 
   unitE :: (_1 `m` a) `arr` a
@@ -102,3 +105,21 @@ instance O arr m _1 v s p t => O (R arr m _1 v s p t) m _1 v s p t where
                  >>> tangentMu
                  >>> (tDup |><| tDup)
                  >>> tangentMw)
+
+  tJoin = R (tJoin >>> unitI)
+            (unitE >>> tDup)
+
+  tDup = R (tDup >>> unitI)
+           (unitE >>> tJoin)
+
+  unitI = R (unitI >>> unitI)
+            (unitE >>> tangentMu >>> (tUnitE |><| id) >>> unitE)
+
+  unitE = R (unitE >>> unitI)
+            (unitE >>> (tangentMw <<< (tUnitI |><| id) <<< unitI))
+
+  tUnitE = R (tUnitE >>> unitI)
+             (unitE >>> tDup) -- Not wholly convinced by this
+
+  tUnitI = R (tUnitI >>> unitI)
+             (unitE >>> tJoin) -- Not wholly convinced by this
