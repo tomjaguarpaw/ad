@@ -20,6 +20,9 @@ class Category arr
   tangentMu :: t (a `m` b) `arr` (t a `m` t b)
   tangentMw :: (t a `m` t b) `arr` t (a `m` b)
 
+  tJoin :: t (t a) `arr` t a
+  tDup  :: t a `arr` t (t a)
+
   unitI :: a `arr` (_1 `m` a)
 
   unitE :: (_1 `m` a) `arr` a
@@ -85,5 +88,17 @@ instance O arr m _1 v s p t => O (R arr m _1 v s p t) m _1 v s p t where
               >>> assocR
               >>> (id |><| tangentMw)
               >>> tangentMw)
+
   tangentMu = R (tangentMu >>> unitI)
-                undefined
+                (unitE
+                 >>> tangentMu
+                 >>> (tJoin |><| tJoin)
+                 >>> tangentMw
+                 >>> tDup)
+
+  tangentMw = R (tangentMw >>> unitI)
+                (unitE
+                 >>> tJoin
+                 >>> tangentMu
+                 >>> (tDup |><| tDup)
+                 >>> tangentMw)
