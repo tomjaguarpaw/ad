@@ -6,22 +6,23 @@
 {-# LANGUAGE TypeFamilies #-}
 
 import Control.Category
-import Data.Profunctor
 import Prelude hiding (id, (.))
 
-class (Profunctor arr, Category arr)
-  => O arr m _1 v s p | arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1 where
-  type T arr :: * -> *
-
+class Category arr
+  => O arr m _1 v s p t | arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1,
+                          arr -> t where
   assocR :: m (m a b) c
             `arr` m a (m b c)
 
   assocL :: m a (m b c)
             `arr` m (m a b) c
 
-  unitI :: a `arr` (a `m` _1)
+  tangentMu :: t (a `m` b) `arr` (t a `m` t b)
+  tangentMw :: (t a `m` t b) `arr` t (a `m` b)
 
-  unitE :: (a `m` _1) `arr` a
+  unitI :: a `arr` (_1 `m` a)
+
+  unitE :: (_1 `m` a) `arr` a
 
   comm :: m a b `arr` m b a
 
@@ -47,28 +48,42 @@ class (Profunctor arr, Category arr)
 
   dup :: a `arr` (a `m` a)
 
-  add :: (T arr a `m` T arr a) `arr` T arr a
+  add :: (t a `m` t a) `arr` t a
 
-foo :: O arr m _1 v s p
+foo :: O arr m _1 v s p t
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
     -> arr ((a1 `m` b1) `m` c1) ((a2 `m` b2) `m` c2)
 foo l m r = assocR >>> ((l >>> m) |><| r) >>> assocL
 
-data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) a b =
-  forall r. R (a `arr` (r `m` b)) ((r `m` T arr b) `arr` T arr a)
+data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t a b =
+  forall r. R (a `arr` (r `m` b)) ((r `m` t b) `arr` t a)
 
-instance (O arr m _1 v s p, Category arr)
-  => Category (R arr m _1 v s p) where
-  id = R (id >>> unitI >>> comm) (comm >>> unitE >>> id)
+instance O arr m _1 v s p t
+  => Category (R arr m _1 v s p t) where
+  id = R (id >>> unitI) (unitE >>> id)
 
   f . g = case f of
     R f1 f2 -> case g of
       R g1 g2 -> R (assocL <<< (id |><| f1) <<< g1)
                    (assocR >>> (id |><| f2) >>> g2)
 
+instance O arr m _1 v s p t => O (R arr m _1 v s p t) m _1 v s p t where
+  assocR = R (assocR >>> unitI)
+             (unitE
+              >>> tangentMu
+              >>> (id |><| tangentMu)
+              >>> assocL
+              >>> (tangentMw |><| id)
+              >>> tangentMw)
 
-{-
-instance O arr m v s p => O (R arr m v s p) m v s p where
--}
+  assocL = R (assocL >>> unitI)
+             (unitE
+              >>> tangentMu
+              >>> (tangentMu |><| id)
+              >>> assocR
+              >>> (id |><| tangentMw)
+              >>> tangentMw)
+  tangentMu = R (tangentMu >>> unitI)
+                undefined
