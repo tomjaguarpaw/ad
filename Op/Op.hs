@@ -33,7 +33,7 @@ class Category arr => C arr varr v m t | arr -> varr v m t where
   comm :: m a b `arr` m b a
 
 class Category arr
-  => O arr tarr m _1 v s p t | arr -> tarr m v s p _1 t
+  => O arr tarr m _1 v s p t u | arr -> tarr m v s p _1 t u
   where
   arrT :: (a `tarr` b) -> (a `arr` b)
 
@@ -48,6 +48,8 @@ class Category arr
 
   ignore :: a `arr` _1
 
+  unitT :: _1 `arr` v u
+
   pair :: v a `m` v b `arr` v (a `p` b)
   unpair :: v (a `p` b) `arr` v a `m` v b
 
@@ -60,7 +62,7 @@ class Category arr
 
   add :: (t a `m` t a) `arr` t a
 
-foo :: (C tarr varr v m t, O arr tarr m _1 v s p t)
+foo :: (C tarr varr v m t, O arr tarr m _1 v s p t u)
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
@@ -69,11 +71,11 @@ foo l m r = arrT assoc >>> ((l >>> m) |><| r) >>> arrT (flipC assoc)
 
 data R arr (tarr :: * -> * -> *) m _1
        (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t
-       (tv :: * -> *) a b =
+       (u :: *) a b =
   forall r. R (a `arr` (r `m` b)) ((r `m` t b) `arr` t a)
 
-instance (C tarr varr v m t, O arr tarr m _1 v s p t)
-  => Category (R arr tarr m _1 v s p t tv) where
+instance (C tarr varr v m t, O arr tarr m _1 v s p t u)
+  => Category (R arr tarr m _1 v s p t u) where
   id = R (id >>> arrT unit) (arrT (flipC unit) >>> id)
 
   f . g = case f of
@@ -81,7 +83,21 @@ instance (C tarr varr v m t, O arr tarr m _1 v s p t)
       R g1 g2 -> R (arrT (flipC assoc) <<< (id |><| f1) <<< g1)
                    (arrT assoc >>> (id |><| f2) >>> g2)
 
-instance (O arr tarr m _1 v s p t, C tarr varr v m t)
-  => O (R arr tarr m _1 v s p t tv) tarr m _1 v s p t where
+instance (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+  => O (R arr tarr m _1 v s p t u) tarr m _1 v s p t u where
+  arrT f = R (arrT (f >>> unit)) (arrT (flipC (arrTa f >>> unit)))
+
   inl = R (inl >>> arrT unit)
-          undefined
+          (bar >>> baz >>> quux)
+
+bar :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+    => ((_1 `m` (t (v (s a b)))) `arr` (_1 `m` (v (s (tv a) (tv b)))))
+bar = arrT (flipC unit >>> tVar >>> arrV sPush >>> unit)
+
+baz :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+    => (_1 `m` (v (s (tv a) (tv b)))) `arr` (v (tv a) `m` v (s u u))
+baz = match (arrT comm >>> (id |><| unitT)) undefined
+
+quux :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+     => (v (tv a) `m` v (s u u)) `arr` (t (v a))
+quux = (id |><| ignore) >>> arrT (flipC (comm <<< unit <<< tVar))
