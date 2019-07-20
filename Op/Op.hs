@@ -9,6 +9,12 @@
 import Control.Category
 import Prelude hiding (id, (.), (>>))
 
+class Category arr => Monoidal arr m where
+  (|><|) :: arr a1 b1
+         -> arr a2 b2
+         -> arr (m a1 a2)
+                (m b1 b2)
+
 class Category arr => T arr s p tv | arr -> s p tv where
   sPush :: tv (s a b) `arr` s (tv a) (tv b)
   pPush :: tv (p a b) `arr` p (tv a) (tv b)
@@ -41,12 +47,9 @@ class Category arr
 
   inr :: v b `arr` v (s a b)
 
-  (|><|) :: arr a1 b1
-         -> arr a2 b2
-         -> arr (m a1 a2)
-                (m b1 b2)
-
   ignore :: a `arr` _1
+
+  zero :: _1 `arr` t a
 
   unitT :: _1 `arr` v u
 
@@ -62,7 +65,7 @@ class Category arr
 
   add :: (t a `m` t a) `arr` t a
 
-foo :: (C tarr varr v m t, O arr tarr m _1 v s p t u)
+foo :: (Monoidal arr m, C tarr varr v m t, O arr tarr m _1 v s p t u)
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
@@ -74,7 +77,7 @@ data R arr (tarr :: * -> * -> *) m _1
        (u :: *) a b =
   forall r. R (a `arr` (r `m` b)) ((r `m` t b) `arr` t a)
 
-instance (C tarr varr v m t, O arr tarr m _1 v s p t u)
+instance (Monoidal arr m, C tarr varr v m t, O arr tarr m _1 v s p t u)
   => Category (R arr tarr m _1 v s p t u) where
   id = R (id >>> arrT unit) (arrT (flipC unit) >>> id)
 
@@ -83,21 +86,38 @@ instance (C tarr varr v m t, O arr tarr m _1 v s p t u)
       R g1 g2 -> R (arrT (flipC assoc) <<< (id |><| f1) <<< g1)
                    (arrT assoc >>> (id |><| f2) >>> g2)
 
-instance (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+instance (Monoidal arr m, O arr tarr m _1 v s p t u,
+          C tarr varr v m t, T varr s p tv)
   => O (R arr tarr m _1 v s p t u) tarr m _1 v s p t u where
   arrT f = R (arrT (f >>> unit)) (arrT (flipC (arrTa f >>> unit)))
 
   inl = R (inl >>> arrT unit)
           (bar >>> baz >>> quux)
 
+  ignore = R (ignore >>> arrT unit)
+             (arrT (flipC unit >>> tUnit) >>> zero)
+
 bar :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
     => ((_1 `m` (t (v (s a b)))) `arr` (_1 `m` (v (s (tv a) (tv b)))))
 bar = arrT (flipC unit >>> tVar >>> arrV sPush >>> unit)
 
-baz :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+baz :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m t,
+        T varr s p tv)
     => (_1 `m` (v (s (tv a) (tv b)))) `arr` (v (tv a) `m` v (s u u))
 baz = match (arrT comm >>> (id |><| unitT)) undefined
 
-quux :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
+quux :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m t,
+         T varr s p tv)
      => (v (tv a) `m` v (s u u)) `arr` (t (v a))
 quux = (id |><| ignore) >>> arrT (flipC (comm <<< unit <<< tVar))
+
+runR :: (Monoidal arr m,
+         C tarr varr v m t,
+         O arr tarr m _1 v s p t u)
+     => R arr tarr m _1 v s p t u a b
+     -> arr (a `m` t b) (t a `m` b)
+runR (R f g) = (f |><| id)
+               >>> arrT assoc
+               >>> (id |><| arrT comm)
+               >>> arrT (flipC assoc)
+               >>> (g |><| id)
