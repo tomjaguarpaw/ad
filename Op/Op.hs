@@ -5,6 +5,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-} --  Try to get rid of this
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 import Control.Category
 import Prelude hiding (id, (.), (>>))
@@ -53,8 +54,8 @@ class Category arr
 
   unitT :: _1 `arr` v u
 
-  pair :: v a `m` v b `arr` v (a `p` b)
-  unpair :: v (a `p` b) `arr` v a `m` v b
+  pair :: (v a `m` v b) `arr` v (a `p` b)
+  unpair :: v (a `p` b) `arr` (v a `m` v b)
 
   match :: ((ci `m` v ai1) `arr` (co `m` v ao1))
         -> ((ci `m` v ai2) `arr` (co `m` v ao2))
@@ -86,7 +87,7 @@ instance (Monoidal arr m, C tarr varr v m t, O arr tarr m _1 v s p t u)
       R g1 g2 -> R (arrT (flipC assoc) <<< (id |><| f1) <<< g1)
                    (arrT assoc >>> (id |><| f2) >>> g2)
 
-instance (Monoidal arr m, O arr tarr m _1 v s p t u,
+instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
           C tarr varr v m t, T varr s p tv)
   => O (R arr tarr m _1 v s p t u) tarr m _1 v s p t u where
   arrT f = R (arrT (f >>> unit)) (arrT (flipC (arrTa f >>> unit)))
@@ -96,6 +97,23 @@ instance (Monoidal arr m, O arr tarr m _1 v s p t u,
 
   ignore = R (ignore >>> arrT unit)
              (arrT (flipC unit >>> tUnit) >>> zero)
+
+  pair = R (pair >>> arrT unit)
+           flub
+
+  match = \f g -> case f of
+    R f1 f2 -> case g of
+      R g1 g2 -> R undefined undefined
+
+flub :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv,
+         Monoidal tarr m)
+     => m _1 (t (v (p a b))) `arr` t (m (v a) (v b))
+flub = arrT (flipC unit)
+       >>> arrT tVar
+       >>> arrT (arrV pPush)
+       >>> unpair
+       >>> arrT (flipC (tVar |><| tVar))
+       >>> arrT (flipC tPush)
 
 bar :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv)
     => ((_1 `m` (t (v (s a b)))) `arr` (_1 `m` (v (s (tv a) (tv b)))))
