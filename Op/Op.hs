@@ -6,11 +6,13 @@
 {-# LANGUAGE TypeFamilies #-}
 
 import Control.Category
-import Prelude hiding (id, (.))
+import Prelude hiding (id, (.), (>>))
 
 class Category arr
-  => O arr m _1 v s p t | arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1,
-                          arr -> t where
+  => O arr m _1 v s p t tv |
+  arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1,
+  arr -> t, arr -> tv
+  where
   assocR :: m (m a b) c
             `arr` m a (m b c)
 
@@ -23,6 +25,9 @@ class Category arr
   tJoin :: t (t a) `arr` t a
   tDup  :: t a `arr` t (t a)
 
+  tVar   :: t (v a) `arr` v (tv a)
+  tUnvar :: v (tv a) `arr` t (v a)
+
   tUnitE :: t _1 `arr` _1
   tUnitI :: _1 `arr` t _1
 
@@ -32,14 +37,16 @@ class Category arr
 
   comm :: m a b `arr` m b a
 
-  inl :: v a `arr` v (m a b)
+  inl :: v a `arr` v (s a b)
 
-  inr :: v b `arr` v (m a b)
+  inr :: v b `arr` v (s a b)
 
   (|><|) :: arr a1 b1
          -> arr a2 b2
          -> arr (m a1 a2)
                 (m b1 b2)
+
+  ignore :: a `arr` _1
 
   pair :: v a `m` v b
           `arr` v (a `p` b)
@@ -47,27 +54,28 @@ class Category arr
   unpair :: v (a `p` b)
             `arr` v a `m` v b
 
-  match :: ((m (v ai1) ci) `arr` (m (v ao1) co))
-        -> ((m (v ai2) ci) `arr` (m (v ao2) co))
-        -> ((m (v (s ai1 ai2)) ci)
-            `arr` (v (s ao1 ao2) `m` co))
+  match :: ((ci `m` v ai1) `arr` (co `m` v ao1))
+        -> ((ci `m` v ai2) `arr` (co `m` v ao2))
+        -> ((ci `m` v (s ai1 ai2))
+            `arr` (co `m` v (s ao1 ao2)))
 
   dup :: a `arr` (a `m` a)
 
   add :: (t a `m` t a) `arr` t a
 
-foo :: O arr m _1 v s p t
+foo :: O arr m _1 v s p t tv
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
     -> arr ((a1 `m` b1) `m` c1) ((a2 `m` b2) `m` c2)
 foo l m r = assocR >>> ((l >>> m) |><| r) >>> assocL
 
-data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t a b =
+data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) t
+       (tv :: * -> *) a b =
   forall r. R (a `arr` (r `m` b)) ((r `m` t b) `arr` t a)
 
-instance O arr m _1 v s p t
-  => Category (R arr m _1 v s p t) where
+instance O arr m _1 v s p t tv
+  => Category (R arr m _1 v s p t tv) where
   id = R (id >>> unitI) (unitE >>> id)
 
   f . g = case f of
@@ -75,7 +83,7 @@ instance O arr m _1 v s p t
       R g1 g2 -> R (assocL <<< (id |><| f1) <<< g1)
                    (assocR >>> (id |><| f2) >>> g2)
 
-instance O arr m _1 v s p t => O (R arr m _1 v s p t) m _1 v s p t where
+instance O arr m _1 v s p t tv => O (R arr m _1 v s p t tv) m _1 v s p t tv where
   assocR = R (assocR >>> unitI)
              (unitE
               >>> tangentMu
@@ -123,3 +131,9 @@ instance O arr m _1 v s p t => O (R arr m _1 v s p t) m _1 v s p t where
 
   tUnitI = R (tUnitI >>> unitI)
              (unitE >>> tJoin) -- Not wholly convinced by this
+
+  comm = R (comm >>> unitI)
+           (unitE >>> tangentMu >>> comm >>> tangentMw)
+
+  inl = R (inl >>> unitI)
+          undefined
