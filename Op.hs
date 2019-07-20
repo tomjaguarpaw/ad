@@ -1,22 +1,30 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE TypeFamilies #-}
 
 import Control.Category
 import Data.Profunctor
+import Prelude hiding (id, (.))
 
-class Mon m where
+class (Profunctor arr, Category arr)
+  => O arr m _1 v s p | arr -> m, arr -> v, arr -> s, arr -> p, arr -> _1 where
+  type T arr :: * -> *
+
   assocR :: m (m a b) c
-         -> m a (m b c)
+            `arr` m a (m b c)
 
   assocL :: m a (m b c)
-         -> m (m a b) c
+            `arr` m (m a b) c
 
-  comm :: m a b -> m b a
+  unitI :: a `arr` (a `m` _1)
 
-class (Profunctor arr, Category arr, Mon m)
-  => O arr m v s p | arr -> m, arr -> v, arr -> s, arr -> p where
+  unitE :: (a `m` _1) `arr` a
+
+  comm :: m a b `arr` m b a
+
   inl :: v a `arr` v (m a b)
 
   inr :: v b `arr` v (m a b)
@@ -39,9 +47,28 @@ class (Profunctor arr, Category arr, Mon m)
 
   dup :: a `arr` (a `m` a)
 
-foo :: O arr m v s p
+  add :: (T arr a `m` T arr a) `arr` T arr a
+
+foo :: O arr m _1 v s p
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
     -> arr ((a1 `m` b1) `m` c1) ((a2 `m` b2) `m` c2)
-foo l m r = dimap assocR assocL ((l >>> m) |><| r)
+foo l m r = assocR >>> ((l >>> m) |><| r) >>> assocL
+
+data R arr m _1 (v :: * -> *) (s :: * -> * -> *) (p :: * -> * -> *) a b =
+  forall r. R (a `arr` (r `m` b)) ((r `m` T arr b) `arr` T arr a)
+
+instance (O arr m _1 v s p, Category arr)
+  => Category (R arr m _1 v s p) where
+  id = R (id >>> unitI >>> comm) (comm >>> unitE >>> id)
+
+  f . g = case f of
+    R f1 f2 -> case g of
+      R g1 g2 -> R (assocL <<< (id |><| f1) <<< g1)
+                   (assocR >>> (id |><| f2) >>> g2)
+
+
+{-
+instance O arr m v s p => O (R arr m v s p) m v s p where
+-}
