@@ -104,6 +104,9 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
   pair = R (pair >>> arrT unit >>> (unitT |><| id))
            flub
 
+  zero = R (zero >>> arrT unit)
+           (arrT (flipC unit) >>> ignore >>> zero)
+
   caseS = \f g -> case f of
     R f1 f2 -> case g of
       R g1 g2 -> R (caseS (f1 >>> (inl |><| id))
