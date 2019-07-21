@@ -87,8 +87,12 @@ instance (Monoidal arr m, C tarr varr v m _1 t, O arr tarr m _1 v s p t u)
         R ((pair |><| id) <<< arrT (flipC assoc) <<< (id |><| f1) <<< g1)
           ((unpair |><| id) >>> arrT assoc >>> (id |><| f2) >>> g2)
 
+bling :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t)
+      => a `arr` (v u `m` a)
 bling = arrT unit >>> (unitT |><| id)
 
+blong :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t)
+      => (v u `m` a) `arr` a
 blong = (ignore |><| id) >>> arrT (flipC unit)
 
 instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
