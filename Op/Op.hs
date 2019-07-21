@@ -1,5 +1,10 @@
+{-# OPTIONS_GHC -Wall #-}
+
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE PolyKinds #-}
@@ -8,7 +13,10 @@
 {-# LANGUAGE UndecidableInstances #-} --  Try to get rid of this
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
+import Control.Applicative (liftA2)
 import Control.Category
+import Data.Functor.Identity (Identity(Identity), runIdentity)
+import Data.Tuple (swap)
 import Prelude hiding (id, (.), (>>))
 
 class Category arr => Monoidal arr m where
@@ -17,12 +25,14 @@ class Category arr => Monoidal arr m where
          -> arr (m a1 a2)
                 (m b1 b2)
 
-class Category arr => T arr s p tv | arr -> s p tv where
+class Category arr => T (arr :: k -> k -> *) s p tv | arr -> s p tv where
   sPush :: tv (s a b) `arr` s (tv a) (tv b)
   pPush :: tv (p a b) `arr` p (tv a) (tv b)
   flipT :: (a `arr` b) -> (b `arr` a)
 
-class Monoidal arr m => C arr varr v m _1 t tv | arr -> varr v m _1 t tv where
+class Monoidal arr m => C (arr :: k -> k -> *) (varr :: ty -> ty -> *)
+  (v :: ty -> k) (m :: k -> k -> k) (_1 :: k) (t :: k -> k) (tv :: ty -> ty)
+  | arr -> varr v m _1 t tv where
   arrV  :: (a `varr` b) -> (v a `arr` v b)
   arrTa :: (a `arr` b) -> (t a `arr` t b)
   flipC :: (a `arr` b) -> (b `arr` a)
@@ -236,3 +246,125 @@ runR (R f g) = (f |><| id)
                >>> (id |><| arrT comm)
                >>> arrT (flipC assoc)
                >>> (g |><| id)
+
+data Hask a b = Hask { runHask :: a -> b }
+
+data HaskId a b = HaskId { hi :: Hask a b, hiFlip :: Hask b a }
+
+flipIso :: HaskId a b -> HaskId b a
+flipIso f = HaskId (hiFlip f) (hi f)
+
+data Ty = F | U | S Ty Ty | P Ty Ty | Tangent Ty
+
+data TyI a where
+  TyIF  :: Float -> TyI 'F
+  TyIU  :: TyI 'U
+  TyIS  :: Either (TyI a) (TyI b) -> TyI ('S a b)
+  TyIP  :: (TyI a, TyI b) -> TyI ('P a b)
+  TyITF :: Float -> TyI ('Tangent 'F)
+  TyITU :: TyI ('Tangent 'U)
+  TyITS :: Either (TyI ('Tangent a)) (TyI ('Tangent b))
+        -> TyI ('Tangent ('S a b))
+  TyITP :: (TyI ('Tangent a), TyI ('Tangent b)) -> TyI ('Tangent ('P a b))
+  TyITT :: TyI ('Tangent a) -> TyI ('Tangent ('Tangent a))
+
+data Ctx ty = CU | CTy ty | CP (Ctx ty) (Ctx ty) | CTangent (Ctx ty)
+
+data CtxI c where
+  CtxU  :: CtxI CU
+  CtxTy :: TyI ty -> CtxI ('CTy ty)
+  CtxP  :: (CtxI c1, CtxI c2) -> CtxI ('CP c1 c2)
+  CtxTangent :: CtxI ctx -> CtxI (CTangent ctx)
+
+data TyT a = TyT { unTyT :: TyI ('Tangent a) }
+
+data FArr f a b = FArr { runFArr :: f a -> f b }
+
+data IdC arr a b = IdC { idC :: a `arr` b, idCFlip :: b `arr` a }
+
+instance Category (FArr f) where
+  id = FArr id
+  f . g = FArr (runFArr f . runFArr g)
+
+instance Category arr => Category (IdC arr) where
+  id = IdC id id
+  f . g = IdC (idC f <<< idC g)
+              (idCFlip f >>> idCFlip g)
+
+type TyHask = FArr TyI
+type TyHaskId = IdC TyHask
+
+instance Category Hask where
+  id = Hask id
+  f . g = Hask (runHask f . runHask g)
+
+instance Category HaskId where
+  id = HaskId id id
+  f . g = HaskId (hi f <<< hi g) (hiFlip f >>> hiFlip g)
+
+instance Monoidal Hask (,) where
+  f |><| g = Hask (\(a, b) -> (runHask f a, runHask g b))
+
+instance Monoidal HaskId (,) where
+  f |><| g = HaskId (hi f |><| hi g) (hiFlip f |><| hiFlip g)
+
+instance T TyHaskId 'S 'P 'Tangent where
+  sPush = IdC (FArr (\case (TyITS e) -> TyIS e))
+              (FArr (\case (TyIS e) -> TyITS e))
+  pPush = IdC (FArr (\case (TyITP e) -> TyIP e))
+              (FArr (\case (TyIP e) -> TyITP e))
+  flipT x = IdC (idCFlip x) (idC x)
+
+instance Monoidal (IdC (FArr CtxI)) 'CP where
+
+instance C (IdC (FArr CtxI)) TyHaskId CTy CP CU CTangent 'Tangent where
+  arrV x = IdC (FArr $ \case (CtxTy e) -> CtxTy (runFArr (idC x) e))
+               (FArr $ \case (CtxTy e) -> CtxTy (runFArr (idCFlip x) e))
+
+  arrTa x = IdC
+    (FArr $ \case (CtxTangent e) -> CtxTangent (runFArr (idC x) e))
+    (FArr $ \case (CtxTangent e) -> CtxTangent (runFArr (idCFlip x) e))
+
+{-
+  flipC x = HaskId (hiFlip x) (hi x)
+
+  assoc = HaskId (Hask (\((a, b), c) -> (a, (b, c))))
+                 (Hask (\(a, (b, c)) -> ((a, b), c)))
+
+  tJoin = HaskId undefined undefined
+
+  tVar = undefined
+
+  tUnit = HaskId (Hask (const ()))
+                 (Hask TangentUnit)
+
+  unit = HaskId (Hask (\x -> (((), x)))) (Hask (\((), x) -> x))
+
+  comm = HaskId (Hask swap) (Hask swap)
+
+instance O Hask HaskId (,) () Identity Either (,) Identity () Identity Float
+    where
+  arrT = hi
+
+  inl = Hask (fmap Left)
+
+  inr = Hask (fmap Right)
+
+  ignore = Hask (const ())
+
+  unitT = Hask (const (Identity ()))
+
+  pair = Hask (uncurry (liftA2 (,)))
+  unpair = Hask (\(Identity (x, y)) -> (Identity x, Identity y))
+
+  caseS f g = Hask $ \(ci, e) -> case runIdentity e of
+    Left l  -> runHask f (ci, Identity l)
+    Right r -> runHask g (ci, Identity r)
+
+  dup = Hask (\x -> (x, x))
+
+  plus  = Hask (uncurry (liftA2 (+)))
+  times = Hask (uncurry (liftA2 (*)))
+
+--  pPush = Hask runIdentity >>> \(x, y) -> (Identity x, Identity y))
+-}
