@@ -182,20 +182,17 @@ bar :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv, T varr s p tv)
     => (t (v (s a b))) `arr` (_1 `m` (v (s (tv a) (tv b))))
 bar = arrT (tVar >>> arrV sPush >>> unit)
 
-baz :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv,
-        T varr s p tv)
+baz :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
     => (_1 `m` (v (s (tv a) (tv b)))) `arr` v (tv a)
 baz = caseS (arrT (flipC unit))
             (ignore >>> zero >>> arrT tVar)
 
-bazFlip :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv,
-            T varr s p tv)
+bazFlip :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
         => (_1 `m` (v (s (tv a) (tv b)))) `arr` v (tv b)
 bazFlip = caseS (ignore >>> zero >>> arrT tVar)
                 (arrT (flipC unit))
 
-quux :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv,
-         T varr s p tv)
+quux :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
      => v (tv a) `arr` t (v a)
 quux = arrT (flipC tVar)
 
