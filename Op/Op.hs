@@ -52,9 +52,6 @@ class Category arr
 
   zero :: _1 `arr` t a
 
-  -- This probably belongs in a superclass
-  zeroV :: v u `arr` v (tv a)
-
   unitT :: _1 `arr` v u
 
   pair :: (v a `m` v b) `arr` v (a `p` b)
@@ -107,9 +104,6 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
   zero = R (zero >>> arrT unit)
            (arrT (flipC unit) >>> ignore >>> zero)
 
-  zeroV = R (zeroV >>> arrT unit)
-            (arrT (flipC unit) >>> ignore >>> zero)
-
   caseS = \f g -> case f of
     R f1 f2 -> case g of
       R g1 g2 -> R (caseS (f1 >>> (inl |><| id))
@@ -144,7 +138,8 @@ bar = arrT (flipC unit >>> tVar >>> arrV sPush >>> unit)
 baz :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m t,
         T varr s p tv)
     => (_1 `m` (v (s (tv a) (tv b)))) `arr` v (tv a)
-baz = caseS (arrT (flipC unit)) (ignore >>> unitT >>> zeroV)
+baz = caseS (arrT (flipC unit))
+            (ignore >>> zero >>> arrT tVar)
 
 quux :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m t,
          T varr s p tv)
