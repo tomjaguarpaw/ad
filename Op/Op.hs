@@ -121,6 +121,8 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
 
   add = R (add >>> arrT unit) (arrT (flipC tPush) <<< dup <<< arrT (flipC unit))
 
+  unitT = R (unitT >>> arrT unit) (zero <<< ignore <<< arrT (flipC unit))
+
 flub :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv,
          Monoidal tarr m)
      => m (v u) (t (v (p a b))) `arr` t (m (v a) (v b))
