@@ -39,7 +39,7 @@ class Monoidal arr m => C arr varr v m _1 t tv | arr -> varr v m _1 t tv where
 
   comm :: m a b `arr` m b a
 
-class Category arr
+class Monoidal arr m
   => O arr tarr m _1 v s p t u | arr -> tarr m v s p _1 t u
   where
   arrT :: (a `tarr` b) -> (a `arr` b)
@@ -86,6 +86,34 @@ instance (Monoidal arr m, C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
       R g1 g2 ->
         R ((pair |><| id) <<< arrT (flipC assoc) <<< (id |><| f1) <<< g1)
           ((unpair |><| id) >>> arrT assoc >>> (id |><| f2) >>> g2)
+
+instance (Monoidal arr m, C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
+  => Monoidal (R arr tarr m _1 v s p t u) m where
+  f |><| g = case f of
+    R f1 f2 -> case g of
+      R g1 g2 ->
+        R ((f1 |><| g1)
+           >>> arrT ((comm |><| id)
+                     >>> assoc
+                     >>> (id |><| flipC assoc)
+                     >>> flipC assoc
+                     >>> (comm |><| id)
+                     >>> assoc)
+           >>> (pair |><| id))
+          (arrT (flipC tPush)
+           <<< (f2 |><| g2)
+           <<< blah)
+
+blah :: (Monoidal arr m, C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
+    => ((v (r1 `p` r2)) `m` (t (a `m` b)))
+        `arr` ((v r1 `m` t a) `m` (v r2 `m` (t b)))
+blah = arrT (flipC ((comm |><| id)
+                     >>> assoc
+                     >>> (id |><| flipC assoc)
+                     >>> flipC assoc
+                     >>> (comm |><| id)
+                     >>> assoc))
+           <<< (unpair |><| arrT tPush)
 
 bling :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
       => a `arr` (v u `m` a)
