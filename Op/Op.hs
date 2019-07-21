@@ -268,13 +268,37 @@ data TyI a where
   TyITP :: (TyI ('Tangent a), TyI ('Tangent b)) -> TyI ('Tangent ('P a b))
   TyITT :: TyI ('Tangent a) -> TyI ('Tangent ('Tangent a))
 
+tyToTangent :: TyI a -> TyI ('Tangent a)
+tyToTangent = \case
+  TyIF f -> TyITF f
+  TyIU   -> TyITU
+  TyIS e -> TyITS $ case e of
+    Left l  -> Left (tyToTangent l)
+    Right r -> Right (tyToTangent r)
+  TyIP (p1, p2) -> TyITP (tyToTangent p1, tyToTangent p2)
+  TyITF t -> TyITT (TyITF t)
+  TyITU   -> TyITT (TyITU)
+  TyITS t -> TyITT (TyITS t)
+  TyITP t -> TyITT (TyITP t)
+  TyITT t -> TyITT (TyITT t)
+
+tyFromTangent :: TyI ('Tangent a) -> TyI a
+tyFromTangent = \case
+  TyITF f -> TyIF f
+  TyITU   -> TyIU
+  TyITS e -> case e of
+    Left l  -> TyIS (Left (tyFromTangent l))
+    Right l -> TyIS (Right (tyFromTangent l))
+  TyITP (p1, p2) -> TyIP (tyFromTangent p1, tyFromTangent p2)
+  TyITT e -> e
+
 data Ctx ty = CU | CTy ty | CP (Ctx ty) (Ctx ty) | CTangent (Ctx ty)
 
 data CtxI c where
-  CtxU  :: CtxI CU
+  CtxU  :: CtxI 'CU
   CtxTy :: TyI ty -> CtxI ('CTy ty)
   CtxP  :: (CtxI c1, CtxI c2) -> CtxI ('CP c1 c2)
-  CtxTangent :: CtxI ctx -> CtxI (CTangent ctx)
+  CtxTangent :: CtxI ctx -> CtxI ('CTangent ctx)
 
 data TyT a = TyT { unTyT :: TyI ('Tangent a) }
 
@@ -316,8 +340,13 @@ instance T TyHaskId 'S 'P 'Tangent where
   flipT x = IdC (idCFlip x) (idC x)
 
 instance Monoidal (IdC (FArr CtxI)) 'CP where
+  f |><| g =
+    IdC (FArr $ \(CtxP (a1, a2)) ->
+            CtxP (runFArr (idC f) a1, runFArr (idC g) a2))
+        (FArr $ \(CtxP (a1, a2)) ->
+            CtxP (runFArr (idCFlip f) a1, runFArr (idCFlip g) a2))
 
-instance C (IdC (FArr CtxI)) TyHaskId CTy CP CU CTangent 'Tangent where
+instance C (IdC (FArr CtxI)) TyHaskId 'CTy 'CP 'CU 'CTangent 'Tangent where
   arrV x = IdC (FArr $ \case (CtxTy e) -> CtxTy (runFArr (idC x) e))
                (FArr $ \case (CtxTy e) -> CtxTy (runFArr (idCFlip x) e))
 
@@ -325,11 +354,17 @@ instance C (IdC (FArr CtxI)) TyHaskId CTy CP CU CTangent 'Tangent where
     (FArr $ \case (CtxTangent e) -> CtxTangent (runFArr (idC x) e))
     (FArr $ \case (CtxTangent e) -> CtxTangent (runFArr (idCFlip x) e))
 
-{-
-  flipC x = HaskId (hiFlip x) (hi x)
+  flipC x = IdC (idCFlip x) (idC x)
 
-  assoc = HaskId (Hask (\((a, b), c) -> (a, (b, c))))
-                 (Hask (\(a, (b, c)) -> ((a, b), c)))
+  assoc = IdC (FArr $ \case (CtxP (CtxP (a, b), c)) -> CtxP (a, CtxP (b, c)))
+              (FArr $ \case CtxP (a, CtxP (b, c)) -> (CtxP (CtxP (a, b), c)))
+
+  tJoin = IdC (FArr $ \case CtxTangent a -> a)
+              (FArr $ \case a -> CtxTangent a)
+
+  tVar = IdC (FArr $ \case CtxTangent (CtxTy e) -> CtxTy (tyToTangent e))
+             (FArr $ \case CtxTy ty -> CtxTangent (CtxTy (tyFromTangent ty)))
+{-
 
   tJoin = HaskId undefined undefined
 
