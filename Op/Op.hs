@@ -65,6 +65,10 @@ class Monoidal arr m
 
   add :: (t a `m` t a) `arr` t a
 
+  plus :: (v Float `m` v Float) `arr` v Float
+
+  times :: (v Float `m` v Float) `arr` v Float
+
 foo :: (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
     => arr a1 z
     -> arr z a2
@@ -165,6 +169,16 @@ instance (O arr tarr m _1 v s p t u,
   add = R (add >>> bling) (arrT (flipC tPush) <<< dup <<< blong)
 
   unitT = R (unitT >>> bling) (zero <<< ignore <<< blong)
+
+  plus = R (plus >>> bling) (arrT (flipC tPush) <<< dup <<< blong)
+
+  times = R ((dup |><| dup)
+            >>> arrT assoc
+            >>> (id |><| arrT (flipC assoc))
+            >>> (id |><| arrT comm)
+            >>> arrT (flipC assoc)
+            >>> (pair |><| times))
+            undefined
 
 flub :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv, T varr s p tv)
      => t (v (p a b)) `arr` t (v a `m` v b)
