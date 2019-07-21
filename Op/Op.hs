@@ -32,7 +32,7 @@ class Monoidal arr m => C arr varr v m _1 t tv | arr -> varr v m _1 t tv where
   tPush :: t (a `m` b) `arr` (t a `m` t b)
   tJoin :: t (t a) `arr` t a
 
-  tVar   :: t (v a) `arr` v (tv a)
+  tVar :: t (v a) `arr` v (tv a)
 
   tUnit :: t _1 `arr` _1
 
