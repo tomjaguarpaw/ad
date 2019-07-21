@@ -65,7 +65,7 @@ class Monoidal arr m
 
   add :: (t a `m` t a) `arr` t a
 
-  scale :: (v Float `m` v (tv a)) `arr` tv a
+  scale :: (v Float `m` v (tv a)) `arr` t (tv a)
 
   dot :: (v (tv a) `m` v (tv a)) `arr` v Float
 
