@@ -189,6 +189,8 @@ instance (O arr tarr m _1 v s p t u tv f,
   times = R (flab >>> (pair |><| times))
             undefined
 
+flab :: (O arr tarr m _1 v s p t u tv f, C tarr varr v m _1 t tv, T varr s p tv)
+     => arr (m a1 a2) (m (m a1 a2) (m a1 a2))
 flab = (dup |><| dup)
        >>> arrT assoc
        >>> (id |><| arrT (flipC assoc))
