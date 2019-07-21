@@ -125,7 +125,7 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
 
 flub :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv,
          Monoidal tarr m)
-     => m (v u) (t (v (p a b))) `arr` t (m (v a) (v b))
+     => (v u `m` t (v (p a b))) `arr` t (v a `m` v b)
 flub = arrT (flipC unit)
        >>> arrT tVar
        >>> arrT (arrV pPush)
