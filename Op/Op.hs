@@ -104,13 +104,18 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
   pair = R (pair >>> arrT unit >>> (unitT |><| id))
            flub
 
-{-
   caseS = \f g -> case f of
     R f1 f2 -> case g of
-      R g1 g2 -> R (caseS (f1 >>> arrT comm >>> (id |><| inl))
-                          (g1 >>> arrT comm >>> (id |><| inr)))
-                   undefined
--}
+      R g1 g2 -> R (caseS (f1 >>> (inl |><| id))
+                          (g1 >>> (inr |><| id)))
+                   (arrT comm
+                    >>> caseS (arrT comm >>> f2 >>> arrT tPush
+                               >>> (id |><| (arrT tVar >>> inl)))
+                              (arrT comm >>> g2 >>> arrT tPush
+                               >>> (id |><| (arrT tVar >>> inr)))
+                    >>> (id |><| arrT (flipC (arrV sPush)))
+                    >>> (id |><| arrT (flipC tVar)
+                    >>> arrT (flipC tPush)))
 
 flub :: (O arr tarr m _1 v s p t u, C tarr varr v m t, T varr s p tv,
          Monoidal tarr m)
