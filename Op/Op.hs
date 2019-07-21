@@ -21,7 +21,7 @@ class Category arr => T arr s p tv | arr -> s p tv where
   pPush :: tv (p a b) `arr` p (tv a) (tv b)
   flipT :: (a `arr` b) -> (b `arr` a)
 
-class Category arr => C arr varr v m _1 t | arr -> varr v m _1 t where
+class Category arr => C arr varr v m _1 t tv | arr -> varr v m _1 t tv where
   arrV  :: (a `varr` b) -> (v a `arr` v b)
   arrTa :: (a `arr` b) -> (t a `arr` t b)
   flipC :: (a `arr` b) -> (b `arr` a)
@@ -65,7 +65,7 @@ class Category arr
 
   add :: (t a `m` t a) `arr` t a
 
-foo :: (Monoidal arr m, C tarr varr v m _1 t, O arr tarr m _1 v s p t u)
+foo :: (Monoidal arr m, C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
     => arr a1 z
     -> arr z a2
     -> arr (b1 `m` c1) (b2 `m` c2)
@@ -77,7 +77,7 @@ data R arr (tarr :: * -> * -> *) m _1
        (u :: *) a b =
   forall r. R (a `arr` (v r `m` b)) ((v r `m` t b) `arr` t a)
 
-instance (Monoidal arr m, C tarr varr v m _1 t, O arr tarr m _1 v s p t u)
+instance (Monoidal arr m, C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u)
   => Category (R arr tarr m _1 v s p t u) where
   id = R bling blong
 
@@ -87,16 +87,16 @@ instance (Monoidal arr m, C tarr varr v m _1 t, O arr tarr m _1 v s p t u)
         R ((pair |><| id) <<< arrT (flipC assoc) <<< (id |><| f1) <<< g1)
           ((unpair |><| id) >>> arrT assoc >>> (id |><| f2) >>> g2)
 
-bling :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t)
+bling :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
       => a `arr` (v u `m` a)
 bling = arrT unit >>> (unitT |><| id)
 
-blong :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t)
+blong :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv)
       => (v u `m` a) `arr` a
 blong = (ignore |><| id) >>> arrT (flipC unit)
 
 instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
-          C tarr varr v m _1 t, T varr s p tv)
+          C tarr varr v m _1 t tv, T varr s p tv)
   => O (R arr tarr m _1 v s p t u) tarr m _1 v s p t u where
   arrT f = R (arrT f >>> bling)
              (blong >>> arrT (flipC (arrTa f)))
@@ -132,7 +132,7 @@ instance (Monoidal arr m, Monoidal tarr m, O arr tarr m _1 v s p t u,
 
   unitT = R (unitT >>> bling) (zero <<< ignore <<< blong)
 
-flub :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t, T varr s p tv,
+flub :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv, T varr s p tv,
          Monoidal tarr m, Monoidal arr m)
      => (v u `m` t (v (p a b))) `arr` t (v a `m` v b)
 flub = blong
@@ -142,29 +142,29 @@ flub = blong
        >>> arrT (flipC (tVar |><| tVar))
        >>> arrT (flipC tPush)
 
-flubber :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t, T varr s p tv,
+flubber :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv, T varr s p tv,
             Monoidal arr m)
         => (v u `m` t (v (p a b))) `arr` t (v (p a b))
 flubber = blong
 
-bar :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t, T varr s p tv,
+bar :: (O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv, T varr s p tv,
         Monoidal arr m)
     => ((v u `m` (t (v (s a b)))) `arr` (_1 `m` (v (s (tv a) (tv b)))))
 bar = blong >>> arrT (tVar >>> arrV sPush >>> unit)
 
-baz :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t,
+baz :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv,
         T varr s p tv)
     => (_1 `m` (v (s (tv a) (tv b)))) `arr` v (tv a)
 baz = caseS (arrT (flipC unit))
             (ignore >>> zero >>> arrT tVar)
 
-quux :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t,
+quux :: (Monoidal arr m, O arr tarr m _1 v s p t u, C tarr varr v m _1 t tv,
          T varr s p tv)
      => v (tv a) `arr` t (v a)
 quux = arrT (flipC tVar)
 
 runR :: (Monoidal arr m,
-         C tarr varr v m _1 t,
+         C tarr varr v m _1 t tv,
          O arr tarr m _1 v s p t u)
      => R arr tarr m _1 v s p t u a b
      -> arr (a `m` t b) (t a `m` b)
