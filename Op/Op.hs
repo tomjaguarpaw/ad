@@ -19,18 +19,24 @@ import Data.Functor.Identity (Identity(Identity), runIdentity)
 import Data.Tuple (swap)
 import Prelude hiding (id, (.), (>>))
 
-class Category arr => Monoidal arr m where
+class Category arr => Monoidal arr m _1 | arr -> _1 where
   (|><|) :: arr a1 b1
          -> arr a2 b2
          -> arr (m a1 a2)
                 (m b1 b2)
+
+  unitI :: a `arr` (_1 `m` a)
+  unitE :: (_1 `m` a) `arr` a
+  comm :: m a b `arr` m b a
+  assocR :: m (m a b) c `arr` m a (m b c)
+  assocL :: m a (m b c) `arr` m (m a b) c
 
 class Category arr => T (arr :: k -> k -> *) s p tv | arr -> s p tv where
   sPush :: tv (s a b) `arr` s (tv a) (tv b)
   pPush :: tv (p a b) `arr` p (tv a) (tv b)
   flipT :: (a `arr` b) -> (b `arr` a)
 
-class Monoidal arr m => C (arr :: k -> k -> *) (varr :: ty -> ty -> *)
+class Monoidal arr m _1 => C (arr :: k -> k -> *) (varr :: ty -> ty -> *)
   (v :: ty -> k) (m :: k -> k -> k) (_1 :: k) (t :: k -> k) (tv :: ty -> ty)
   | arr -> varr v m _1 t tv where
   arrV  :: (a `varr` b) -> (v a `arr` v b)
@@ -48,9 +54,7 @@ class Monoidal arr m => C (arr :: k -> k -> *) (varr :: ty -> ty -> *)
 
   unit :: a `arr` (_1 `m` a)
 
-  comm :: m a b `arr` m b a
-
-class Monoidal arr m
+class Monoidal arr m _1
   => O (arr :: c -> c -> *) tarr m (_1 :: c) (v :: ty -> c)
        (s :: ty -> ty -> ty) (p :: ty -> ty -> ty) (t :: c -> c)
        (u :: ty) (tv :: ty -> ty) (f :: ty)
@@ -109,8 +113,9 @@ instance (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u tv f)
         R ((pair |><| id) <<< arrT (flipC assoc) <<< (id |><| f1) <<< g1)
           ((unpair |><| id) >>> arrT assoc >>> (id |><| f2) >>> g2)
 
-instance (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u tv f)
-  => Monoidal (R arr tarr m _1 v s p t u tv f) m where
+instance (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u tv f,
+          T varr s p tv)
+  => Monoidal (R arr tarr m _1 v s p t u tv f) m _1 where
   f |><| g = case f of
     R f1 f2 -> case g of
       R g1 g2 ->
@@ -125,6 +130,12 @@ instance (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u tv f)
           (arrT (flipC tPush)
            <<< (f2 |><| g2)
            <<< blah)
+
+  unitI = arrT unitI
+  unitE = arrT unitE
+  comm = arrT comm
+  assocR = arrT assocR
+  assocL = arrT assocL
 
 blah :: (C tarr varr v m _1 t tv, O arr tarr m _1 v s p t u tv f)
     => ((v (r1 `p` r2)) `m` (t (a `m` b)))
@@ -326,11 +337,13 @@ instance Category HaskId where
   id = HaskId id id
   f . g = HaskId (hi f <<< hi g) (hiFlip f >>> hiFlip g)
 
+{-
 instance Monoidal Hask (,) where
   f |><| g = Hask (\(a, b) -> (runHask f a, runHask g b))
 
 instance Monoidal HaskId (,) where
   f |><| g = HaskId (hi f |><| hi g) (hiFlip f |><| hiFlip g)
+-}
 
 instance T TyHaskId 'S 'P 'Tangent where
   sPush = IdC (FArr (\case (TyITS e) -> TyIS e))
@@ -339,12 +352,18 @@ instance T TyHaskId 'S 'P 'Tangent where
               (FArr (\case (TyIP e) -> TyITP e))
   flipT x = IdC (idCFlip x) (idC x)
 
-instance Monoidal (IdC (FArr CtxI)) 'CP where
+instance Monoidal (IdC (FArr CtxI)) 'CP 'CU where
   f |><| g =
     IdC (FArr $ \(CtxP (a1, a2)) ->
             CtxP (runFArr (idC f) a1, runFArr (idC g) a2))
         (FArr $ \(CtxP (a1, a2)) ->
             CtxP (runFArr (idCFlip f) a1, runFArr (idCFlip g) a2))
+
+  unitI = IdC (FArr (\a -> CtxP (CtxU, a))) (FArr (\(CtxP (CtxU, a)) -> a))
+  unitE = IdC (FArr (\(CtxP (CtxU, a)) -> a)) (FArr (\a -> CtxP (CtxU, a)))
+
+  assocR = IdC (FArr (\(CtxP (CtxP (a, b), c)) -> CtxP (a, CtxP (b, c))))
+               undefined
 
 instance C (IdC (FArr CtxI)) TyHaskId 'CTy 'CP 'CU 'CTangent 'Tangent where
   arrV x = IdC (FArr $ \case (CtxTy e) -> CtxTy (runFArr (idC x) e))
