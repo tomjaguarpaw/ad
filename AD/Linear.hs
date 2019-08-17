@@ -111,61 +111,64 @@ vf = (++ "")
 vr = (++ "r")
 
 rev :: Prog -> (Prog, [Var], [Var] -> Prog)
-rev []       = ([], [], const [])
-rev (c : cs) = let (pf, xs, pr) = rev cs in case c of
-  Add v (v1, v2) ->
-    ( Add (vf v) (vf v1, vf v2) : pf
-    , xs
-    , \xs' -> pr xs' ++ [Dup (vr v1, vr v2) (vr v)]
-    )
-  Call v f vv -> case f of
-    Sub -> error "Sub"
-    Mul ->
-      ( Dup (vv ++ "1", vv ++ "2") vv
-        : Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
-        : Call v Mul (vv ++ "2")
-        : pf
-      , (vv ++ "at1") : (vv ++ "at2") : xs
-      , \(v12 : v22 : xs') ->
-        pr xs'
-          ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
-             , Tuple (vv ++ "t1") [vr v ++ "1", v12]
-             , Tuple (vv ++ "t2") [vr v ++ "2", v22]
-             , Call (vv ++ "t1m") Mul (vv ++ "t1")
-             , Call (vv ++ "t2m") Mul (vv ++ "t2")
-             , Tuple (vr vv) [vv ++ "t2m", vv ++ "t1m"]
-             ]
-      )
-    Div ->
-      ( Dup (vv ++ "1", vv ++ "2") vv
-        : Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
-        : Call v Div (vv ++ "2")
-        : pf
-      , (vv ++ "at1") : (vv ++ "at2") : xs
-      , \(v12 : v22 : xs') ->
-        pr xs'
-          ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
-             , Tuple (vv ++ "t1") [vr v ++ "1", v12]
-             , Tuple (vv ++ "t2") [vr v ++ "2", v22]
-             , Call (vv ++ "t1m") Div (vv ++ "t1")
-             , Call (vv ++ "t2m") SqR (vv ++ "t2")
-             , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
-             ]
-      )
-    SqR -> undefined
-  Tuple t vs ->
-    ( Tuple (vf t) (map vf vs) : pf
-    , xs
-    , \xs' -> pr xs' ++ [Untuple (map vr vs) (vr t)]
-    )
-  Untuple{} -> error "Untuple"
-  Dup (v1, v2) v ->
-    ( Dup (vf v1, vf v2) (vf v) : pf
-    , xs
-    , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
-    )
-  Lit v lit -> (Lit (vf v) lit : pf, xs, \xs' -> pr xs' ++ [Elim (vr v)])
-  Elim{} -> error "Elim"
+rev [] = ([], [], const [])
+rev (c : cs) =
+  let (pf, xs, pr) = rev cs
+      ff (a, b, cc) = (a ++ pf, b ++ xs, cc)
+  in  case c of
+        Add v (v1, v2) -> ff
+          ( [Add (vf v) (vf v1, vf v2)]
+          , []
+          , \xs' -> pr xs' ++ [Dup (vr v1, vr v2) (vr v)]
+          )
+        Call v f vv -> case f of
+          Sub -> error "Sub"
+          Mul -> ff
+            ( [ Dup (vv ++ "1", vv ++ "2") vv
+              , Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
+              , Call v Mul (vv ++ "2")
+              ]
+            , [vv ++ "at1", vv ++ "at2"]
+            , \(v12 : v22 : xs') ->
+              pr xs'
+                ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
+                   , Tuple (vv ++ "t1") [vr v ++ "1", v12]
+                   , Tuple (vv ++ "t2") [vr v ++ "2", v22]
+                   , Call (vv ++ "t1m") Mul (vv ++ "t1")
+                   , Call (vv ++ "t2m") Mul (vv ++ "t2")
+                   , Tuple (vr vv) [vv ++ "t2m", vv ++ "t1m"]
+                   ]
+            )
+          Div -> ff
+            ( [ Dup (vv ++ "1", vv ++ "2") vv
+              , Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
+              , Call v Div (vv ++ "2")
+              ]
+            , [vv ++ "at1", vv ++ "at2"]
+            , \(v12 : v22 : xs') ->
+              pr xs'
+                ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
+                   , Tuple (vv ++ "t1") [vr v ++ "1", v12]
+                   , Tuple (vv ++ "t2") [vr v ++ "2", v22]
+                   , Call (vv ++ "t1m") Div (vv ++ "t1")
+                   , Call (vv ++ "t2m") SqR (vv ++ "t2")
+                   , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
+                   ]
+            )
+          SqR -> undefined
+        Tuple t vs -> ff
+          ( [Tuple (vf t) (map vf vs)]
+          , []
+          , \xs' -> pr xs' ++ [Untuple (map vr vs) (vr t)]
+          )
+        Untuple{}      -> error "Untuple"
+        Dup (v1, v2) v -> ff
+          ( [Dup (vf v1, vf v2) (vf v)]
+          , []
+          , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
+          )
+        Lit v lit -> ff ([Lit (vf v) lit], [], \xs' -> pr xs' ++ [Elim (vr v)])
+        Elim{}    -> error "Elim"
 
 rev2 :: Prog -> Prog
 rev2 p = pf ++ pr vs where (pf, vs, pr) = rev p
