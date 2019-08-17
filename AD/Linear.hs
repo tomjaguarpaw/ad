@@ -11,7 +11,7 @@ import qualified Control.Monad.State           as St
 
 data Value = FloatV Float | TupleV [Value] deriving Show
 
-data Function = Mul | Sub | Div deriving Show
+data Function = Mul | Sub | Div | SqR deriving Show
 
 data Cmd = Call Var Function Var
          | Tuple Var [Var]
@@ -19,6 +19,7 @@ data Cmd = Call Var Function Var
          | Dup (Var, Var) Var
          | Add Var (Var, Var)
          | Lit Var Value
+         | Elim Var
          deriving Show
 
 type Prog = [Cmd]
@@ -31,6 +32,7 @@ call :: Function -> Value -> Maybe Value
 call Mul (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 * x2))
 call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
+call SqR (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (- x1 / (x2 * x2)))
 call _   _                               = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
@@ -72,7 +74,22 @@ eval env (c : cs) = do
       (ts S.:> ((), envFinal)) <- S.toList newVars
 
       pure (M.insert v' (TupleV ts) envFinal)
-    Untuple{}      -> undefined
+    Untuple vs v -> do
+      (tuplet, envWithoutV) <-
+        note ("Could not pop " ++ show v ++ " when Untupling") $ pop v env
+
+      t <- case tuplet of
+        TupleV t -> pure t
+        other    -> Left ("Tuple " ++ show v ++ " was " ++ show other)
+
+      -- Zip doesn't check for equal length
+      let inserts = forWithState (S.each (zip t vs)) envWithoutV
+            $ \((tv, vv), env_) -> pure (M.insert vv tv env_)
+
+      (_ S.:> ((), envFinal)) <- S.toList inserts
+
+      pure envFinal
+
     Dup (v1, v2) v -> do
       (t, envWithoutV) <-
         note ("Could not pop " ++ show v ++ " when duping") $ pop v env
@@ -80,12 +97,17 @@ eval env (c : cs) = do
       pure (insertNew envWithoutV)
     Lit v value    -> pure (M.insert v value env)
     Add v (v1, v2) -> do
-      (FloatV t1, env1) <- note "Add" $ pop v1 env
-      (FloatV t2, env2) <- note "Add" $ pop v2 env1
+      (FloatV t1, env1) <- note ("Add: " ++ show v1) $ pop v1 env
+      (FloatV t2, env2) <- note ("Add: " ++ show v2) $ pop v2 env1
       pure (M.insert v (FloatV (t1 + t2)) env2)
+    Elim v -> do
+      (_, envWithoutV) <-
+        note ("Could not pop " ++ show v ++ " when Eliming") $ pop v env
+      pure envWithoutV
+
 
 vf, vr :: Var -> Var
-vf = (++ "f")
+vf = (++ "")
 vr = (++ "r")
 
 rev :: Prog -> (Prog, [Var], [Var] -> Prog)
@@ -97,20 +119,59 @@ rev (c : cs) = case c of
     , \xs' -> pr xs' ++ [Dup (vr v1, vr v2) (vr v)]
     )
     where (pf, xs, pr) = rev cs
-  Call _v' f _vv -> case f of
-    Sub -> undefined
-    Mul -> undefined
-    Div -> undefined
-  Tuple t vs -> (Tuple t vs : pf, xs, \xs' -> pr xs' ++ [Untuple vs t])
+  Call v f vv -> case f of
+    Sub -> error "Sub"
+    Mul ->
+      ( Dup (vv ++ "1", vv ++ "2") vv
+        : Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
+        : Call v Mul (vv ++ "2")
+        : pf
+      , (vv ++ "at1") : (vv ++ "at2") : xs
+      , \(v12 : v22 : xs') ->
+        pr xs'
+          ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
+             , Tuple (vv ++ "t1") [vr v ++ "1", v12]
+             , Tuple (vv ++ "t2") [vr v ++ "2", v22]
+             , Call (vv ++ "t1m") Mul (vv ++ "t1")
+             , Call (vv ++ "t2m") Mul (vv ++ "t2")
+             , Tuple (vr vv) [vv ++ "t2m", vv ++ "t1m"]
+             ]
+      )
+      where (pf, xs, pr) = rev cs
+    Div ->
+      ( Dup (vv ++ "1", vv ++ "2") vv
+        : Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
+        : Call v Div (vv ++ "2")
+        : pf
+      , (vv ++ "at1") : (vv ++ "at2") : xs
+      , \(v12 : v22 : xs') ->
+        pr xs'
+          ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
+             , Tuple (vv ++ "t1") [vr v ++ "1", v12]
+             , Tuple (vv ++ "t2") [vr v ++ "2", v22]
+             , Call (vv ++ "t1m") Div (vv ++ "t1")
+             , Call (vv ++ "t2m") SqR (vv ++ "t2")
+             , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
+             ]
+      )
+      where (pf, xs, pr) = rev cs
+    SqR -> undefined
+  Tuple t vs ->
+    ( Tuple (vf t) (map vf vs) : pf
+    , xs
+    , \xs' -> pr xs' ++ [Untuple (map vr vs) (vr t)]
+    )
     where (pf, xs, pr) = rev cs
-  Untuple{} -> undefined
+  Untuple{} -> error "Untuple"
   Dup (v1, v2) v ->
     ( Dup (vf v1, vf v2) (vf v) : pf
     , xs
     , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
     )
     where (pf, xs, pr) = rev cs
-  Lit{} -> undefined
+  Lit v lit -> (Lit (vf v) lit : pf, xs, \xs' -> pr xs' ++ [Elim (vr v)])
+    where (pf, xs, pr) = rev cs
+  Elim{} -> error "Elim"
 
 rev2 :: Prog -> Prog
 rev2 p = pf ++ pr vs where (pf, vs, pr) = rev p
@@ -194,6 +255,18 @@ test = do
   print (rev2 example)
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) awf)
   print (awff (3.0 :: Double) 4.0)
+
+  print
+    (eval
+      (M.fromList
+        [ ("x"  , FloatV 3)
+        , ("y"  , FloatV 4)
+        , ("vr" , FloatV 1)
+        ]
+      )
+      (rev2 awf)
+    )
+  print (awff_rev (3.0 :: Double) 4.0 1.0)
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
 sexample = forWithState (S.each [1 .. 10]) "" $ \(i, s) -> do
