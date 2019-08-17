@@ -110,6 +110,42 @@ awff x y =
       v = 2 * p * q + 3 * r
   in  v
 
+awff_rev :: Fractional a => a -> a -> a -> (a, a)
+awff_rev x y dα_dv =
+  let p     = 7 * x
+      q     = p * x * 5
+
+      dv_dq = 2 * p
+
+      dα_dq = dα_dv * dv_dq
+
+      dq_dr = 0
+      dv_dr = 3
+
+      dα_dr = dα_dq * dq_dr + dα_dv * dv_dr
+
+      dr_dp = 0
+      dq_dp = x * 5
+      dv_dp = 2 * q
+
+      dα_dp = dα_dr * dr_dp + dα_dq * dq_dp + dα_dv * dv_dp
+
+      dv_dx = 0
+      dv_dy = 0
+
+      dr_dx = 0
+      dr_dy = -1 / (y * y)
+
+      dq_dx = p * 5
+      dq_dy = 0
+
+      dp_dx = 7
+      dp_dy = 0
+
+      dα_dx = dα_dp * dp_dx + dα_dq * dq_dx + dα_dr * dr_dx + dα_dv * dv_dx
+      dα_dy = dα_dp * dp_dy + dα_dq * dq_dy + dα_dr * dr_dy + dα_dv * dv_dy
+  in  (dα_dx, dα_dy)
+
 test :: IO ()
 test = do
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) example)
