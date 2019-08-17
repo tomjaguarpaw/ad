@@ -150,7 +150,7 @@ test :: IO ()
 test = do
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) example)
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) awf)
-  print (awff (3.0::Double) 4.0)
+  print (awff (3.0 :: Double) 4.0)
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
 sexample = forWithState (S.each [1 .. 10]) "" $ \(i, s) -> do
