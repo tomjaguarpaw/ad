@@ -11,13 +11,15 @@ import qualified Control.Monad.State           as St
 
 data Value = FloatV Float | TupleV [Value] deriving Show
 
-data Function = Add | Mul | Sub | Div deriving Show
+data Function = Mul | Sub | Div deriving Show
 
 data Cmd = Call Var Function Var
          | Tuple Var [Var]
          | Untuple [Var] Var
          | Dup (Var, Var) Var
+         | Add Var (Var, Var)
          | Lit Var Value
+         deriving Show
 
 type Prog = [Cmd]
 
@@ -26,7 +28,6 @@ type Var = String
 type Env = M.Map Var Value
 
 call :: Function -> Value -> Maybe Value
-call Add (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 + x2))
 call Mul (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 * x2))
 call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
@@ -77,10 +78,45 @@ eval env (c : cs) = do
         note ("Could not pop " ++ show v ++ " when duping") $ pop v env
       let insertNew = M.insert v1 t . M.insert v2 t
       pure (insertNew envWithoutV)
-    Lit v value -> pure (M.insert v value env)
+    Lit v value    -> pure (M.insert v value env)
+    Add v (v1, v2) -> do
+      (FloatV t1, env1) <- note "Add" $ pop v1 env
+      (FloatV t2, env2) <- note "Add" $ pop v2 env1
+      pure (M.insert v (FloatV (t1 + t2)) env2)
+
+vf, vr :: Var -> Var
+vf = (++ "f")
+vr = (++ "r")
+
+rev :: Prog -> (Prog, [Var], [Var] -> Prog)
+rev []       = ([], [], const [])
+rev (c : cs) = case c of
+  Add v (v1, v2) ->
+    ( Add (vf v) (vf v1, vf v2) : pf
+    , xs
+    , \xs' -> pr xs' ++ [Dup (vr v1, vr v2) (vr v)]
+    )
+    where (pf, xs, pr) = rev cs
+  Call _v' f _vv -> case f of
+    Sub -> undefined
+    Mul -> undefined
+    Div -> undefined
+  Tuple t vs -> (Tuple t vs : pf, xs, \xs' -> pr xs' ++ [Untuple vs t])
+    where (pf, xs, pr) = rev cs
+  Untuple{} -> undefined
+  Dup (v1, v2) v ->
+    ( Dup (vf v1, vf v2) (vf v) : pf
+    , xs
+    , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
+    )
+    where (pf, xs, pr) = rev cs
+  Lit{} -> undefined
+
+rev2 :: Prog -> Prog
+rev2 p = pf ++ pr vs where (pf, vs, pr) = rev p
 
 example :: Prog
-example = [Tuple "t" ["x", "y"], Call "z" Add "t", Dup ("z1", "z2") "z"]
+example = [Add "z" ("x", "y"), Dup ("z1", "z2") "z"]
 
 awf :: Prog
 awf =
@@ -105,8 +141,7 @@ awf =
   , Lit "3" (FloatV 3)
   , Tuple "3_r" ["3", "r"]
   , Call "3*r" Mul "3_r"
-  , Tuple "2*p*q_3*r" ["2*p*q", "3*r"]
-  , Call "v" Add "2*p*q_3*r"
+  , Add "v" ("2*p*q", "3*r")
   ]
 
 awff :: Fractional a => a -> a -> a
@@ -156,6 +191,7 @@ awff_rev x y dα_dv =
 test :: IO ()
 test = do
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) example)
+  print (rev2 example)
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) awf)
   print (awff (3.0 :: Double) 4.0)
 
