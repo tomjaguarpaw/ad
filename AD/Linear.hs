@@ -32,7 +32,7 @@ call :: Function -> Value -> Maybe Value
 call Mul (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 * x2))
 call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
-call SqR (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (- x1 / (x2 * x2)))
+call SqR (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (-x1 / (x2 * x2)))
 call _   _                               = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
