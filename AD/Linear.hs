@@ -32,7 +32,8 @@ call :: Function -> Value -> Maybe Value
 call Mul (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 * x2))
 call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
-call SqR (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (-x1 / (x2 * x2)))
+call SqR (TupleV [FloatV x1, FloatV x2, FloatV x3])
+  = Just (FloatV (-(x1 * x3) / (x2 * x2)))
 call _   _                               = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
@@ -148,8 +149,9 @@ rev (c : cs) =
             , \(v12 : v22 : xs') ->
               pr xs'
                 ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
-                   , Tuple (vv ++ "t1") [vr v ++ "1", v12]
-                   , Tuple (vv ++ "t2") [vr v ++ "2", v22]
+                   , Dup (v12 ++ "1", v12 ++ "2") v12
+                   , Tuple (vv ++ "t1") [vr v ++ "1", v12 ++ "1"]
+                   , Tuple (vv ++ "t2") [v12 ++ "2", v22, vr v ++ "2"]
                    , Call (vv ++ "t1m") Div (vv ++ "t1")
                    , Call (vv ++ "t2m") SqR (vv ++ "t2")
                    , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
@@ -183,9 +185,9 @@ awf =
   , Tuple "7x" ["7", "x1"]
   , Call "p" Mul "7x"
   , Dup ("p1", "p2") "p"
-  , Lit "1" (FloatV 1)
-  , Tuple "1/y" ["1", "y"]
-  , Call "r" Div "1/y"
+  , Lit "11" (FloatV 11)
+  , Tuple "11/y" ["11", "y"]
+  , Call "r" Div "11/y"
   , Tuple "px" ["p1", "x2"]
   , Call "p*x" Mul "px"
   , Lit "5" (FloatV 5)
@@ -205,7 +207,7 @@ awf =
 awff :: Fractional a => a -> a -> a
 awff x y =
   let p = 7 * x
-      r = 1 / y
+      r = 11 / y
       q = p * x * 5
       v = 2 * p * q + 3 * r
   in  v
@@ -234,7 +236,7 @@ awff_rev x y dα_dv =
       dv_dy = 0
 
       dr_dx = 0
-      dr_dy = -1 / (y * y)
+      dr_dy = -11 / (y * y)
 
       dq_dx = p * 5
       dq_dy = 0
