@@ -112,13 +112,12 @@ vr = (++ "r")
 
 rev :: Prog -> (Prog, [Var], [Var] -> Prog)
 rev []       = ([], [], const [])
-rev (c : cs) = case c of
+rev (c : cs) = let (pf, xs, pr) = rev cs in case c of
   Add v (v1, v2) ->
     ( Add (vf v) (vf v1, vf v2) : pf
     , xs
     , \xs' -> pr xs' ++ [Dup (vr v1, vr v2) (vr v)]
     )
-    where (pf, xs, pr) = rev cs
   Call v f vv -> case f of
     Sub -> error "Sub"
     Mul ->
@@ -137,7 +136,6 @@ rev (c : cs) = case c of
              , Tuple (vr vv) [vv ++ "t2m", vv ++ "t1m"]
              ]
       )
-      where (pf, xs, pr) = rev cs
     Div ->
       ( Dup (vv ++ "1", vv ++ "2") vv
         : Untuple [vv ++ "at1", vv ++ "at2"] (vv ++ "1")
@@ -154,23 +152,19 @@ rev (c : cs) = case c of
              , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
              ]
       )
-      where (pf, xs, pr) = rev cs
     SqR -> undefined
   Tuple t vs ->
     ( Tuple (vf t) (map vf vs) : pf
     , xs
     , \xs' -> pr xs' ++ [Untuple (map vr vs) (vr t)]
     )
-    where (pf, xs, pr) = rev cs
   Untuple{} -> error "Untuple"
   Dup (v1, v2) v ->
     ( Dup (vf v1, vf v2) (vf v) : pf
     , xs
     , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
     )
-    where (pf, xs, pr) = rev cs
   Lit v lit -> (Lit (vf v) lit : pf, xs, \xs' -> pr xs' ++ [Elim (vr v)])
-    where (pf, xs, pr) = rev cs
   Elim{} -> error "Elim"
 
 rev2 :: Prog -> Prog
