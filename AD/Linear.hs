@@ -47,30 +47,37 @@ note s = \case
 
 eval :: Env -> Prog -> Either String Env
 eval env []       = pure env
-eval env (c : cs) = case c of
-  Call v' f vv -> do
-    (t, envWithoutv) <-
-      note ("Could not pop " ++ show vv ++ " when calling") $ pop vv env
-    vvv <- note ("Could not call " ++ show f) $ call f t
-    eval (M.insert v' vvv envWithoutv) cs
-  Tuple v' vs -> do
-    let
-      newVars = forWithState (S.each vs) env $ \(vv, env_) -> do
-        (t, envWithoutV) <- S.lift
-          (note ("Could not pop " ++ show vv ++ " when tupling") $ pop vv env_)
-        S.yield t
-        pure envWithoutV
+eval env (c : cs) = do
+  env' <- env'E
+  eval env' cs
+ where
+  env'E = case c of
+    Call v' f vv -> do
+      (t, envWithoutv) <-
+        note ("Could not pop " ++ show vv ++ " when calling") $ pop vv env
+      vvv <- note ("Could not call " ++ show f) $ call f t
+      pure (M.insert v' vvv envWithoutv)
+    Tuple v' vs -> do
+      let
+        newVars = forWithState (S.each vs) env $ \(vv, env_) -> do
+          (t, envWithoutV) <-
+            S.lift
+              ( note ("Could not pop " ++ show vv ++ " when tupling")
+              $ pop vv env_
+              )
+          S.yield t
+          pure envWithoutV
 
-    (ts S.:> ((), envFinal)) <- S.toList newVars
+      (ts S.:> ((), envFinal)) <- S.toList newVars
 
-    eval (M.insert v' (TupleV ts) envFinal) cs
-  Untuple{}      -> undefined
-  Dup (v1, v2) v -> do
-    (t, envWithoutV) <-
-      note ("Could not pop " ++ show v ++ " when duping") $ pop v env
-    let insertNew = M.insert v1 t . M.insert v2 t
-    eval (insertNew envWithoutV) cs
-  Lit v value -> eval (M.insert v value env) cs
+      pure (M.insert v' (TupleV ts) envFinal)
+    Untuple{}      -> undefined
+    Dup (v1, v2) v -> do
+      (t, envWithoutV) <-
+        note ("Could not pop " ++ show v ++ " when duping") $ pop v env
+      let insertNew = M.insert v1 t . M.insert v2 t
+      pure (insertNew envWithoutV)
+    Lit v value -> pure (M.insert v value env)
 
 example :: Prog
 example = [Tuple "t" ["x", "y"], Call "z" Add "t", Dup ("z1", "z2") "z"]
