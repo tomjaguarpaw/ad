@@ -149,9 +149,9 @@ rev (c : cs) =
             , \(v12 : v22 : xs') ->
               pr xs'
                 ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
-                   , Dup (v12 ++ "1", v12 ++ "2") v12
-                   , Tuple (vv ++ "t1") [vr v ++ "1", v12 ++ "1"]
-                   , Tuple (vv ++ "t2") [v12 ++ "2", v22, vr v ++ "2"]
+                   , Dup (v22 ++ "1", v22 ++ "2") v22
+                   , Tuple (vv ++ "t1") [vr v ++ "1", v22 ++ "1"]
+                   , Tuple (vv ++ "t2") [v12, v22 ++ "2", vr v ++ "2"]
                    , Call (vv ++ "t1m") Div (vv ++ "t1")
                    , Call (vv ++ "t2m") SqR (vv ++ "t2")
                    , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
