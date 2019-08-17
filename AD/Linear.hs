@@ -251,14 +251,8 @@ test = do
   print (awff (3.0 :: Double) 4.0)
 
   print
-    (eval
-      (M.fromList
-        [ ("x"  , FloatV 3)
-        , ("y"  , FloatV 4)
-        , ("vr" , FloatV 1)
-        ]
-      )
-      (rev2 awf)
+    (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)])
+          (rev2 awf)
     )
   print (awff_rev (3.0 :: Double) 4.0 1.0)
 
