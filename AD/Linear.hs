@@ -32,9 +32,9 @@ call :: Function -> Value -> Maybe Value
 call Mul (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 * x2))
 call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
-call SqR (TupleV [FloatV x1, FloatV x2, FloatV x3])
-  = Just (FloatV (-(x1 * x3) / (x2 * x2)))
-call _   _                               = Nothing
+call SqR (TupleV [FloatV x1, FloatV x2, FloatV x3]) =
+  Just (FloatV (-(x1 * x3) / (x2 * x2)))
+call _ _ = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
 -- A good example for typeclass dictionaries?
@@ -149,7 +149,7 @@ rev (c : cs) =
             , \(v12 : v22 : xs') ->
               pr xs'
                 ++ [ Dup (vr v ++ "1", vr v ++ "2") (vr v)
-                   , Dup (v22 ++ "1", v22 ++ "2") v22
+                   , Dup (v22 ++ "1" , v22 ++ "2")  v22
                    , Tuple (vv ++ "t1") [vr v ++ "1", v22 ++ "1"]
                    , Tuple (vv ++ "t2") [v12, v22 ++ "2", vr v ++ "2"]
                    , Call (vv ++ "t1m") Div (vv ++ "t1")
