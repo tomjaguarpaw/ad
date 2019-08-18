@@ -9,7 +9,8 @@ import qualified Streaming                     as S
 import qualified Streaming.Prelude             as S
 import qualified Control.Monad.State           as St
 
-data Value = FloatV Float | TupleV [Value] deriving Show
+data Value = FloatV Float | TupleV [Value] | VectorV (Seq.Seq Value)
+  deriving Show
 
 data Function = Mul | Sub | Div | SqR deriving Show
 
