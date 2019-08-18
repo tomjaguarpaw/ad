@@ -214,7 +214,8 @@ rev (c : cs) =
                    , Tuple (vr vv) [vr vv ++ "$vector", vv ++ "$old_index"]
                    ]
             )
-          IncAt -> error "rev of IncAt"
+          IncAt   -> error "rev of IncAt"
+          ToFloat -> error "ToFloat"
         Tuple t vs -> ff
           ( [Tuple (vf t) (map vf vs)]
           , []
@@ -288,6 +289,22 @@ triangleexample :: Prog
 triangleexample = [ForRange "n" "acc_in" ("i", "acc") loop "acc'" "acc_res"]
   where loop = [Call "i_f" ToFloat "i", Add "acc'" ("i_f", "acc")]
 
+sumexample :: Prog
+sumexample =
+  [ Lit "acc_in" (FloatV 0)
+  , Tuple "v_acc_in" ["v_in", "acc_in"]
+  , ForRange "n" "v_acc_in" ("i", "v_acc") loop "v_acc'" "v_acc_res"
+  ]
+ where
+  loop =
+    [ Untuple ["v", "acc"] "v_acc"
+    , Tuple "v_i" ["v", "i"]
+    , Call "v'_vi" Index "v_i"
+    , Untuple ["v'", "vi"] "v'_vi"
+    , Add "acc'" ("acc", "vi")
+    , Tuple "v_acc'" ["v'", "acc'"]
+    ]
+
 awff :: Fractional a => a -> a -> a
 awff x y =
   let p = 7 * x
@@ -342,15 +359,15 @@ test = do
   printExample [("x", FloatV 3), ("y", FloatV 4)] awf
   print (awff (3.0 :: Double) 4.0)
 
-  let range10 = map (FloatV . (* 10)) [0 .. 9]
+  let range10 = VectorV (Seq.fromList (map (FloatV . (* 10)) [0 .. 9]))
 
   putStrLn "Index example"
-  printExample [("v", VectorV (Seq.fromList range10))] indexexample
-  printExample [("v", VectorV (Seq.fromList range10))] indexincexample
+  printExample [("v", range10)] indexexample
+  printExample [("v", range10)] indexincexample
   printExample
     [ ("v'r" , VectorV (Seq.replicate 10 (FloatV 0)))
     , ("v_3r", FloatV 11)
-    , ("v"   , VectorV (Seq.fromList range10))
+    , ("v"   , range10)
     ]
     (rev2 indexexample)
 
@@ -358,6 +375,7 @@ test = do
   print (awff_rev (3.0 :: Double) 4.0 1.0)
 
   printExample [("n", IntV 10), ("acc_in", FloatV 0)] triangleexample
+  printExample [("n", IntV 10), ("v_in", range10)]    sumexample
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
 sexample = forWithState (S.each [1 .. 10]) "" $ \(i, s) -> do
