@@ -9,11 +9,12 @@ import qualified Streaming                     as S
 import qualified Streaming.Prelude             as S
 import qualified Data.Sequence                 as Seq
 import qualified Control.Monad.State           as St
+import qualified Control.Lens                  as L
 
 data Value = FloatV Float
            | IntV Int
            | TupleV [Value]
-           | VectorV (Seq.Seq Float)
+           | VectorV (Seq.Seq Value)
            | UnitV
   deriving Show
 
@@ -41,9 +42,16 @@ call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
 call SqR (TupleV [FloatV x1, FloatV x2, FloatV x3]) =
   Just (FloatV (-(x1 * x3) / (x2 * x2)))
 call Index (TupleV [VectorV v, IntV i]) =
-  Just (TupleV [VectorV v, FloatV (Seq.index v i)])
-call IncAt (TupleV [VectorV v, IntV i, FloatV a]) =
-  Just (VectorV (Seq.adjust' (+ a) i v))
+  Just (TupleV [VectorV v, Seq.index v i])
+call IncAt (TupleV [VectorV v, IntV i, FloatV a]) = do
+  v' <- L.traverseOf
+    (L.ix i)
+    (\case
+      FloatV v_i -> Just (FloatV (v_i + a))
+      _          -> Nothing
+    )
+    v
+  pure (VectorV v')
 call _ _ = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
@@ -308,15 +316,17 @@ test = do
   printExample [("x", FloatV 3), ("y", FloatV 4)] awf
   print (awff (3.0 :: Double) 4.0)
 
+  let range10 = map (FloatV . (* 10)) [0 .. 9]
+
   putStrLn "Index example"
-  printExample [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))]
+  printExample [("v", VectorV (Seq.fromList range10))]
                indexexample
-  printExample [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))]
+  printExample [("v", VectorV (Seq.fromList range10))]
                indexincexample
   printExample
-    [ ("v'r" , VectorV (Seq.replicate 10 0))
+    [ ("v'r" , VectorV (Seq.replicate 10 (FloatV 0)))
     , ("v_3r", FloatV 11)
-    , ("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))
+    , ("v", VectorV (Seq.fromList range10))
     ]
     (rev2 indexexample)
 
