@@ -18,7 +18,7 @@ data Value = FloatV Float
            | UnitV
   deriving Show
 
-data Function = Mul | Sub | Div | SqR | Index | IncAt deriving Show
+data Function = Mul | Sub | Div | SqR | Index | IncAt | ToFloat deriving Show
 
 data Cmd = Call Var Function Var
          | Tuple Var [Var]
@@ -27,6 +27,8 @@ data Cmd = Call Var Function Var
          | Add Var (Var, Var)
          | Lit Var Value
          | Elim Var
+         | ForRange Var Var (Var, Var) Prog Var Var
+         | ForRangeRev Var Var (Var, Var) Prog Var Var
          deriving Show
 
 type Prog = [Cmd]
@@ -52,7 +54,8 @@ call IncAt (TupleV [VectorV v, IntV i, FloatV a]) = do
     )
     v
   pure (VectorV v')
-call _ _ = Nothing
+call ToFloat (IntV i) = Just (FloatV (fromIntegral i))
+call _       _        = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
 -- A good example for typeclass dictionaries?
@@ -124,6 +127,24 @@ eval env (c : cs) = do
       (_, envWithoutV) <-
         note ("Could not pop " ++ show v ++ " when Eliming") $ pop v env
       pure envWithoutV
+    ForRange nV sV (iPV, sPV) prog s'PV s'V -> do
+      (IntV n, envWithoutN) <- note ("Pop in ForRange: " ++ show nV)
+        $ pop nV env
+      (s, envWithoutNS) <- note ("Pop in ForRange: " ++ show sV)
+        $ pop sV envWithoutN
+      let
+        runRange =
+          forWithState (S.each [0 .. n - 1]) (envWithoutNS, s)
+            $ \(i, (env_, s_)) -> do
+                let env_i_s = (M.insert iPV (IntV i) . M.insert sPV s_) env_
+                env'               <- S.lift (eval env_i_s prog)
+                (s', envWithoutS') <- S.lift
+                  (note "Pop in ForRange" $ pop s'PV env')
+                pure (envWithoutS', s')
+
+      (_ S.:> ((), (envRange, sFinal))) <- S.toList runRange
+      pure (M.insert s'V sFinal envRange)
+    ForRangeRev{} -> error "ForRangeRev"
 
 
 vf, vr :: Var -> Var
@@ -210,7 +231,9 @@ rev (c : cs) =
           , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
           )
         Lit v lit -> ff ([Lit (vf v) lit], [], \xs' -> pr xs' ++ [Elim (vr v)])
-        Elim{}    -> error "Elim"
+        Elim{}        -> error "Elim"
+        ForRange{}    -> error "ForRange"
+        ForRangeRev{} -> error "ForRangeRev"
 
 rev2 :: Prog -> Prog
 rev2 p = pf ++ pr vs where (pf, vs, pr) = rev p
@@ -261,6 +284,9 @@ indexincexample =
        , Call "v''" IncAt "v'_5_1000"
        ]
 
+triangleexample :: Prog
+triangleexample = [ForRange "n" "acc_in" ("i", "acc") loop "acc'" "acc_res"]
+  where loop = [Call "i_f" ToFloat "i", Add "acc'" ("i_f", "acc")]
 
 awff :: Fractional a => a -> a -> a
 awff x y =
@@ -319,19 +345,19 @@ test = do
   let range10 = map (FloatV . (* 10)) [0 .. 9]
 
   putStrLn "Index example"
-  printExample [("v", VectorV (Seq.fromList range10))]
-               indexexample
-  printExample [("v", VectorV (Seq.fromList range10))]
-               indexincexample
+  printExample [("v", VectorV (Seq.fromList range10))] indexexample
+  printExample [("v", VectorV (Seq.fromList range10))] indexincexample
   printExample
     [ ("v'r" , VectorV (Seq.replicate 10 (FloatV 0)))
     , ("v_3r", FloatV 11)
-    , ("v", VectorV (Seq.fromList range10))
+    , ("v"   , VectorV (Seq.fromList range10))
     ]
     (rev2 indexexample)
 
   printExample [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)] (rev2 awf)
   print (awff_rev (3.0 :: Double) 4.0 1.0)
+
+  printExample [("n", IntV 10), ("acc_in", FloatV 0)] triangleexample
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
 sexample = forWithState (S.each [1 .. 10]) "" $ \(i, s) -> do
