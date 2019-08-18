@@ -14,6 +14,7 @@ data Value = FloatV Float
            | IntV Int
            | TupleV [Value]
            | VectorV (Seq.Seq Float)
+           | UnitV
   deriving Show
 
 data Function = Mul | Sub | Div | SqR | Index | IncAt deriving Show
@@ -168,14 +169,33 @@ rev (c : cs) =
                    ]
             )
           SqR   -> undefined
-          Index -> error "rev of Index"
+          Index -> ff
+            ( [ Untuple [vv ++ "$v", vv ++ "$i"] vv
+              , Dup (vv ++ "$i1", vv ++ "$i2") (vv ++ "$i")
+              , Tuple (vv ++ "$'") [vv ++ "$v", vv ++ "$i1"]
+              , Call v Index (vv ++ "$'")
+              ]
+            , [vv ++ "$i2"]
+            , \(i : xs') ->
+              pr xs'
+                ++ [ Untuple [v ++ "$v", v ++ "$a"] (vr v)
+                   , Tuple (v ++ "$v_i_a") [v ++ "$v", i, v ++ "$a"]
+                   , Call (vr vv ++ "$vector") IncAt (v ++ "$v_i_a")
+                   , Lit (vv ++ "$old_index") UnitV
+                   , Tuple (vr vv) [vr vv ++ "$vector", vv ++ "$old_index"]
+                   ]
+            )
           IncAt -> error "rev of IncAt"
         Tuple t vs -> ff
           ( [Tuple (vf t) (map vf vs)]
           , []
           , \xs' -> pr xs' ++ [Untuple (map vr vs) (vr t)]
           )
-        Untuple{}      -> error "Untuple"
+        Untuple vs t -> ff
+          ( [Untuple (map vf vs) (vf t)]
+          , []
+          , \xs' -> pr xs' ++ [Tuple (vr t) (map vr vs)]
+          )
         Dup (v1, v2) v -> ff
           ( [Dup (vf v1, vf v2) (vf v)]
           , []
@@ -218,16 +238,20 @@ awf =
 
 indexexample :: Prog
 indexexample =
-  [ Lit "v" (VectorV (Seq.fromList (map (* 10) [0 .. 9])))
-  , Lit "3" (IntV 3)
+  [ Lit "3" (IntV 3)
   , Tuple "t" ["v", "3"]
   , Call "v_v_3" Index "t"
   , Untuple ["v'", "v_3"] "v_v_3"
-  , Lit "5" (IntV 5)
-  , Lit "1000" (FloatV 1000)
-  , Tuple "v'_5_1000" ["v'", "5", "1000"]
-  , Call "v''" IncAt "v'_5_1000"
   ]
+
+indexincexample :: Prog
+indexincexample =
+  indexexample
+    ++ [ Lit "5"    (IntV 5)
+       , Lit "1000" (FloatV 1000)
+       , Tuple "v'_5_1000" ["v'", "5", "1000"]
+       , Call "v''" IncAt "v'_5_1000"
+       ]
 
 
 awff :: Fractional a => a -> a -> a
@@ -282,7 +306,24 @@ test = do
   print (awff (3.0 :: Double) 4.0)
 
   putStrLn "Index example"
-  print (eval (M.fromList []) indexexample)
+  print
+    (eval (M.fromList [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))])
+          indexexample
+    )
+  print
+    (eval (M.fromList [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))])
+          indexincexample
+    )
+  print
+    (eval
+      (M.fromList
+        [ ("v'r" , VectorV (Seq.replicate 10 0))
+        , ("v_3r", FloatV 11)
+        , ("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))
+        ]
+      )
+      (rev2 indexexample)
+    )
 
   print
     (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)])
