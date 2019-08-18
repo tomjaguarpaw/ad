@@ -10,10 +10,13 @@ import qualified Streaming.Prelude             as S
 import qualified Data.Sequence                 as Seq
 import qualified Control.Monad.State           as St
 
-data Value = FloatV Float | TupleV [Value] | VectorV (Seq.Seq Value)
+data Value = FloatV Float
+           | IntV Int
+           | TupleV [Value]
+           | VectorV (Seq.Seq Float)
   deriving Show
 
-data Function = Mul | Sub | Div | SqR deriving Show
+data Function = Mul | Sub | Div | SqR | Index | IncAt deriving Show
 
 data Cmd = Call Var Function Var
          | Tuple Var [Var]
@@ -36,6 +39,10 @@ call Sub (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 - x2))
 call Div (TupleV [FloatV x1, FloatV x2]) = Just (FloatV (x1 / x2))
 call SqR (TupleV [FloatV x1, FloatV x2, FloatV x3]) =
   Just (FloatV (-(x1 * x3) / (x2 * x2)))
+call Index (TupleV [VectorV v, IntV i]) =
+  Just (TupleV [VectorV v, FloatV (Seq.index v i)])
+call IncAt (TupleV [VectorV v, IntV i, FloatV a]) =
+  Just (VectorV (Seq.adjust' (+ a) i v))
 call _ _ = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
@@ -159,7 +166,9 @@ rev (c : cs) =
                    , Tuple (vr vv) [vv ++ "t1m", vv ++ "t2m"]
                    ]
             )
-          SqR -> undefined
+          SqR   -> undefined
+          Index -> error "rev of Index"
+          IncAt -> error "rev of IncAt"
         Tuple t vs -> ff
           ( [Tuple (vf t) (map vf vs)]
           , []
@@ -205,6 +214,20 @@ awf =
   , Call "3*r" Mul "3_r"
   , Add "v" ("2*p*q", "3*r")
   ]
+
+indexexample :: Prog
+indexexample =
+  [ Lit "v" (VectorV (Seq.fromList (map (* 10) [0 .. 9])))
+  , Lit "3" (IntV 3)
+  , Tuple "t" ["v", "3"]
+  , Call "v_v_3" Index "t"
+  , Untuple ["v'", "v_3"] "v_v_3"
+  , Lit "5" (IntV 5)
+  , Lit "1000" (FloatV 1000)
+  , Tuple "v'_5_1000" ["v'", "5", "1000"]
+  , Call "v''" IncAt "v'_5_1000"
+  ]
+
 
 awff :: Fractional a => a -> a -> a
 awff x y =
@@ -256,6 +279,9 @@ test = do
   print (rev2 example)
   print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) awf)
   print (awff (3.0 :: Double) 4.0)
+
+  putStrLn "Index example"
+  print (eval (M.fromList []) indexexample)
 
   print
     (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)])
