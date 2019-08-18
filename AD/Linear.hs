@@ -7,6 +7,7 @@
 import qualified Data.Map                      as M
 import qualified Streaming                     as S
 import qualified Streaming.Prelude             as S
+import qualified Data.Sequence                 as Seq
 import qualified Control.Monad.State           as St
 
 data Value = FloatV Float | TupleV [Value] | VectorV (Seq.Seq Value)
