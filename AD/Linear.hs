@@ -18,7 +18,16 @@ data Value = FloatV Float
            | UnitV
   deriving Show
 
-data Function = Mul | Sub | Div | SqR | Index | IncAt | ToFloat deriving Show
+data Function = Mul
+              | Sub
+              | Div
+              | SqR
+              | Index
+              | IncAt
+              | StoreAt
+              | ToFloat
+              | NewVec
+              deriving Show
 
 data Cmd = Call Var Function Var
          | Tuple Var [Var]
@@ -55,7 +64,14 @@ call IncAt (TupleV [VectorV v, IntV i, FloatV a]) = do
     v
   pure (VectorV v')
 call ToFloat (IntV i) = Just (FloatV (fromIntegral i))
-call _       _        = Nothing
+call StoreAt (TupleV [VectorV v, IntV i, a]) =
+  Just (VectorV (L.set (L.ix i) a v))
+call NewVec (IntV n) = Just (VectorV (Seq.replicate n dummyValue))
+  where -- We can only fill in with a dummy value at the moment
+        -- because we don't know what type to fill in with.
+        -- I guess we'll fix this later.
+        dummyValue = UnitV
+call _ _ = Nothing
 
 -- Could do this directly with `WriterT a Maybe` I think.
 -- A good example for typeclass dictionaries?
@@ -127,24 +143,36 @@ eval env (c : cs) = do
       (_, envWithoutV) <-
         note ("Could not pop " ++ show v ++ " when Eliming") $ pop v env
       pure envWithoutV
-    ForRange nV sV (iPV, sPV) prog s'PV s'V -> do
+    ForRange nV sV (iPV, sPV) prog s'PV s'V ->
+      evalForRange env (\n -> [0..n-1]) nV sV (iPV, sPV) prog s'PV s'V
+    ForRangeRev nV sV (iPV, sPV) prog s'PV s'V ->
+      evalForRange env (\n -> [n-1,n-2..0]) nV sV (iPV, sPV) prog s'PV s'V
+
+evalForRange :: Env
+             -> (Int -> [Int])
+             -> Var
+             -> Var
+             -> (Var, Var)
+             -> Prog
+             -> [Char]
+             -> Var
+             -> Either String (M.Map Var Value)
+evalForRange env range nV sV (iPV, sPV) prog s'PV s'V = do
       (IntV n, envWithoutN) <- note ("Pop in ForRange: " ++ show nV)
         $ pop nV env
       (s, envWithoutNS) <- note ("Pop in ForRange: " ++ show sV)
         $ pop sV envWithoutN
-      let
-        runRange =
-          forWithState (S.each [0 .. n - 1]) (envWithoutNS, s)
-            $ \(i, (env_, s_)) -> do
-                let env_i_s = (M.insert iPV (IntV i) . M.insert sPV s_) env_
-                env'               <- S.lift (eval env_i_s prog)
-                (s', envWithoutS') <- S.lift
-                  (note "Pop in ForRange" $ pop s'PV env')
-                pure (envWithoutS', s')
+      let runRange =
+            forWithState (S.each (range n)) (envWithoutNS, s)
+              $ \(i, (env_, s_)) -> do
+                  let env_i_s = (M.insert iPV (IntV i) . M.insert sPV s_) env_
+                  env'               <- S.lift (eval env_i_s prog)
+                  (s', envWithoutS') <- S.lift
+                    (note ("Pop in ForRange: " ++ s'PV) $ pop s'PV env')
+                  pure (envWithoutS', s')
 
       (_ S.:> ((), (envRange, sFinal))) <- S.toList runRange
       pure (M.insert s'V sFinal envRange)
-    ForRangeRev{} -> error "ForRangeRev"
 
 
 vf, vr :: Var -> Var
@@ -216,6 +244,8 @@ rev (c : cs) =
             )
           IncAt   -> error "rev of IncAt"
           ToFloat -> error "ToFloat"
+          NewVec  -> error "NewVec"
+          StoreAt -> error "StoreAt"
         Tuple t vs -> ff
           ( [Tuple (vf t) (map vf vs)]
           , []
@@ -232,8 +262,69 @@ rev (c : cs) =
           , \xs' -> pr xs' ++ [Add (vr v) (vr v1, vr v2)]
           )
         Lit v lit -> ff ([Lit (vf v) lit], [], \xs' -> pr xs' ++ [Elim (vr v)])
-        Elim{}        -> error "Elim"
-        ForRange{}    -> error "ForRange"
+        Elim{}    -> error "Elim"
+        ForRange nV sV (iPV, sPV) prog s'PV s'V ->
+          let
+            (progf, progtrace, progr) = rev prog
+            progfstoretrace =
+              [ Untuple [sPV, nV ++ "$P_looptrace"] (nV ++ "$P_s_looptrace")
+                -- Duplicating and keeping the same name is not ideal
+                -- but we may get away with it.
+                , Dup (iPV, iPV ++ "$2") iPV
+                ]
+                ++ progf
+                ++ [ Tuple (nV ++ "$progtrace") progtrace
+                   , Tuple
+                     (nV ++ "$v_i_a")
+                     [nV ++ "$P_looptrace", iPV ++ "$2", nV ++ "$progtrace"]
+                   , Call (nV ++ "$P_looptrace'") StoreAt (nV ++ "$v_i_a")
+                   , Tuple (nV ++ "$P_s_looptrace'")
+                           [s'PV, nV ++ "$P_looptrace'"]
+                   ]
+            progrstoretrace =
+              [ Dup (vr iPV, vr iPV ++ "$2") (vr iPV)
+              , Untuple [vr s'PV, vr nV ++ "$P_looptrace'"]
+                        (vr nV ++ "$P_s_looptrace'")
+              , Tuple (vr nV ++ "$P_looptrace'_i")
+                      [vr nV ++ "$P_looptrace'", vr iPV ++ "$2"]
+              , Call (vr nV ++ "$v_i") Index (vr nV ++ "$P_looptrace'_i")
+              , Untuple [vr nV ++ "$P_looptrace", vr nV ++ "$progtrace"]
+                        (vr nV ++ "$v_i")
+              , Untuple (map vr progtrace) (vr nV ++ "$progtrace")
+              ]
+              ++ progr (map vr progtrace)
+              ++ [ Tuple (vr nV ++ "$P_s_looptrace")
+                         [vr sPV, vr nV ++ "$P_looptrace"]
+                 ]
+          in
+            ff
+              ( [ Dup (nV ++ "$again", nV ++ "$1") nV
+                , Dup (nV ++ "$2"    , nV ++ "$3") (nV ++ "$again")
+                , Call (nV ++ "$looptrace") NewVec (nV ++ "$1")
+                , Tuple (nV ++ "$s_looptrace") [sV, nV ++ "$looptrace"]
+                , ForRange (nV ++ "$2")
+                           (nV ++ "$s_looptrace")
+                           (iPV, nV ++ "$P_s_looptrace")
+                           progfstoretrace
+                           (nV ++ "$P_s_looptrace'")
+                           (nV ++ "$s_looptrace'")
+                , Untuple [s'V, nV ++ "$looptrace'"] (nV ++ "$s_looptrace'")
+                ]
+              , [nV ++ "$3", nV ++ "$looptrace'"]
+              , \(nV2 : nVs_looptrace' : xs') ->
+                pr xs'
+                  ++ [Tuple (vr nV ++ "$s_looptrace'") [vr s'V, nVs_looptrace']
+                     , ForRangeRev nV2
+                                   (vr nV ++ "$s_looptrace'")
+                                   (vr iPV, vr nV ++ "$P_s_looptrace'")
+                                   progrstoretrace
+                                   (vr nV ++ "$P_s_looptrace")
+                                   (vr nV ++ "$s_looptrace")
+                     , Untuple [vr sV, vr nV ++ "$looptrace"]
+                               (vr nV ++ "$s_looptrace")
+                     , Elim (vr nV ++ "$looptrace")
+                     ]
+              )
         ForRangeRev{} -> error "ForRangeRev"
 
 rev2 :: Prog -> Prog
@@ -376,6 +467,12 @@ test = do
 
   printExample [("n", IntV 10), ("acc_in", FloatV 0)] triangleexample
   printExample [("n", IntV 10), ("v_in", range10)]    sumexample
+  printExample
+    [ ("n", IntV 10)
+    , ("v_in", range10)
+    , ("v_acc_resr", TupleV [VectorV (Seq.replicate 10 (FloatV 100)), FloatV 66])
+    ]
+    (rev2 sumexample)
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
 sexample = forWithState (S.each [1 .. 10]) "" $ \(i, s) -> do
