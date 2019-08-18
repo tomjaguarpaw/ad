@@ -298,37 +298,29 @@ awff_rev x y dα_dv =
       dα_dy = dα_dp * dp_dy + dα_dq * dq_dy + dα_dr * dr_dy + dα_dv * dv_dy
   in  (dα_dx, dα_dy)
 
+printExample :: [(Var, Value)] -> Prog -> IO ()
+printExample bindings = print . eval (M.fromList bindings)
+
 test :: IO ()
 test = do
-  print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) example)
+  printExample [("x", FloatV 3), ("y", FloatV 4)] example
   print (rev2 example)
-  print (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4)]) awf)
+  printExample [("x", FloatV 3), ("y", FloatV 4)] awf
   print (awff (3.0 :: Double) 4.0)
 
   putStrLn "Index example"
-  print
-    (eval (M.fromList [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))])
-          indexexample
-    )
-  print
-    (eval (M.fromList [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))])
-          indexincexample
-    )
-  print
-    (eval
-      (M.fromList
-        [ ("v'r" , VectorV (Seq.replicate 10 0))
-        , ("v_3r", FloatV 11)
-        , ("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))
-        ]
-      )
-      (rev2 indexexample)
-    )
+  printExample [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))]
+               indexexample
+  printExample [("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))]
+               indexincexample
+  printExample
+    [ ("v'r" , VectorV (Seq.replicate 10 0))
+    , ("v_3r", FloatV 11)
+    , ("v", VectorV (Seq.fromList (map (* 10) [0 .. 9])))
+    ]
+    (rev2 indexexample)
 
-  print
-    (eval (M.fromList [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)])
-          (rev2 awf)
-    )
+  printExample [("x", FloatV 3), ("y", FloatV 4), ("vr", FloatV 1)] (rev2 awf)
   print (awff_rev (3.0 :: Double) 4.0 1.0)
 
 sexample :: Monad m => S.Stream (S.Of Integer) m ((), String)
