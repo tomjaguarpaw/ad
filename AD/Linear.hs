@@ -68,7 +68,8 @@ eval env (c : cs) = do
     Call v' f vv -> do
       (t, envWithoutv) <-
         note ("Could not pop " ++ show vv ++ " when calling") $ pop vv env
-      vvv <- note ("Could not call " ++ show f) $ call f t
+      vvv <- note ("Could not call " ++ show f ++ " with arg " ++ show t)
+        $ call f t
       pure (M.insert v' vvv envWithoutv)
     Tuple v' vs -> do
       let
