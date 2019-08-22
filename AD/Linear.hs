@@ -486,35 +486,31 @@ forWithState
   -> s
   -> ((a, s) -> S.Stream f m s)
   -> S.Stream f m (r, s)
-forWithState stream initialState f = St.runStateT (switch inStateT)
+forWithState stream initialState f = St.runStateT (S.distribute inStateT)
                                                   initialState
  where
   inStateT :: S.Stream f (St.StateT s m) r
-  inStateT = S.for (S.hoist S.lift stream) $ \a -> do
-    s  <- St.lift St.get
-    s' <- S.hoist S.lift (f (a, s))
-    St.lift (St.put s')
+  inStateT = S.for (S.hoist S.lift stream) $
+    \a -> stateTInside (\s -> do { s' <- f (a, s); pure ((), s') })
 
-switch
-  :: ( Functor f
-     , Monad m
-     , Monad (t m)
-     , St.MonadTrans t
-     , Monad (t (S.Stream f m))
-     , S.MFunctor t
-     )
-  => S.Stream f (t m) a
-  -> t (S.Stream f m) a
-switch s = S.destroy s yieldsT effectT pure
+stateTInside :: (St.MonadState s (stateT_s m),
+        S.MFunctor t,
+        St.MonadTrans t,
+        St.MonadTrans stateT_s,
+        Monad m,
+        Monad (t (stateT_s m)))
+    =>  (s -> t m (b, s)) -> t (stateT_s m) b
+stateTInside f = switchStateT (St.StateT f)
 
-yieldsT
-  :: (Functor f, Monad m, St.MonadTrans t, Monad (t (S.Stream f m)))
-  => f (t (S.Stream f m) a)
-  -> t (S.Stream f m) a
-yieldsT = St.join . S.lift . S.yields
-
-effectT
-  :: (Monad (t (streamf m)), Monad m, St.MonadTrans streamf, S.MFunctor t)
-  => t m (t (streamf m) a)
-  -> t (streamf m) a
-effectT = St.join . S.hoist S.lift
+switchStateT :: (St.MonadTrans t,
+        St.MonadState s (stateT_s m),
+        S.MFunctor t,
+        Monad (t (stateT_s m)),
+        St.MonadTrans stateT_s,
+        Monad m)
+    => St.StateT s (t m) b -> t (stateT_s m) b
+switchStateT f = do
+  s <- S.lift St.get
+  (a, s') <- S.hoist S.lift (St.runStateT f s)
+  St.lift (St.put s')
+  return a
