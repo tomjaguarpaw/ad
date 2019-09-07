@@ -27,8 +27,7 @@ type a ~> b = forall r . a r -> b r
 
 lensIdentity
   :: (MFunctor t, Monad a, Monad b)
-  => (a ~> t b)
-  -> (IdentityT a ~> t (IdentityT b))
+  => LensLike t (IdentityT a) (IdentityT b) a b
 lensIdentity f s = commuteIdentityT (hoist f s)
 
 -- `MonadTrans` is like `Pointed` so this is akin to an affine traversal
