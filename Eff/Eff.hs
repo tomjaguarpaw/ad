@@ -2,6 +2,7 @@
 {-# LANGUAGE KindSignatures   #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeOperators    #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 import           Control.Monad
 import           Control.Monad.Morph
@@ -28,7 +29,12 @@ type a ~> b = forall r . a r -> b r
 lensIdentity
   :: (MFunctor t, Monad a, Monad b)
   => LensLike t (IdentityT a) (IdentityT b) a b
-lensIdentity f s = commuteIdentityT (hoist f s)
+lensIdentity f = commuteIdentityT . hoist f
+
+unlensIdentity
+  :: (MFunctor t, Monad a, Monad b)
+  => LensLike t a b (IdentityT a) (IdentityT b)
+unlensIdentity f = hoist runIdentityT . f . IdentityT
 
 -- `MonadTrans` is like `Pointed` so this is akin to an affine traversal
 --
@@ -44,8 +50,12 @@ affineState f s = commuteStateT (hoist f s)
 -- and FreeT, because their commutors all have that MonadTrans
 -- constraint.
 
+transformed
+  :: (Monad a, Monad b, MFunctor t)
+  => ASetter (t a) (t b) a b
+transformed f = uncommuteIdentityT . hoist f
 
--- In fact we can literally just crib some of the definition from
+-- In fact we can literally just crib some of the definitions from
 -- lens.
 
 type LensLike f s (t :: * -> *) a b = (a ~> f b) -> (s ~> f t)
@@ -69,9 +79,26 @@ over l f = runIdentityT . l (IdentityT . f)
 traverseOf :: LensLike f s t a b -> (a ~> f b) -> (s ~> f t)
 traverseOf l = l
 
+sequenceOf :: LensLike f s t (f b) b -> (s ~> f t)
+sequenceOf l = l id
+
+-- Squash the StateT next to the b, pulling the f outsite
+squashState :: (Monad b, Monad n, MFunctor f, MonadTrans f,
+                Monad (f (StateT s b)), Monad (f b))
+            => ((StateT s b ~> n) -> (StateT s (f b) ~> f n))
+squashState f = over transformed f . sequenceOf affineState
+
 -- I can't imagine that we can write `set` or `view` although I
 -- haven't looked in detail into why not.
 
+
+-- over transformed picks up an additional constraint compared to
+-- hoist.  I'm not sure why.
+overTransformed :: (MFunctor t, Monad a, Monad b) => (a ~> b) -> (t a ~> t b)
+overTransformed = over transformed
+
+hoist' :: (MFunctor t, Monad a) => (a ~> b) -> (t a ~> t b)
+hoist' = hoist
 
 -- THE END
 
@@ -86,7 +113,11 @@ traverseOf l = l
 
 commuteIdentityT
   :: (MFunctor t, Monad m) => IdentityT (t m) b -> t (IdentityT m) b
-commuteIdentityT f = hoist IdentityT (runIdentityT f)
+commuteIdentityT = hoist IdentityT . runIdentityT
+
+uncommuteIdentityT
+  :: (MFunctor t, Monad m) => t (IdentityT m) b -> IdentityT (t m) b
+uncommuteIdentityT = IdentityT . hoist runIdentityT
 
 commuteStateT
   :: (MonadTrans t, MFunctor t, Monad (t (StateT s m)), Monad m)
