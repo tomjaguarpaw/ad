@@ -205,7 +205,8 @@ happened in the earlier version.
 \end{tabular}
 
 Now the input program has the nice property that every variable is
-defined exactly once and also used exactly once.
+defined exactly once and also used exactly once (except for the inputs
+and outputs).
 
 \section{Arrays}
 
@@ -239,7 +240,7 @@ all cases.
 \section{Purity}
 
 It seems that mutation is essential for efficient reverse mode AD on
-array programs yet it also seems that absense of mutation is essential
+array programs yet it also seems that absence of mutation is essential
 for purity.  Can this apparent tension be resolved?  It turns out the
 answer is yes.  Let's consider how by examining what purity is, and
 more importantly, why we want a language to be pure.
@@ -275,7 +276,17 @@ happens but cannot be observed in other parts of the program then we
 \emph{can} apply the above transformations and the benefits of purity
 continue to hold.
 
-How do we resolve this tension?  
+This give us the clue we need to resolve the tension.  The explicit
+duplication pass described above ensures that every variable is used
+only once.  If a variable referring to an array is used only once then
+we can safely mutate it knowing that this mutation can never be
+observed!
+
+Initially, this sounds like a semantic sleight of hand. 
+
+
+ until we realise that
+every pure input program can be 
 
 
 
