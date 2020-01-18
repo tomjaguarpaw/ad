@@ -1,0 +1,89 @@
+\documentclass[12pt]{article}
+\usepackage{makecell,amsmath}
+\usepackage[a4paper, total={6.5in, 8in}]{geometry}
+
+\title{A note on efficient automatic differentiation of array programs
+  in a linear language}
+
+\begin{document}
+
+\maketitle
+
+In \cite{adml} the authors demonstrate how to differentiate an example
+program, $y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
+
+  \newcommand{\diff}[2]{
+    \bar{v}_{#1} \frac{\partial v_{#1}}{\partial v_{#2}}
+  }
+
+\begin{tabular}[t]{ll}
+
+  $v_1 = \ln{v_{-1}}$
+  &
+  \(\bar{v}_{-1}
+  = \bar{v}_{-1} + \diff{1}{-1}
+  = \bar{v}_{-1} + \bar{v}_1 / v_{-1}
+  \) \\
+
+  $v_2 = v_{-1} \times v_0$
+  &
+  \(\bar{v}_0
+  = \bar{v}_0 + \diff{2}{0}
+  = \bar{v}_0 + \bar{v}_2 \times v_{-1}
+  \) \\
+
+  &
+  \(\bar{v}_{-1}
+  = \diff{2}{-1}
+  = \bar{v}_2 \times v_{0}
+  \) \\
+
+  $v_3 = \sin{v_0}$
+  &
+  \(\bar{v}_0
+  = \diff{3}{0}
+  = \bar{v}_3 \times \cos v_0
+  \) \\
+
+  $v_4 = v_1 + v_2$
+  &
+  \(\bar{v}_2
+  = \diff{4}{2}
+  = \bar{v}_4 \times 1
+  \) \\
+
+  &
+  \(\bar{v}_1
+  = \diff{4}{1}
+  = \bar{v}_4 \times 1
+  \) \\
+
+  $v_5 = v_4 - v_3$
+  &
+  \(\bar{v}_3
+  = \diff{5}{3}
+  = \bar{v}_5 \times (-1)
+  \) \\
+  
+  &
+  \(\bar{v}_4
+  = \diff{5}{4}
+  = \bar{v}_5 \times 1
+  \) \\
+  
+\end{tabular}
+
+
+
+
+\begin{thebibliography}{9}
+
+\bibitem{adml}
+  Automatic differentiation in machine learning: a survey;
+  Atilim Gunes Baydin, Barak A. Pearlmutter, Alexey Andreyevich Radul, Jeffrey Mark Siskind
+  
+https://arxiv.org/abs/1502.05767
+  
+\end{thebibliography}
+
+\end{document}
