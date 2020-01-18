@@ -11,8 +11,11 @@
 
 \maketitle
 
-In \cite{adml} the authors demonstrate how to differentiate an example
-program, $y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
+\section{Recapitulating reverse mode AD}
+
+In \cite{adml} the authors demonstrate how to perform source-to-source
+reverse mode automatic differentiation on an example program, $y =
+f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
 
 First the program is prepared by translation to a form in which there
 are no compound expressions, that is, every function application is to
@@ -100,21 +103,24 @@ in the left column in order followed by the statements in the right
 column in \emph{reverse} order.  It takes as inputs $x_1$, $x_2$ and
 $\bar{y}$ and returns as outputs $y$, $\bar{x}_1$ and $\bar{x}_2$.
 
-To a functional programmer this program might cause some concern since
-it relies on the ability to modify the value of variables after they
-have been assigned, specifically \(\bar{v}_{-1}\) and \(\bar{v}_0\).
-Does reverse mode AD inherently depend on mutability?  Perhaps, but as
-we shall see, we need not give up purity.
+\section{Explicit duplication}
 
-Updating the value of a variable occurs for each site at which it is
-used, other than the first. Thus, the recipe above mixes two concerns:
-differentiating each line of the source program and keeping track of
-each use site of each variable.  We can separate the concerns by
-performing a preparation pass which explicitly tracks reuse of each
-variable.  For every reused variable we insert an explicit ``$\dup$''
-call into the program.  The derivative of $\dup$ is $+$, so in the
-reverse pass lines corresponding to duplication perform the mutating
-accumulation that happened in the earlier version.
+To a functional programmer the derivative program might cause some
+concern.  It relies on the ability to modify the value of variables
+after they have been assigned, specifically \(\bar{v}_{-1}\) and
+\(\bar{v}_0\).  Does reverse mode AD inherently depend on mutability?
+Perhaps, but as we shall see, we need not give up purity.
+
+The updates to a variable $\bar{v}$ occur in lines corresponding to
+the places at which $v$ was used (other than the last). Thus, the
+recipe above mixes two concerns: differentiating each line of the
+source program and keeping track of each use site of each variable.
+We can separate the concerns by performing a preparation pass which
+explicitly tracks reuse of each variable.  For every reused variable
+we insert an explicit ``$\dup$'' call into the program.  The
+derivative of $\dup$ is $+$, so in the reverse pass lines
+corresponding to duplication perform the mutating accumulation that
+happened in the earlier version.
 
 \begin{tabular}[t]{ll}
 
@@ -208,19 +214,111 @@ preprocessing step to make the AD pass simpler.  In this section we
 will see how it can be used in an essential way to achieve efficient
 differentiation of array programs.
 
+The problem we are trying to solve occurs when differentiating
+programs that contain the array index expression.  If a statement in
+our source program is of the form $e = v[i]$ then in a language that
+allows array mutation we could emit the reverse instruction
+$\bar{v}[i] = \bar{v}[i] + \bar{e}$ which efficiently modifies
+$\bar{v}$ in place.  In language that does not support mutation we do
+not have this liberty.  Instead we would have to write something like
+$\bar{v} = \bar{v} + \textrm{deltaVec} \, (\textrm{size} \, v) \, i \,
+\bar{e}$, meaning that the variable $\bar{v}$ is shadowed (not its
+referent modified) and the new $\bar{v}$'s value is the old
+$\bar{v}$'s value plus a ``delta'' vector of the same length, zero
+everywhere except at index $i$ where it takes on the value $\bar{e}$.
+
+In each case the mathematical value of the result is the same.  On the
+other hand, the costs are very different!  Mutating a vector at a
+single location has constant time complexity but adding two vectors
+has time complexity proportional to their size.  In this case we waste
+a lot of time adding zeroes to elements $\bar{v}$.  Optimisations can
+in many cases return the mutation-free version to the time complexity
+of the mutating version but there is no general solution that works in
+all cases.
+
 \section{Purity}
 
-Purity means
+It seems that mutation is essential for efficient reverse mode AD on
+array programs yet it also seems that absense of mutation is essential
+for purity.  Can this apparent tension be resolved?  It turns out the
+answer is yes.  Let's consider how by examining what purity is, and
+more importantly, why we want a language to be pure.
+
+According to \cite{purity}, for a function to be ``pure'' the
+following conditions must hold
 
 \begin{itemize}
- \item I can discard a computation that produces an unused result
- \item I can duplicate the result of a computation rather than
-   duplicating the computation
+  \item
+    Its return value is the same for the same arguments (no variation
+    with local static variables, non-local variables, mutable
+    reference arguments or input streams from I/O devices).
+
+  \item
+    Its evaluation has no side effects (no mutation of local
+    static variables, non-local variables, mutable reference
+    arguments or I/O streams).
 \end{itemize}
 
-The former permits the optimisation ``redundant expression
+A pure language is one in which every function is pure.  For pure
+languages the former condition permits a form of ``dead code
 elimination'' and the latter permits ``common sub-expression
-elimination''.
+elimination''.  Together they allow the order in which function calls
+are evaluated to be rearranged whilst preserving the result.  Having
+these properties at our disposal is helpful because they permit a
+large class of program transformations which can be used by the author
+of a compiler for the language for the purposes of optimisation and a
+programmer writing in the language for the purposes of refactoring.
+If a program contains code which mutates an array, and those mutations
+can be seen by other parts of the program, then we do not have the
+benefit of the transformations above.  On the other hand, if mutation
+happens but cannot be observed in other parts of the program then we
+\emph{can} apply the above transformations and the benefits of purity
+continue to hold.
+
+How do we resolve this tension?  
+
+
+
+
+
+\section{leftover bits}
+
+\begin{tabular}[t]{ll}
+  $e = v[0]$
+  &
+  $\bar{v}[0] = \bar{v}[0] + \bar{e}$
+  \\
+  
+  $v[1] = v[1] + e$
+  &
+  $\bar{e} = \bar{v}[1]$
+  \\
+\end{tabular}
+
+Consider the following program that takes an array $v$ and sums the
+elements
+
+\[
+\textrm{sum} \, (\textrm{size} \, v) \, (\lambda i. v[i])
+\]
+
+If the AD transformation rule for sum is to be referentially
+transparent (TODO: this is probably not the right term: we want
+something like parametric, independent of the form of the lambda,
+etc.) then it needs to calculate the sensitivity of all the free
+variables of the lambda to the sum for each index $i$ in $\{ 0 \ldots
+\textrm{size} \, v\}$ and add them all together.  
+
+Put differently with greater symmetry
+
+\begin{itemize}
+ \item Duplicating the result of a computation is the same as running
+   it twice
+
+ \item Discarding the result of a computation is the same as not
+   running it at all
+\end{itemize}
+
 
 \begin{thebibliography}{9}
 
@@ -230,6 +328,12 @@ elimination''.
   
 https://arxiv.org/abs/1502.05767
   
+\bibitem{purity}
+  https://en.wikipedia.org/wiki/Pure\_function
+
+  TODO: Really ought to find a better reference.  Maybe one of the two
+  books that are referenced in Wikipedia
+
 \end{thebibliography}
 
 \end{document}
