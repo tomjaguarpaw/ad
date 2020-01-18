@@ -5,6 +5,8 @@
 \title{A note on efficient automatic differentiation of array programs
   in a linear language}
 
+\newcommand{\dup}{\mathrm{dup}}
+
 \begin{document}
 
 \maketitle
@@ -12,11 +14,26 @@
 In \cite{adml} the authors demonstrate how to differentiate an example
 program, $y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
 
+First the program is prepared by translation to a form in which there
+are no compound expressions, that is, every function application is to
+a variable, not a sub-expression.  This is like ANF from functional
+programming, or SSA from assembly languages.
+
   \newcommand{\diff}[2]{
     \bar{v}_{#1} \frac{\partial v_{#1}}{\partial v_{#2}}
   }
 
 \begin{tabular}[t]{ll}
+
+  $v_{-1} = x_1$
+  &
+  $\bar{x}_1 = \bar{v}_{-1}$
+  \\
+  
+  $v_{0} = x_2$
+  &
+  $\bar{x}_2 = \bar{v}_{0}$
+  \\
 
   $v_1 = \ln{v_{-1}}$
   &
@@ -71,10 +88,139 @@ program, $y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
   = \bar{v}_5 \times 1
   \) \\
   
+  $y = v_5$
+  &
+  $\bar{v}_5 = \bar{y}$
+  \\
+
 \end{tabular}
 
+The reverse mode derivative program is formed by taking the statements
+in the left column in order followed by the statements in the right
+column in \emph{reverse} order.  It takes as inputs $x_1$, $x_2$ and
+$\bar{y}$ and returns as outputs $y$, $\bar{x}_1$ and $\bar{x}_2$.
 
+To a functional programmer this program might cause some concern since
+it relies on the ability to modify the value of variables after they
+have been assigned, specifically \(\bar{v}_{-1}\) and \(\bar{v}_0\).
+Does reverse mode AD inherently depend on mutability?  Perhaps, but as
+we shall see, we need not give up purity.
 
+Updating the value of a variable occurs for each site at which it is
+used, other than the first. Thus, the recipe above mixes two concerns:
+differentiating each line of the source program and keeping track of
+each use site of each variable.  We can separate the concerns by
+performing a preparation pass which explicitly tracks reuse of each
+variable.  For every reused variable we insert an explicit ``$\dup$''
+call into the program.  The derivative of $\dup$ is $+$, so in the
+reverse pass lines corresponding to duplication perform the mutating
+accumulation that happened in the earlier version.
+
+\begin{tabular}[t]{ll}
+
+  $v_{-1} = x_1$
+  &
+  $\bar{x}_1 = \bar{v}_{-1}$
+  \\
+  
+  $v_{0} = x_2$
+  &
+  $\bar{x}_2 = \bar{v}_{0}$
+  \\
+
+  \((v_{-1,1}, v_{-1,2}) = \dup \, v_{-1}\)
+  &
+  \(\bar{v}_{-1} = \bar{v}_{-1,1} + \bar{v}_{-1,2}\)
+  \\
+
+  \((v_{0,1}, v_{0,2}) = \dup \, v_0\)
+  &
+  \(\bar{v}_{0} = \bar{v}_{0,1} + \bar{v}_{0,2}\)
+  \\
+
+  $v_1 = \ln{v_{-1,1}}$
+  &
+  \(\bar{v}_{-1,1}
+  = \diff{1}{-1,1}
+  = \bar{v}_1 / v_{-1,1}
+  \) \\
+
+  $v_2 = v_{-1,2} \times v_{0,1}$
+  &
+  \(\bar{v}_{0,1}
+  = \diff{2}{0,1}
+  = \bar{v}_2 \times v_{-1,2}
+  \) \\
+
+  &
+  \(\bar{v}_{-1,2}
+  = \diff{2}{-1,2}
+  = \bar{v}_2 \times v_{0,1}
+  \) \\
+
+  $v_3 = \sin{v_{0,2}}$
+  &
+  \(\bar{v}_{0,2}
+  = \diff{3}{0,2}
+  = \bar{v}_3 \times \cos v_{0,2}
+  \) \\
+
+  $v_4 = v_1 + v_2$
+  &
+  \(\bar{v}_2
+  = \diff{4}{2}
+  = \bar{v}_4 \times 1
+  \) \\
+
+  &
+  \(\bar{v}_1
+  = \diff{4}{1}
+  = \bar{v}_4 \times 1
+  \) \\
+
+  $v_5 = v_4 - v_3$
+  &
+  \(\bar{v}_3
+  = \diff{5}{3}
+  = \bar{v}_5 \times (-1)
+  \) \\
+  
+  &
+  \(\bar{v}_4
+  = \diff{5}{4}
+  = \bar{v}_5 \times 1
+  \) \\
+  
+  $y = v_5$
+  &
+  $\bar{v}_5 = \bar{y}$
+  \\
+
+\end{tabular}
+
+Now the input program has the nice property that every variable is
+defined exactly once and also used exactly once.
+
+\section{Arrays}
+
+In the above, explicit duplication style was used as a convenient
+preprocessing step to make the AD pass simpler.  In this section we
+will see how it can be used in an essential way to achieve efficient
+differentiation of array programs.
+
+\section{Purity}
+
+Purity means
+
+\begin{itemize}
+ \item I can discard a computation that produces an unused result
+ \item I can duplicate the result of a computation rather than
+   duplicating the computation
+\end{itemize}
+
+The former permits the optimisation ``redundant expression
+elimination'' and the latter permits ``common sub-expression
+elimination''.
 
 \begin{thebibliography}{9}
 
