@@ -11,89 +11,138 @@
 
 \maketitle
 
+\section{Introduction}
+
+Presentations of reverse mode AD algorithms typically deal with the
+accumulation of sensitivities by using mutation.  This poses a problem
+for the designers of a language that is intended to be pure functional
+language, because it should not be possible to mutate data in one part
+of the program and have the mutation be observed elsewhere in the
+program.  How can a source-to-source reverse mode AD pass be added to
+such a language?
+
+In this note we describe an approach for resolving this apparent
+tension.
+
 \section{Recapitulating reverse mode AD}
 
 In \cite{adml} the authors demonstrate how to perform source-to-source
-reverse mode automatic differentiation on an example program, $y =
-f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)$.
+reverse mode automatic differentiation on an example program
 
-First the program is prepared by translation to a form in which there
-are no compound expressions, that is, every function application is to
-a variable, not a sub-expression.  This is like ANF from functional
-programming, or SSA from assembly languages.
+\[
+y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)
+\]
+
+Before differentiation the program is prepared by translation to a
+form in which there are no compound expressions.  By introducing fresh
+variables every function application can be made to a variable (rather
+than a sub-expression).  This is like ANF from functional programming,
+or SSA from assembly languages.  This preparation step is a form of
+book-keeping that allows the subsequent AD pass to be simpler.  If
+this step is not performed explicitly then the AD pass will have to
+perform it implicitly.
 
   \newcommand{\diff}[2]{
     \bar{v}_{#1} \frac{\partial v_{#1}}{\partial v_{#2}}
   }
 
-\begin{tabular}[t]{ll}
+\begin{tabular}[t]{ll|lll}
 
-  $v_{-1} = x_1$
+  $v_{-1}$ & $= x_1$
   &
-  $\bar{x}_1 = \bar{v}_{-1}$
+  $\bar{x}_1$ & $= \bar{v}_{-1}$
   \\
   
-  $v_{0} = x_2$
+  $v_{0}$ & $= x_2$
   &
-  $\bar{x}_2 = \bar{v}_{0}$
+  $\bar{x}_2$ & $= \bar{v}_{0}$
   \\
 
-  $v_1 = \ln{v_{-1}}$
+  \hline
+
+  $v_1$ & $= \ln{v_{-1}}$
   &
-  \(\bar{v}_{-1}
-  = \bar{v}_{-1} + \diff{1}{-1}
-  = \bar{v}_{-1} + \bar{v}_1 / v_{-1}
+  \(\bar{v}_{-1}\)
+  &
+  \(= \bar{v}_{-1} + \diff{1}{-1}\)
+  &
+  \(= \bar{v}_{-1} + \bar{v}_1 / v_{-1}
   \) \\
 
-  $v_2 = v_{-1} \times v_0$
+  $v_2$ & $= v_{-1} \times v_0$
   &
-  \(\bar{v}_0
-  = \bar{v}_0 + \diff{2}{0}
-  = \bar{v}_0 + \bar{v}_2 \times v_{-1}
+  \(\bar{v}_0\)
+  &
+  \(= \bar{v}_0 + \diff{2}{0}\)
+  &
+  \(= \bar{v}_0 + \bar{v}_2 \times v_{-1}
   \) \\
 
   &
-  \(\bar{v}_{-1}
-  = \diff{2}{-1}
+  &
+  \(\bar{v}_{-1}\)
+  &
+  \(= \diff{2}{-1}\)
+  &
+  \(
   = \bar{v}_2 \times v_{0}
   \) \\
 
-  $v_3 = \sin{v_0}$
+  $v_3$ & $= \sin{v_0}$
   &
-  \(\bar{v}_0
-  = \diff{3}{0}
+  \(\bar{v}_0\)
+  &
+  \(= \diff{3}{0}\)
+  &
+  \(
   = \bar{v}_3 \times \cos v_0
   \) \\
 
-  $v_4 = v_1 + v_2$
+  $v_4$ & $= v_1 + v_2$
   &
-  \(\bar{v}_2
-  = \diff{4}{2}
+  \(\bar{v}_2\)
+  &
+  \(= \diff{4}{2}\)
+  &
+  \(
   = \bar{v}_4 \times 1
   \) \\
 
   &
-  \(\bar{v}_1
-  = \diff{4}{1}
+  &
+  \(\bar{v}_1\)
+  &
+  \(= \diff{4}{1}\)
+  &
+  \(
   = \bar{v}_4 \times 1
   \) \\
 
-  $v_5 = v_4 - v_3$
+  $v_5$ & $= v_4 - v_3$
   &
-  \(\bar{v}_3
-  = \diff{5}{3}
+  \(\bar{v}_3\)
+  &
+  \(= \diff{5}{3}\)
+  &
+  \(
   = \bar{v}_5 \times (-1)
   \) \\
   
   &
-  \(\bar{v}_4
-  = \diff{5}{4}
+  &
+  \(\bar{v}_4\)
+  &
+  \(= \diff{5}{4}\)
+  &
+  \(
   = \bar{v}_5 \times 1
   \) \\
   
-  $y = v_5$
+  \hline
+
+  $y$ & $= v_5$
   &
-  $\bar{v}_5 = \bar{y}$
+  $\bar{v}_5$ & $= \bar{y}$
   \\
 
 \end{tabular}
@@ -105,115 +154,151 @@ $\bar{y}$ and returns as outputs $y$, $\bar{x}_1$ and $\bar{x}_2$.
 
 \section{Explicit duplication}
 
-To a functional programmer the derivative program might cause some
+To a pure functional programmer the derivative program might cause some
 concern.  It relies on the ability to modify the value of variables
 after they have been assigned, specifically \(\bar{v}_{-1}\) and
 \(\bar{v}_0\).  Does reverse mode AD inherently depend on mutability?
 Perhaps, but as we shall see, we need not give up purity.
 
-The updates to a variable $\bar{v}$ occur in lines corresponding to
-the places at which $v$ was used (other than the last). Thus, the
-recipe above mixes two concerns: differentiating each line of the
-source program and keeping track of each use site of each variable.
-We can separate the concerns by performing a preparation pass which
-explicitly tracks reuse of each variable.  For every reused variable
-we insert an explicit ``$\dup$'' call into the program.  The
-derivative of $\dup$ is $+$, so in the reverse pass lines
-corresponding to duplication perform the mutating accumulation that
-happened in the earlier version.
+Note that each update to a sensitivity variable $\bar{v}$ occurs on a
+line corresponding to a place at which the primal variable $v$ was
+used as an argument (other than the last such use where a direct
+assignment to $\bar{v}$ occurs). Thus, the recipe above mixes two
+concerns: that of differentiating each line of the source program and
+that of keeping track of each use site of each variable.  We can
+separate the concerns by performing an additional preparation pass
+which explicitly tracks reuse of each variable.  For every reused
+variable we insert an explicit ``$\dup$'' call into the program which
+replaces the original variables name with two fresh names.  The
+reverse derivative of $\dup$ is $+$.  In the reverse pass lines
+corresponding to duplication perform the accumulation that was handled
+by mutation in the earlier version.
 
-\begin{tabular}[t]{ll}
+\begin{tabular}[t]{ll|lll}
 
-  $v_{-1} = x_1$
+  $v_{-1}$ & $= x_1$
   &
-  $\bar{x}_1 = \bar{v}_{-1}$
+  $\bar{x}_1$ & $= \bar{v}_{-1}$
   \\
   
-  $v_{0} = x_2$
+  $v_{0}$ & $= x_2$
   &
-  $\bar{x}_2 = \bar{v}_{0}$
+  $\bar{x}_2$ & $= \bar{v}_{0}$
   \\
 
-  \((v_{-1,1}, v_{-1,2}) = \dup \, v_{-1}\)
+  \hline
+
+  \((v_{-1,1}, v_{-1,2})\) & \(= \dup \, v_{-1}\)
   &
-  \(\bar{v}_{-1} = \bar{v}_{-1,1} + \bar{v}_{-1,2}\)
+  \(\bar{v}_{-1}\) & \(= \bar{v}_{-1,1} + \bar{v}_{-1,2}\)
   \\
 
-  \((v_{0,1}, v_{0,2}) = \dup \, v_0\)
+  \((v_{0,1}, v_{0,2})\) & \(= \dup \, v_0\)
   &
-  \(\bar{v}_{0} = \bar{v}_{0,1} + \bar{v}_{0,2}\)
+  \(\bar{v}_{0}\) & \(= \bar{v}_{0,1} + \bar{v}_{0,2}\)
   \\
 
-  $v_1 = \ln{v_{-1,1}}$
+  $v_1$ & $= \ln{v_{-1,1}}$
   &
-  \(\bar{v}_{-1,1}
-  = \diff{1}{-1,1}
+  \(\bar{v}_{-1,1}\)
+  & \(
+  = \diff{1}{-1,1}\)
+  & \(
   = \bar{v}_1 / v_{-1,1}
   \) \\
 
-  $v_2 = v_{-1,2} \times v_{0,1}$
+  $v_2$ & $= v_{-1,2} \times v_{0,1}$
   &
-  \(\bar{v}_{0,1}
-  = \diff{2}{0,1}
+  \(\bar{v}_{0,1}\)
+  & \(
+  = \diff{2}{0,1}\)
+  & \(
   = \bar{v}_2 \times v_{-1,2}
   \) \\
 
+  & &
+  \(\bar{v}_{-1,2}\)
   &
-  \(\bar{v}_{-1,2}
-  = \diff{2}{-1,2}
+  \(= \diff{2}{-1,2}\)
+  & \(
   = \bar{v}_2 \times v_{0,1}
   \) \\
 
-  $v_3 = \sin{v_{0,2}}$
+  $v_3$ & $= \sin{v_{0,2}}$
   &
-  \(\bar{v}_{0,2}
-  = \diff{3}{0,2}
+  \(\bar{v}_{0,2}\)
+  & \(
+  = \diff{3}{0,2}\)
+  & \(
   = \bar{v}_3 \times \cos v_{0,2}
   \) \\
 
-  $v_4 = v_1 + v_2$
+  $v_4$ & $= v_1 + v_2$
   &
-  \(\bar{v}_2
-  = \diff{4}{2}
+  \(\bar{v}_2\)
+  & \(
+  = \diff{4}{2}\)
+  & \(
   = \bar{v}_4 \times 1
   \) \\
 
+  & &
+  \(\bar{v}_1\)
   &
-  \(\bar{v}_1
-  = \diff{4}{1}
+  \(= \diff{4}{1}\)
+  & \(
   = \bar{v}_4 \times 1
   \) \\
 
-  $v_5 = v_4 - v_3$
+  $v_5$ & $= v_4 - v_3$
   &
-  \(\bar{v}_3
-  = \diff{5}{3}
+  \(\bar{v}_3\)
+  & \(
+  = \diff{5}{3}\)
+  & \(
   = \bar{v}_5 \times (-1)
   \) \\
   
-  &
-  \(\bar{v}_4
-  = \diff{5}{4}
+  & &
+  \(\bar{v}_4\)
+  & \(
+  = \diff{5}{4}\)
+  & \(
   = \bar{v}_5 \times 1
   \) \\
   
-  $y = v_5$
+  \hline
+
+  $y$ & $= v_5$
   &
-  $\bar{v}_5 = \bar{y}$
+  $\bar{v}_5$ & $= \bar{y}$
   \\
 
 \end{tabular}
 
-Now the input program has the nice property that every variable is
-defined exactly once and also used exactly once (except for the inputs
-and outputs).
+The variable $v_0$ was used twice in the primal code.  Thus we insert
+a statement $(v_{0,1}, v_{0,2}) = \mathrm{dup} \, v_0$ which generates
+two fresh names with which to refer to $v_0$ and updates the use sites
+of $v_0$ so that each uses a unique one of these two names.  The same
+applies to the variable $v_1$.
+
+Now the input program has the nice property that every variable is not
+only defined exactly once but also \emph{used} exactly once (except
+for the inputs and outputs).  Our AD pass is simpler, because
+everything to do with keeping track of use sites has already been
+taken care of by the explicit duplication pass.  Pure functional
+programmers are happier because it no longer looks like we are
+modifying variables after they have been bound.
 
 \section{Arrays}
 
-In the above, explicit duplication style was used as a convenient
-preprocessing step to make the AD pass simpler.  In this section we
-will see how it can be used in an essential way to achieve efficient
-differentiation of array programs.
+In the previous section explicit duplication style was used as a
+convenient preprocessing step to make the AD pass simpler.  It also
+assuaged some of the fears of a pure functional programmer regarding
+mutation.  We will shortly describe how explicit duplicating style can
+also be turned to the goal of achieving efficient differentiation of
+array programs in a pure language but let us first demonstrate what
+the difficulty is.
 
 The problem we are trying to solve occurs when differentiating
 programs that contain the array index expression.  If a statement in
@@ -221,29 +306,35 @@ our source program is of the form $e = v[i]$ then in a language that
 allows array mutation we could emit the reverse instruction
 $\bar{v}[i] = \bar{v}[i] + \bar{e}$ which efficiently modifies
 $\bar{v}$ in place.  In language that does not support mutation we do
-not have this liberty.  Instead we would have to write something like
+not have this luxury.  Instead we would have to emit something like
 $\bar{v} = \bar{v} + \textrm{deltaVec} \, (\textrm{size} \, v) \, i \,
 \bar{e}$, meaning that the variable $\bar{v}$ is shadowed (not its
 referent modified) and the new $\bar{v}$'s value is the old
-$\bar{v}$'s value plus a ``delta'' vector of the same length, zero
-everywhere except at index $i$ where it takes on the value $\bar{e}$.
+$\bar{v}$'s value plus a ``delta'' vector of the same length, where
+$\textrm{deltaVec} \, n \, i \, e$ is a vector of length $n$ satisfying
 
-In each case the mathematical value of the result is the same.  On the
+\[
+(\textrm{deltaVec} \, n \, i \, e)[j]
+= \textrm{ if } i == j \textrm{ then } e  \textrm{ else } 0
+\]
+
+The mathematical value of the result is the same in each case.  On the
 other hand, the costs are very different!  Mutating a vector at a
 single location has constant time complexity but adding two vectors
-has time complexity proportional to their size.  In this case we waste
-a lot of time adding zeroes to elements $\bar{v}$.  Optimisations can
-in many cases return the mutation-free version to the time complexity
+has time complexity proportional to their size.  The reverse mode code
+we emitted in the language without array mutation wastes a lot of time
+adding zeroes to elements of $\bar{v}$.  Optimisations might in some
+cases lead to mutation-free code that runs in the same time complexity
 of the mutating version but there is no general solution that works in
 all cases.
 
 \section{Purity}
 
 It seems that mutation is essential for efficient reverse mode AD on
-array programs yet it also seems that absence of mutation is essential
-for purity.  Can this apparent tension be resolved?  It turns out the
-answer is yes.  Let's consider how by examining what purity is, and
-more importantly, why we want a language to be pure.
+array programs.  How do we reconcile this with our desire for purity?
+It turns out that explicit duplicating style can help.  Let's consider
+how by examining what purity is, and more importantly, why we might
+want a language to be pure.
 
 According to \cite{purity}, for a function to be ``pure'' the
 following conditions must hold
@@ -260,37 +351,109 @@ following conditions must hold
     arguments or I/O streams).
 \end{itemize}
 
-A pure language is one in which every function is pure.  For pure
-languages the former condition permits a form of ``dead code
-elimination'' and the latter permits ``common sub-expression
-elimination''.  Together they allow the order in which function calls
-are evaluated to be rearranged whilst preserving the result.  Having
-these properties at our disposal is helpful because they permit a
-large class of program transformations which can be used by the author
-of a compiler for the language for the purposes of optimisation and a
-programmer writing in the language for the purposes of refactoring.
-If a program contains code which mutates an array, and those mutations
-can be seen by other parts of the program, then we do not have the
-benefit of the transformations above.  On the other hand, if mutation
-happens but cannot be observed in other parts of the program then we
-\emph{can} apply the above transformations and the benefits of purity
-continue to hold.
+A pure language is one in which every function is pure.  Purity is
+desirable because the former condition permits very strong form of
+``dead code elimination'' and the latter permits a very strong form of
+``common sub-expression elimination''.  Together they allow complete
+freedom over the order in which function calls are evaluated.  Having
+these properties at one's disposal permits a large class of
+behavior-preserving program transformations.  The transformations can
+be used by a compiler author (for the purpose of optimisation) and a
+programmer (for the purpose of refactoring).
 
-This give us the clue we need to resolve the tension.  The explicit
-duplication pass described above ensures that every variable is used
-only once.  If a variable referring to an array is used only once then
-we can safely mutate it knowing that this mutation can never be
-observed!
+If a programming language supports array mutation in a form such
+that those mutations can be seen by other parts of the program then
+we do not have the benefit of freely applying transformations above.
+On the other hand, if mutation happens but cannot be observed in other
+parts of the program then we \emph{can} apply the above
+transformations and the benefits of purity continue to hold.
 
-Initially, this sounds like a semantic sleight of hand. 
+This analysis of the benefits of purity gives us the clue we need to
+resolve the tension.  The explicit duplication pass described above
+ensures that every variable is used only once.  If a variable
+referring to an array is used only once then we can safely mutate it
+knowing that this mutation can never be observed!  This might sound
+like a rhetorical sleight of hand, so let us proceed immediately
+demonstrate that this point of view is actually useful.
 
+Take a program in a pure first order language containing the array
+index operation
 
- until we realise that
-every pure input program can be 
+\[
+\cdot[\cdot] : \mathrm{Array} \, a \to \mathrm{Int} \to a
+\]
 
+replace all array index calls to calls to the function
 
+\newcommand{\indexL}{\mathrm{index}}
 
+\[
+\indexL : \mathrm{Array} \, a \to \mathrm{Int} \to (a, \mathrm{Array}
+\, a)
+\]
 
+which returns the element of $v$ at index $i$ as well as the original
+array unchanged.  The next use of the input array will be be via the
+name given to the second component of the return tuple.  This allows
+us to mention the original array later in the program without
+explicitly duplicating it (which would amount to a copy).  Reuses of
+non-array variables can then be removed by transforming to explicit
+duplication style.
+
+By way of example, here is a program and its reverse derivative in
+mutating style.
+
+\begin{tabular}[t]{ll|ll}
+  $v_0$ & $= v[0]$
+  &
+  $\bar{v}[0]$ & $ = \bar{v}[0] + \bar{v}_0$
+  \\
+  
+  $v_1$ & $ = v[1]$
+  &
+  $\bar{v}[1]$ & $ = \bar{v}[1] + \bar{v}_1$
+  \\
+
+  $r$ & $= v_0 * v_1$
+  &
+  $\bar{v}_0$ & $ = v_1 * \bar{r}$
+  \\
+
+  & &
+  $\bar{v}_1$ & $ = v_0 * \bar{r}$
+  \\
+\end{tabular}
+
+here it is using $\indexL$ with unobservable mutation
+
+\begin{tabular}[t]{ll|ll}
+  $(v_0, v')$ & $ = \indexL \, v \, 0$
+  &
+  $\bar{v}$ & $ = \mathrm{inc} \, \bar{v}' \, 0 \, \bar{v}_0$
+  \\
+  
+  $(v_1, v'')$ & $ = \indexL \, v' \, 1$
+  &
+  $\bar{v}'$ & $ = \mathrm{inc} \, \bar{v}'' \, 1 \, \bar{v}_1$
+  \\
+
+  $r$ & $ = v_0 * v_1$
+  &
+  $\bar{v}_0$ & $ = v_1 * \bar{r}$
+  \\
+
+  & &
+  $\bar{v}_1$ & $ = v_0 * \bar{r}$
+  \\
+\end{tabular}
+
+We claim, but do not prove here, that any pure first order program
+with array indexing can be rewritten to use $\indexL$.
+
+This is only a small taste of how this transformation works for
+straight line programs (i.e. no loops or recursion, no branches, no
+higher-order functions).  The ideas presented here extend in a natural
+way to the general case but we won't go into detail here.
 
 \section{leftover bits}
 
@@ -329,6 +492,11 @@ Put differently with greater symmetry
  \item Discarding the result of a computation is the same as not
    running it at all
 \end{itemize}
+
+The ability to mutate arrays implies that the duplication operation on
+arrays must perform a copy.  We need to avoid this copy otherwise we
+are back to square one!
+
 
 
 \begin{thebibliography}{9}
