@@ -134,7 +134,18 @@ traverseOf = useOptic
 traverses :: Applicative f
            => ((a -> f b) -> s -> f t)
            -> Traversal s t a b
-traverses = error "Not clear what to fill in here"
+traverses =
+  error $ unwords [ "Not clear what to fill in here."
+                  , "I guesss something we make a special choice of Applicative"
+                  , "(it shoudn't work for all Applicatives)"
+                  , "that extracts all the as into a list"
+                  , "and also extracts a function to put them all back together"
+                  , "again after we've transformed them."
+                  , "This won't be type safe, so maybe we can use a type-level"
+                  , "index to provide safefy."
+                  , "The lens example provides a basic example of how to do this."
+                  , "(It doesn't need type safety)"
+                  ]
 
 lensOf :: Functor f
        => Lens s t a b
