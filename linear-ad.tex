@@ -16,11 +16,16 @@
 \section{Abstract}
 
 Reverse mode automatic differentiation (AD) is an algorithm which can
-efficiently calculate the gradients of a numerical program.  The
-standard treatment uses mutation when the input program
-which contain array indexing.  This note suggests an approach by
-which reverse mode AD can be implemented efficiently on numerical
-array programs in a pure language.
+efficiently calculate the gradients of a numerical program.  When the
+input program contains array indexing, standard AD algorithms will
+produce a derivative program that involves array mutation.  In a
+language that does not support mutation, a simple but inefficient
+alternative is to use vectors which contain zero everywhere except at
+a single index.
+
+This note suggests an alternative approach by which reverse mode AD
+can be implemented efficiently on numerical array programs in a pure
+language.
 
 \section{Introduction}
 
@@ -35,8 +40,8 @@ this note we describe an approach for resolving the apparent tension.
 \section{Recapitulating reverse mode automatic differentiation}
 
 In \cite{adml} the authors demonstrate how to perform source-to-source
-reverse mode AD on the following example program in a first-order
-language
+reverse mode AD on program (\ref{adml-program}), written in a
+first-order language
 
 \begin{equation}
 \label {adml-program}
@@ -48,7 +53,7 @@ program (\ref{adml-program}) is generated.  Before differentiation the
 program is prepared into a normal form in which there are no compound
 expressions. Instead, every function application is made to a variable
 (rather than a sub-expression).  This is achieved by the introduction
-of fresh variables.  The form is similar to ANF from functional
+of fresh variables.  The normal form is similar to ANF from functional
 programming and SSA from assembly languages.  The preparation step is
 a form of book-keeping that allows the subsequent AD pass to be
 simpler.  If this step is not performed explicitly then the AD pass
@@ -495,17 +500,17 @@ After this transformation the primal program has the property that
 every variable is used exactly once, implying that no
 \emph{observable} in-place accumulation will be needed in the reverse
 program.  The reverse mode derivative of $\indexL$ is $\incL$ which
-has the type below (where $a$ ranges over numeric types) and which
-in-place accumulates to an array at a given index, returning the array
-after accumulation.  Recall that the input array to $\textrm{inc}$
-cannot subsequently be used in the program so the mutation that
-$\incL$ performs cannot be observed.  Figure \ref{array-program-dup}
-shows the program differentiated in terms of $\incL$.
+performs in-place accumulation to an array at a given index, returning the array
+after accumulation.
 \[
 \incL : \mathrm{Array} \, a \to \mathrm{Int} \to a \to \mathrm{Array}
 \, a
 \]
 % or just substitute Float instead of a
+Recall that the input array to $\textrm{inc}$
+cannot subsequently be used in the program so the mutation that
+$\incL$ performs cannot be observed.  Figure \ref{array-program-dup}
+shows the program differentiated in terms of $\incL$.
 We hypothesise that any pure first-order program with array indexing
 can be rewritten to use $\indexL$ instead of $\cdot[\cdot]$.
 
@@ -519,7 +524,7 @@ purity.
 
 \section{Conclusion and further work}
 
-In this note we present an approach which, we hypothesise, can
+In this note we presented an approach which, we hypothesise, can
 reconcile reverse mode AD (which seems to inherently require mutation)
 with a desire for purity (which facilitates a large class of useful
 program transformations).  We present only the details needed to
@@ -529,47 +534,21 @@ form of linear typing and the ideas presented here extend in a natural
 way to the general case, taking further inspiration from the theory of
 linear types.
 
-\section{leftover bits}
+%% \section{Leftover bits}
 
-\begin{tabular}[t]{ll}
-  $e = v[0]$
-  &
-  $\bar{v}[0] = \bar{v}[0] + \bar{e}$
-  \\
-  
-  $v[1] = v[1] + e$
-  &
-  $\bar{e} = \bar{v}[1]$
-  \\
-\end{tabular}
+%% Put differently with greater symmetry
 
-Consider the following program that takes an array $v$ and sums the
-elements
+%% \begin{itemize}
+%%  \item Duplicating the result of a computation is the same as running
+%%    it twice
 
-\[
-\textrm{sum} \, (\textrm{size} \, v) \, (\lambda i. v[i])
-\]
+%%  \item Discarding the result of a computation is the same as not
+%%    running it at all
+%% \end{itemize}
 
-If the AD transformation rule for sum is to be referentially
-transparent (TODO: this is probably not the right term: we want
-something like parametric, independent of the form of the lambda,
-etc.) then it needs to calculate the sensitivity of all the free
-variables of the lambda to the sum for each index $i$ in $\{ 0 \ldots
-\textrm{size} \, v\}$ and add them all together.  
-
-Put differently with greater symmetry
-
-\begin{itemize}
- \item Duplicating the result of a computation is the same as running
-   it twice
-
- \item Discarding the result of a computation is the same as not
-   running it at all
-\end{itemize}
-
-The ability to mutate arrays implies that the duplication operation on
-arrays must perform a copy.  We need to avoid this copy otherwise we
-are back to square one!
+%% The ability to mutate arrays implies that the duplication operation on
+%% arrays must perform a copy.  We need to avoid this copy otherwise we
+%% are back to square one!
 
 \section{Acknowledgements}
 
