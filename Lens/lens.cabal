@@ -16,5 +16,7 @@ library
   -- (preferably with a version lower bound).  This is a bit like a
   -- Python "requirements.txt"
   build-depends:       base,
-                       profunctors
+                       profunctors,
+                       distributive,
+                       pointed
   default-language:    Haskell2010
