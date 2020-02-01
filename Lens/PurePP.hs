@@ -49,11 +49,15 @@ type LensLike f s t a b = forall p. ProfunctorMap f p => p a b -> p s t
 class Extract f where
   extract :: f a -> a
 
+-- Someone must have defined this somewhere
+data ConstId a b = ConstId { unConstId :: b }
+
 type Traversal s t a b = LensLike PolyF  s t a b
 type Lens      s t a b = LensLike (,)    s t a b
 type Prism     s t a b = LensLike Either s t a b
 type Grate     s t a b = LensLike (->)   s t a b
 type Getter    s t a b = LensLike (Constrained Extract) s t a b
+type Iso       s t a b = LensLike ConstId s t a b
 
 -- This is more general than I expected
 useOptic :: (Wrapped p f a b -> Wrapped p' f' s t)
@@ -85,6 +89,9 @@ instance (Functor f, Contravariant f)
     Wrapped (\(Constrained g)
                 -> contramap (extract . unConstrained) (f (extract g)))
 
+instance (Profunctor p, Functor f) => (ProfunctorMap ConstId (Wrapped p f)) where
+  pmap (Wrapped p) = Wrapped (dimap unConstId (fmap ConstId) p)
+
 traverseOf :: Applicative f
            => Traversal s t a b
            -> (a -> f b) -> s -> f t
@@ -104,3 +111,8 @@ getOf :: (Functor f, Contravariant f)
       => Getter s t a b
       -> (a -> f b) -> (s -> f t)
 getOf = useOptic
+
+isoOf :: (Profunctor p, Functor f)
+      => Iso s t a b
+      -> p a (f b) -> p s (f t)
+isoOf = useOptic
