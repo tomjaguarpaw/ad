@@ -346,13 +346,15 @@ which generates two fresh names with the same value as $v_0$.  We also
 update the use sites of $v_0$ so that each uses a unique one of these
 names.  The same transformation is done for the variable $v_1$.
 
-Now the input program has the nice property that every variable is not
-only defined exactly once but also \emph{used} exactly once (except
-for the inputs and outputs).  Our AD pass is simpler, because
-everything to do with keeping track of use sites is taken care of
-implicitly.  Pure functional programmers are happier because it no
-longer looks like we are modifying variables after they have been
-bound.
+The transformed input program has the vital property that every
+variable is not only defined exactly once but also \emph{used} exactly
+once (except for the inputs and outputs).  This property is vital in
+two ways that we will take advantage of in the remainder of the paper.
+Firstly, our AD pass is simpler, because everything to do with keeping
+track of use sites is taken care of implicitly.  Secondly, pure
+functional programmers accept the input program as a pure functional
+program because it no longer looks like we are modifying variables
+after they have been bound.
 
 \section{Arrays}
 
