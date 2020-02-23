@@ -2,6 +2,8 @@
 \usepackage{makecell,amsmath}
 \usepackage[a4paper, total={6.5in, 8in}]{geometry}
 
+\DeclareMathAlphabet      {\mathbfit}{OML}{cmm}{b}{it}
+
 \title{A note on efficient automatic differentiation of array programs
   in a pure language}
 
@@ -245,49 +247,49 @@ mutation need happen.
 
   \hline
 
-  \((v_{-1,1}, v_{-1,2})\) & \(= \dup \, v_{-1}\)
+  \((\mathbfit{v}_{-1,1}, \mathbfit{v}_{-1,2})\) & \(= \dup \, v_{-1}\)
   &
-  \(\bar{v}_{-1}\) & \(= \bar{v}_{-1,1} + \bar{v}_{-1,2}\)
+  \(\bar{v}_{-1}\) & \(= \bar{\mathbfit{v}}_{-1,1} + \bar{\mathbfit{v}}_{-1,2}\)
   \\
 
-  \((v_{0,1}, v_{0,2})\) & \(= \dup \, v_0\)
+  \((\mathbfit{v}_{0,1}, \mathbfit{v}_{0,2})\) & \(= \dup \, v_0\)
   &
-  \(\bar{v}_{0}\) & \(= \bar{v}_{0,1} + \bar{v}_{0,2}\)
+  \(\bar{v}_{0}\) & \(= \bar{\mathbfit{v}}_{0,1} + \bar{\mathbfit{v}}_{0,2}\)
   \\
 
-  $v_1$ & $= \ln{v_{-1,1}}$
+  $v_1$ & $= \ln{\mathbfit{v}_{-1,1}}$
   &
-  \(\bar{v}_{-1,1}\)
+  \(\bar{\mathbfit{v}}_{-1,1}\)
   & \(
   = \diff{1}{-1,1}\)
   & \(
-  = \bar{v}_1 / v_{-1,1}
+  = \bar{v}_1 / \mathbfit{v}_{-1,1}
   \) \\
 
-  $v_2$ & $= v_{-1,2} \times v_{0,1}$
+  $v_2$ & $= \mathbfit{v}_{-1,2} \times \mathbfit{v}_{0,1}$
   &
-  \(\bar{v}_{0,1}\)
+  \(\bar{\mathbfit{v}}_{0,1}\)
   & \(
   = \diff{2}{0,1}\)
   & \(
-  = \bar{v}_2 \times v_{-1,2}
+  = \bar{v}_2 \times \mathbfit{v}_{-1,2}
   \) \\
 
   & &
-  \(\bar{v}_{-1,2}\)
+  \(\bar{\mathbfit{v}}_{-1,2}\)
   &
   \(= \diff{2}{-1,2}\)
   & \(
-  = \bar{v}_2 \times v_{0,1}
+  = \bar{v}_2 \times \mathbfit{v}_{0,1}
   \) \\
 
-  $v_3$ & $= \sin{v_{0,2}}$
+  $v_3$ & $= \sin{\mathbfit{v}_{0,2}}$
   &
-  \(\bar{v}_{0,2}\)
+  \(\bar{\mathbfit{v}}_{0,2}\)
   & \(
   = \diff{3}{0,2}\)
   & \(
-  = \bar{v}_3 \times \cos v_{0,2}
+  = \bar{v}_3 \times \cos \mathbfit{v}_{0,2}
   \) \\
 
   $v_4$ & $= v_1 + v_2$
@@ -333,7 +335,8 @@ mutation need happen.
 
 \end{tabular}
 \caption{\label{adml-diff-dup} The reverse mode derivative of program
-  (\ref{adml-program}) in explicit duplication style}
+  (\ref{adml-program}) in explicit duplication style.  The
+  newly-introduced variables appear in bold.}
 \end{figure}
 
 As an example of how the explicit duplication transform is applied,
