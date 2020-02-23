@@ -48,6 +48,13 @@ first-order language
 y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)
 \end{equation}
 
+In standard mathematical notation the derivative is expressed by the
+equations
+\begin{align*}
+\frac{\partial y}{\partial x_1} = \frac{1}{x_1} + x_2
+&&
+\frac{\partial y}{\partial x_2} = x_2 - \cos(x_2)
+\end{align*}
 Figure \ref{adml-diff} shows how the reverse mode derivative of
 program (\ref{adml-program}) is generated.  Before differentiation the
 program is prepared into a normal form in which there are no compound
