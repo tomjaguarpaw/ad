@@ -60,11 +60,12 @@ program (\ref{adml-program}) is generated.  Before differentiation the
 program is prepared into a normal form in which there are no compound
 expressions. Instead, every function application is made to a variable
 (rather than a sub-expression).  This is achieved by the introduction
-of fresh variables.  The normal form is similar to ANF from functional
-programming and SSA from assembly languages.  The preparation step is
-a form of book-keeping that allows the subsequent AD pass to be
-simpler.  If this step is not performed explicitly then the AD pass
-will have to perform it implicitly.
+of fresh variables.  The normal form is similar to administrative
+normal form from functional programming and single static assignment
+from assembly languages.  The preparation step is a form of
+book-keeping that allows the subsequent AD pass to be simpler.  If
+this step is not performed explicitly then the AD pass will have to
+perform it implicitly.
 
   \newcommand{\diff}[2]{
     \bar{v}_{#1} \frac{\partial v_{#1}}{\partial v_{#2}}
