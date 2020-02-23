@@ -210,7 +210,8 @@ occurs). Thus, the recipe above mixes two concerns: that of
 differentiating each line of the source program and that of keeping
 track of each use site of each variable.  We can separate the concerns
 by performing an additional preparation pass which explicitly tracks
-reuse of each variable.
+reuse of each variable.  This technique was first brought to our
+attention by Minka in \cite{minka}.
 
 Figure \ref{adml-diff-dup} shows the reverse mode program generated
 using ``explicit duplication form''. For every reused variable we
@@ -592,11 +593,6 @@ linear types.
 %% The ability to mutate arrays implies that the duplication operation on
 %% arrays must perform a copy.  We need to avoid this copy otherwise we
 %% are back to square one!
-
-\section{Acknowledgements}
-
-We are grateful to Tom Minka for bringing to our attention the
-benefits of explicit duplication style in his talk \cite{minka}.
 
 \begin{thebibliography}{9}
 
