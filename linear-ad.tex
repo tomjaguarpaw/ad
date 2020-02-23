@@ -374,8 +374,8 @@ $\bar{v}[i] = \bar{v}[i] + \bar{e}$ which efficiently modifies
 $\bar{v}$ in place.  In language that does not support mutation we do
 not have this luxury.  Instead we would have to emit something like
 $\bar{v} = \bar{v} + \textrm{deltaVec} \, (\textrm{size} \, v) \, i \,
-\bar{e}$, meaning that the variable $\bar{v}$ is shadowed (not its
-referent modified) and the new $\bar{v}$'s value is the old
+\bar{e}$, meaning that the variable $\bar{v}$ is shadowed (the value
+that it refers to is not modified) and the new $\bar{v}$'s value is the old
 $\bar{v}$'s value plus a ``delta'' array of the same size, where
 $\textrm{deltaVec} \, n \, i \, e$ is a vector of size $n$ satisfying
 
