@@ -498,9 +498,11 @@ in the primal program with calls to the function
 which returns the element of the array at the given index as well as
 the original array unchanged.  This allows us to mention the original
 array later in the program, via the name given to the second component
-of the return tuple, without explicitly duplicating it\footnote{which
-  would amount to a copy, for semantic reasons that we won't elaborate
-  on in this note}.  Reuses of scalar variables can then be removed by
+of the return tuple, without explicitly duplicating it.  Explicit
+duplication of an array in the primal code gives rise to the sum of
+two arrays in the derivative code, an expensive operation that
+returning the original array unchanged allows us to avoid.  Reuses of
+scalar variables can then be removed by
 transforming to explicit duplication style.
 
 \begin{figure}[t]
