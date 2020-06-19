@@ -24,8 +24,8 @@ language that does not support mutation, a simple but inefficient
 alternative is to use vectors which contain zero everywhere except at
 a single index.
 
-This note suggests an alternative approach by which reverse mode AD
-can be implemented efficiently on numerical array programs in a pure
+This note suggests an another approach, through which efficient reverse mode AD
+can be implemented for numerical array programs in a pure
 language.
 \end{abstract}
 
@@ -66,7 +66,7 @@ of fresh variables.  The normal form is similar to administrative
 normal form from functional programming and single static assignment
 from assembly languages.  The preparation step is a form of
 book-keeping that allows the subsequent AD pass to be simpler.  If
-this step is not performed explicitly then the AD pass will have to
+this step were not performed explicitly then the AD pass would have to
 perform it implicitly.
 
   \newcommand{\diff}[2]{
@@ -200,7 +200,7 @@ outputs $y$, $\bar{x}_1$ and $\bar{x}_2$.
 To a pure functional programmer the derivative program might cause
 some concern.  It seems to rely on the ability to modify the values of
 variables after they have been assigned, in this case \(\bar{v}_{-1}\)
-and \(\bar{v}_0\).  Does reverse mode AD inherently depend on
+and \(\bar{v}_0\).  Does efficient reverse mode AD inherently depend on
 mutability?  Perhaps, but as we shall see, we need not give up purity.
 
 Note that each update to a sensitivity variable $\bar{v}$ occurs on a
@@ -220,7 +220,7 @@ original variable with two fresh variables.  The reverse derivative of
 $\dup$ is $+$ so, in the reverse pass, lines corresponding to
 duplication perform the accumulation that was handled by mutation in
 the earlier version.  The calculations performed in Figures
-\ref{adml-diff} and \ref{adml-diff-dup} are exactly the same.  The
+\ref{adml-diff} and \ref{adml-diff-dup} are exactly the same; the
 difference between them is is that the code of Figure
 \ref{adml-diff-dup} is structured in a way which demonstrates that no
 mutation need happen.
@@ -340,12 +340,12 @@ mutation need happen.
   newly-introduced variables appear in bold.}
 \end{figure}
 
-As an example of how the explicit duplication transform is applied,
+As an example of how the explicit duplication transformation is applied,
 consider the variable $v_0$.  It was used twice in the primal code.
 Thus we insert a statement $(v_{0,1}, v_{0,2}) = \mathrm{dup} \, v_0$
 which generates two fresh names with the same value as $v_0$.  We also
 update the use sites of $v_0$ so that each uses a unique one of these
-names.  The same transformation is done for the variable $v_1$.
+names.  The same transformation is done for the variable $v_{-1}$.
 
 The transformed input program has the vital property that every
 variable is not only defined exactly once but also \emph{used} exactly
@@ -353,7 +353,7 @@ once (except for the inputs and outputs).  This property is vital in
 two ways that we will take advantage of in the remainder of the paper.
 Firstly, our AD pass is simpler, because everything to do with keeping
 track of use sites is taken care of implicitly.  Secondly, pure
-functional programmers accept the input program as a pure functional
+functional programmers accept the output program as a pure functional
 program because it no longer looks like we are modifying variables
 after they have been bound.
 
@@ -422,8 +422,8 @@ hold
 \end{itemize}
 
 These purity conditions are desirable because the former permits a
-very strong form of ``dead code elimination'' and the latter permits a
-very strong form of ``common sub-expression elimination''.  Together
+very strong form of ``common sub-expression elimination'' and the latter permits a
+very strong form of ``dead code elimination''.  Together
 they allow freedom over the order in which function calls are
 evaluated.  Having these properties at one's disposal permits a large
 class of behavior-preserving program transformations.  The
@@ -560,7 +560,7 @@ can be rewritten to use $\indexL$ instead of $\cdot[\cdot]$.
 
 We have generated two different programs, in Figures
 \ref{array-program-mutating} and \ref{array-program-dup}, which
-perform exactly the same calculations.  The former involves explicit
+perform exactly the same calculation.  The former involves explicit
 mutation that could, in principle, be observed in the rest of the
 program.  The latter shows that the mutation can be made unobservable
 to the rest of the program, preserving the desirable properties of
@@ -569,7 +569,7 @@ purity.
 \section{Conclusion and further work}
 
 In this note we presented an approach which, we hypothesise, can
-reconcile reverse mode AD (which seems to inherently require mutation)
+reconcile efficient reverse mode AD (which seems to inherently require mutation)
 with a desire for purity (which facilitates a large class of useful
 program transformations).  We present only the details needed to
 handle straight line programs (no loops or recursion, no branches, no
