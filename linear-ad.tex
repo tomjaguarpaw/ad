@@ -51,9 +51,10 @@ y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)
 In standard mathematical notation the derivative is expressed by the
 equations
 \begin{align*}
-\frac{\partial y}{\partial x_1} = \frac{1}{x_1} + x_2
-&&
-\frac{\partial y}{\partial x_2} = x_2 - \cos(x_2)
+  \nabla{f}(x_1, x_2)
+  = \left(\frac{\partial y}{\partial x_1},
+  \frac{\partial y}{\partial x_2} \right)
+  = \left(\frac{1}{x_1} + x_2, x_2 - \cos(x_2)\right)
 \end{align*}
 Figure \ref{adml-diff} shows how the reverse mode derivative of
 program (\ref{adml-program}) is generated.  Before differentiation the
