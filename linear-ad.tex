@@ -342,7 +342,10 @@ mutation need happen.
 
 As an example of how the explicit duplication transformation is applied,
 consider the variable $v_0$.  It was used twice in the primal code.
-Thus we insert a statement $(v_{0,1}, v_{0,2}) = \mathrm{dup} \, v_0$
+Thus we insert a statement
+\[
+(v_{0,1}, v_{0,2}) = \mathrm{dup} \, v_0
+\]
 which generates two fresh names with the same value as $v_0$.  We also
 update the use sites of $v_0$ so that each uses a unique one of these
 names.  The same transformation is done for the variable $v_{-1}$.
