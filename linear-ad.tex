@@ -74,6 +74,9 @@ perform it implicitly.
 
 \begin{figure}[t]
 \center
+$\left\downarrow
+% The size of the parbox is how far apart the arrows are
+\parbox{0.65\linewidth}{%
 \begin{tabular}[t]{ll|lll}
 
   \multicolumn{2}{l|}{primal code}
@@ -181,8 +184,11 @@ perform it implicitly.
   \\
 
 \end{tabular}
+}\right\uparrow$
 \caption{\label{adml-diff} The reverse mode derivative of program
-  (\ref{adml-program})}
+  (\ref{adml-program}).  The arrows indicate that program statements
+  are executed in reverse for the derivative code.
+  }
 \end{figure}
 
 The left-hand column of Figure \ref{adml-diff} contains the statements
@@ -225,6 +231,9 @@ mutation need happen.
 
 \begin{figure}[t]
 \center
+$\left\downarrow
+% The size of the parbox is how far apart the arrows are
+\parbox{0.79\linewidth}{%
 \begin{tabular}[t]{ll|lll}
 
   \multicolumn{2}{l|}{primal code}
@@ -333,6 +342,7 @@ mutation need happen.
   \\
 
 \end{tabular}
+}\right\uparrow$
 \caption{\label{adml-diff-dup} The reverse mode derivative of program
   (\ref{adml-program}) in explicit duplication style.  The
   newly-introduced variables appear in bold.}
