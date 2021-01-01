@@ -8,6 +8,10 @@
 #
 # If you get stuck you can run `exit 1` and the split will be
 # cancelled.  You may have to check out your original branch again.
+#
+# If you have any difficulty using split.sh then file an issue
+#
+# https://github.com/tomjaguarpaw/ad/issues/new
 
 set -e
 
