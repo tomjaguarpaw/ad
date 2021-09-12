@@ -1,0 +1,27 @@
+name: Build LaTeX document
+on:
+  push:
+    paths:
+    - 'Linear-AD/linear-ad.tex'
+
+  workflow_dispatch:
+
+  schedule:
+    # Run at 11pm (0 23) every 31st of the month
+    - cron:  '0 23 31 * *'
+
+jobs:
+  build_latex:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up Git repository
+        uses: actions/checkout@v2
+      - name: Compile LaTeX document
+        uses: xu-cheng/latex-action@v2
+        with:
+          root_file: Linear-AD/linear-ad.tex
+      - uses: actions/upload-artifact@v2
+        with:
+          name: linear-ad.pdf
+          path: linear-ad.pdf
+          retention-days: 90
