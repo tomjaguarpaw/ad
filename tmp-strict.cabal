@@ -1,0 +1,13 @@
+cabal-version:      2.4
+name:               tmp-strict
+version:            0
+
+executable tmp-strict
+    main-is:          Main.hs
+
+    other-modules:    Strict
+
+    build-depends:    base ^>=4.14.3.0, containers
+    hs-source-dirs:   app
+    default-language: Haskell2010
+    ghc-options:      -rtsopts
