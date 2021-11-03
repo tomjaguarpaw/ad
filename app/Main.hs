@@ -51,7 +51,7 @@ pairFoldStrictPair = foldl' f (StrictPair 0 0) [1..million]
 
 pairFoldStrict :: Strict (Integer, Integer)
 pairFoldStrict = foldl' f (strict (0, 0)) [1..million]
-  where f (unstrict->(count, theSum)) x = strict (count + 1, theSum + x)
+  where f (Strict (count, theSum)) x = strict (count + 1, theSum + x)
 
 maybeFoldBad :: (Integer, Maybe Integer)
 maybeFoldBad = foldl' f (0, Nothing) [1..million]
