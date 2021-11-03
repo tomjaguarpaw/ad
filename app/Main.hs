@@ -2,42 +2,18 @@
 
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PatternSynonyms #-}
-{-# LANGUAGE RoleAnnotations #-}
 {-# LANGUAGE ViewPatterns #-}
-{-# LANGUAGE TypeFamilies #-}
 
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
 
+import Strict
+
 import Data.List (foldl')
-import Unsafe.Coerce
 
 import qualified Data.Map.Lazy as L
 import qualified Data.Map.Strict as S
-
-class Strictly a where
-  data Strict a
-  strict :: a -> Strict a
-  unstrict :: Strict a -> a
-
-instance Strictly (a, b) where
-  data Strict (a, b) = StrictPair' !a !b deriving Show
-  strict x = unsafeCoerce $ case x of
-    (!_, !_) -> x
-  unstrict (StrictPair' a b) = (a, b)
-
-instance Strictly (Maybe a) where
-  data Strict (Maybe a) = StrictNothing' | StrictJust' !a deriving Show
-  strict x = unsafeCoerce $ case x of
-    Nothing -> x
-    Just !_ -> x
-  unstrict = \case
-    StrictJust' j  -> Just j
-    StrictNothing' -> Nothing
-
-pattern Strict x <- (unstrict->x)
 
 million :: Integer
 million = 1000 * 1000
@@ -64,7 +40,7 @@ pairFoldBangsAwkward = foldl' f (0, 0) [1..million]
 
 pairFoldBangsAwkward2 :: (Integer, Integer)
 pairFoldBangsAwkward2 = foldl' f (0, 0) [1..million]
-  where f (count, theSum) x = ((,) $! count + 1) $! theSum
+  where f (count, theSum) _ = ((,) $! count + 1) $! theSum
 
 
 data StrictPair a b = StrictPair !a !b deriving Show
