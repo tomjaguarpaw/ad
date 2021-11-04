@@ -11,7 +11,7 @@ executable tmp-strict
     ghc-options:      -rtsopts
 
 library stricter
-    build-depends:    base
+    build-depends:    base, strict, these
     hs-source-dirs:   lib
     exposed-modules:  Strict
     ghc-options:      -Wall

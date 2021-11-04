@@ -93,4 +93,10 @@ countParityStrict = foldl' inc (S.fromList [("even", 0), ("odd", 0)])
                     else S.adjust (+1) "odd" m
 
 main :: IO ()
-main = print (countParityStrict [1..million])
+main = do
+  print (countParityStrict [1..million])
+  print (strict (1, 2))
+  print (strict (Just 1))
+  print (strict (Nothing :: Maybe Int))
+  -- print (strict (1 :: Int))
+  -- ^ emits custom type error
