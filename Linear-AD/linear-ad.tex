@@ -1,0 +1,629 @@
+\documentclass[12pt]{article}
+\usepackage{makecell,amsmath}
+\usepackage[a4paper, total={6.5in, 8in}]{geometry}
+
+\DeclareMathAlphabet      {\mathbfit}{OML}{cmm}{b}{it}
+
+\title{A note on efficient automatic differentiation of array programs
+  in a pure language}
+
+\author{Tom Ellis, Andrew Fitzgibbon, Simon Peyton Jones\\Microsoft Research}
+
+\newcommand{\dup}{\mathrm{dup}}
+
+\begin{document}
+
+\maketitle
+
+\begin{abstract}
+Reverse mode automatic differentiation (AD) is an algorithm which can
+efficiently calculate the gradients of a numerical program.  When the
+input program contains array indexing, standard AD algorithms will
+produce a derivative program that involves array mutation.  In a
+language that does not support mutation, a simple but inefficient
+alternative is to use vectors which contain zero everywhere except at
+a single index.
+
+This note suggests an another approach, through which efficient reverse mode AD
+can be implemented for numerical array programs in a pure
+language.
+\end{abstract}
+
+\section{Introduction}
+
+Presentations of reverse mode AD algorithms typically deal with the
+accumulation of sensitivities by using mutation.  This poses a problem
+for the designers of a language that is intended to be pure.  In a
+pure language it should not be possible to mutate data in one part of
+a program and have the mutation be observed elsewhere.  How can a
+source-to-source reverse mode AD pass be added to such a language?  In
+this note we describe an approach for resolving the apparent tension.
+
+\section{Recapitulating reverse mode AD}
+
+In \cite{adml} the authors demonstrate how to perform source-to-source
+reverse mode AD on program (\ref{adml-program}), written in a
+first-order language
+\begin{equation}
+\label {adml-program}
+y = f(x_1, x_2) = \ln(x_1)+x_1 x_2-\sin(x_2)
+\end{equation}
+In standard mathematical notation the derivative is expressed by the
+equations
+\begin{align*}
+  \nabla{f}(x_1, x_2)
+  = \left(\frac{\partial y}{\partial x_1},
+  \frac{\partial y}{\partial x_2} \right)
+  = \left(\frac{1}{x_1} + x_2, ~x_2 - \cos(x_2)\right)
+\end{align*}
+Figure \ref{adml-diff} shows how the reverse mode derivative of
+program (\ref{adml-program}) is generated.  Before differentiation the
+program is prepared into a normal form in which there are no compound
+expressions. Instead, every function application is made to a variable
+(rather than a sub-expression).  This is achieved by the introduction
+of fresh variables.  The normal form is similar to administrative
+normal form from functional programming and single static assignment
+from assembly languages.  The preparation step is a form of
+book-keeping that allows the subsequent AD pass to be simpler.  If
+this step were not performed explicitly then the AD pass would have to
+perform it implicitly.
+
+  \newcommand{\diff}[2]{
+    \bar{v}_{#1} \frac{\partial v_{#1}}{\partial v_{#2}}
+  }
+
+\begin{figure}[t]
+\center
+$\left\downarrow
+% The size of the parbox is how far apart the arrows are
+\parbox{0.65\linewidth}{%
+\begin{tabular}[t]{ll|lll}
+
+  \multicolumn{2}{l|}{primal code}
+  &
+  \multicolumn{3}{l}{derivative code}
+  \\
+
+  \hline
+
+  $v_{-1}$ & $= x_1$
+  &
+  $\bar{x}_1$ & $= \bar{v}_{-1}$
+  \\
+  
+  $v_{0}$ & $= x_2$
+  &
+  $\bar{x}_2$ & $= \bar{v}_{0}$
+  \\
+
+  \hline
+
+  $v_1$ & $= \ln{v_{-1}}$
+  &
+  \(\bar{v}_{-1}\)
+  &
+  \(= \bar{v}_{-1} + \diff{1}{-1}\)
+  &
+  \(= \bar{v}_{-1} + \bar{v}_1 / v_{-1}
+  \) \\
+
+  $v_2$ & $= v_{-1} \times v_0$
+  &
+  \(\bar{v}_0\)
+  &
+  \(= \bar{v}_0 + \diff{2}{0}\)
+  &
+  \(= \bar{v}_0 + \bar{v}_2 \times v_{-1}
+  \) \\
+
+  &
+  &
+  \(\bar{v}_{-1}\)
+  &
+  \(= \diff{2}{-1}\)
+  &
+  \(
+  = \bar{v}_2 \times v_{0}
+  \) \\
+
+  $v_3$ & $= \sin{v_0}$
+  &
+  \(\bar{v}_0\)
+  &
+  \(= \diff{3}{0}\)
+  &
+  \(
+  = \bar{v}_3 \times \cos v_0
+  \) \\
+
+  $v_4$ & $= v_1 + v_2$
+  &
+  \(\bar{v}_2\)
+  &
+  \(= \diff{4}{2}\)
+  &
+  \(
+  = \bar{v}_4 \times 1
+  \) \\
+
+  &
+  &
+  \(\bar{v}_1\)
+  &
+  \(= \diff{4}{1}\)
+  &
+  \(
+  = \bar{v}_4 \times 1
+  \) \\
+
+  $v_5$ & $= v_4 - v_3$
+  &
+  \(\bar{v}_3\)
+  &
+  \(= \diff{5}{3}\)
+  &
+  \(
+  = \bar{v}_5 \times (-1)
+  \) \\
+  
+  &
+  &
+  \(\bar{v}_4\)
+  &
+  \(= \diff{5}{4}\)
+  &
+  \(
+  = \bar{v}_5 \times 1
+  \) \\
+  
+  \hline
+
+  $y$ & $= v_5$
+  &
+  $\bar{v}_5$ & $= \bar{y}$
+  \\
+
+\end{tabular}
+}\right\uparrow$
+\caption{\label{adml-diff} The reverse mode derivative of program
+  (\ref{adml-program}).  The arrows indicate that program statements
+  are executed in reverse for the derivative code.
+  }
+\end{figure}
+
+The left-hand column of Figure \ref{adml-diff} contains the statements
+of program (\ref{adml-program}) after preparation.  The right-hand
+column contains the derivative statements, each of which corresponds
+to a statement on the left-hand side.  The reverse mode derivative
+program is formed by taking the statements in the left column in order
+followed by the statements in the right column in \emph{reverse}
+order.  It takes as inputs $x_1$, $x_2$ and $\bar{y}$ and returns as
+outputs $y$, $\bar{x}_1$ and $\bar{x}_2$.
+
+\section{Explicit duplication}
+
+To a pure functional programmer the derivative program might cause
+some concern.  It seems to rely on the ability to modify the values of
+variables after they have been assigned, in this case \(\bar{v}_{-1}\)
+and \(\bar{v}_0\).  Does efficient reverse mode AD inherently depend on
+mutability?  Perhaps, but as we shall see, we need not give up purity.
+
+Note that each update to a sensitivity variable $\bar{v}$ occurs on a
+line corresponding to a use of the primal variable $v$ as an argument
+(other than the last such use where a direct assignment to $\bar{v}$
+occurs). Thus, the recipe above mixes two concerns: that of
+differentiating each line of the source program and that of keeping
+track of each use site of each variable.  We can separate the concerns
+by performing an additional preparation pass which explicitly tracks
+reuse of each variable\cite{minka}.
+
+Figure \ref{adml-diff-dup} shows the reverse mode program generated
+using ``explicit duplication form''. For every reused variable we
+insert an explicit ``$\dup$'' call into the program, replacing the
+original variable with two fresh variables.  The reverse derivative of
+``$\dup$'' is $+$ so, in the reverse pass, lines corresponding to
+duplication perform the accumulation that was handled by mutation in
+the earlier version.  The calculations performed in Figures
+\ref{adml-diff} and \ref{adml-diff-dup} are exactly the same; the
+difference between them is is that the code of Figure
+\ref{adml-diff-dup} is structured in a way which demonstrates that no
+mutation need happen.
+
+\begin{figure}[t]
+\center
+$\left\downarrow
+% The size of the parbox is how far apart the arrows are
+\parbox{0.79\linewidth}{%
+\begin{tabular}[t]{ll|lll}
+
+  \multicolumn{2}{l|}{primal code}
+  &
+  \multicolumn{3}{l}{derivative code}
+  \\
+
+  \hline
+
+  $v_{-1}$ & $= x_1$
+  &
+  $\bar{x}_1$ & $= \bar{v}_{-1}$
+  \\
+  
+  $v_{0}$ & $= x_2$
+  &
+  $\bar{x}_2$ & $= \bar{v}_{0}$
+  \\
+
+  \hline
+
+  \((\mathbfit{v}_{-1,1}, \mathbfit{v}_{-1,2})\) & \(= \dup \, v_{-1}\)
+  &
+  \(\bar{v}_{-1}\) & \(= \bar{\mathbfit{v}}_{-1,1} + \bar{\mathbfit{v}}_{-1,2}\)
+  \\
+
+  \((\mathbfit{v}_{0,1}, \mathbfit{v}_{0,2})\) & \(= \dup \, v_0\)
+  &
+  \(\bar{v}_{0}\) & \(= \bar{\mathbfit{v}}_{0,1} + \bar{\mathbfit{v}}_{0,2}\)
+  \\
+
+  $v_1$ & $= \ln{\mathbfit{v}_{-1,1}}$
+  &
+  \(\bar{\mathbfit{v}}_{-1,1}\)
+  & \(
+  = \diff{1}{-1,1}\)
+  & \(
+  = \bar{v}_1 / \mathbfit{v}_{-1,1}
+  \) \\
+
+  $v_2$ & $= \mathbfit{v}_{-1,2} \times \mathbfit{v}_{0,1}$
+  &
+  \(\bar{\mathbfit{v}}_{0,1}\)
+  & \(
+  = \diff{2}{0,1}\)
+  & \(
+  = \bar{v}_2 \times \mathbfit{v}_{-1,2}
+  \) \\
+
+  & &
+  \(\bar{\mathbfit{v}}_{-1,2}\)
+  &
+  \(= \diff{2}{-1,2}\)
+  & \(
+  = \bar{v}_2 \times \mathbfit{v}_{0,1}
+  \) \\
+
+  $v_3$ & $= \sin{\mathbfit{v}_{0,2}}$
+  &
+  \(\bar{\mathbfit{v}}_{0,2}\)
+  & \(
+  = \diff{3}{0,2}\)
+  & \(
+  = \bar{v}_3 \times \cos \mathbfit{v}_{0,2}
+  \) \\
+
+  $v_4$ & $= v_1 + v_2$
+  &
+  \(\bar{v}_2\)
+  & \(
+  = \diff{4}{2}\)
+  & \(
+  = \bar{v}_4 \times 1
+  \) \\
+
+  & &
+  \(\bar{v}_1\)
+  &
+  \(= \diff{4}{1}\)
+  & \(
+  = \bar{v}_4 \times 1
+  \) \\
+
+  $v_5$ & $= v_4 - v_3$
+  &
+  \(\bar{v}_3\)
+  & \(
+  = \diff{5}{3}\)
+  & \(
+  = \bar{v}_5 \times (-1)
+  \) \\
+  
+  & &
+  \(\bar{v}_4\)
+  & \(
+  = \diff{5}{4}\)
+  & \(
+  = \bar{v}_5 \times 1
+  \) \\
+  
+  \hline
+
+  $y$ & $= v_5$
+  &
+  $\bar{v}_5$ & $= \bar{y}$
+  \\
+
+\end{tabular}
+}\right\uparrow$
+\caption{\label{adml-diff-dup} The reverse mode derivative of program
+  (\ref{adml-program}) in explicit duplication style.  The
+  newly-introduced variables appear in bold.}
+\end{figure}
+
+As an example of how the explicit duplication transformation is applied,
+consider the variable $v_0$.  It was used twice in the primal code.
+Thus we insert a statement
+\[
+(v_{0,1}, v_{0,2}) = \mathrm{dup} \, v_0
+\]
+which generates two fresh names with the same value as $v_0$.  We also
+update the use sites of $v_0$ so that each uses a unique one of these
+names.  The same transformation is done for the variable $v_{-1}$.
+
+The transformed input program has the vital property that every
+variable is not only defined exactly once but also \emph{used} exactly
+once (except for the inputs and outputs).  This property is vital in
+two ways that we will take advantage of in the remainder of the paper.
+Firstly, our AD pass is simpler, because everything to do with keeping
+track of use sites is taken care of implicitly.  Secondly, pure
+functional programmers accept the output program as a pure functional
+program because it no longer looks like we are modifying variables
+after they have been bound.
+
+\section{Arrays}
+
+In the previous section explicit duplication style was used as a
+convenient preprocessing step to simplify the AD pass.  It also
+assuaged some of the fears of a pure functional programmer regarding
+mutation.  We will shortly describe how explicit duplication style can
+also be turned to the goal of achieving efficient differentiation of
+array programs in a pure language but let us first demonstrate what
+the difficulty is.
+
+The problem we are trying to solve occurs when we differentiate
+programs that contain the array index expression.  If a statement in
+our source program is of the form $e = v[i]$ then in a language that
+allows array mutation we could emit the reverse instruction
+$\bar{v}[i] = \bar{v}[i] + \bar{e}$ which efficiently modifies
+$\bar{v}$ in place.  In language that does not support mutation we do
+not have this luxury.  Instead we would have to emit something like
+$\bar{v} = \bar{v} + \textrm{deltaVec} \, (\textrm{size} \, v) \, i \,
+\bar{e}$, meaning that the variable $\bar{v}$ is shadowed (the value
+that it refers to is not modified) and the new $\bar{v}$'s value is the old
+$\bar{v}$'s value plus a ``delta'' array of the same size, where
+$\textrm{deltaVec} \, n \, i \, e$ is a vector of size $n$ satisfying
+
+\[
+(\textrm{deltaVec} \, n \, i \, e)[j]
+= \textrm{ if } i == j \textrm{ then } e  \textrm{ else } 0
+\]
+
+The mathematical value of the result is the same in each case.  On the
+other hand, the computations performed are very different.
+Specifically, mutating a array at a single location has constant time
+complexity but adding two arrays has time complexity proportional to
+their size.  The reverse mode code containing the $\textrm{deltaVec}$
+wastes a lot of time adding zeroes to elements of $\bar{v}$.  The
+absence of mutability in our language hurts us even in the cases where
+the source program itself is pure!  Optimisations might solve the
+problem in particular cases but there is no general solution.
+
+% It's a bit bold to claim there is no general solution.
+
+\section{Purity}
+
+It seems that mutation is essential for efficient reverse mode AD of
+array programs.  How do we reconcile this with our desire for purity?
+It turns out that explicit duplication style can help.  Let's see how
+by examining what purity is, and more importantly, why we might want a
+language to be pure.
+
+A pure language is one in which every function is pure.  According to
+\cite{purity}, for a function to be pure the following conditions must
+hold
+
+\begin{itemize}
+  \item
+    Its return value is the same for the same arguments (no variation
+    with local static variables, non-local variables, mutable
+    reference arguments or input streams from I/O devices).
+
+  \item
+    Its evaluation has no side effects (no mutation of local
+    static variables, non-local variables, mutable reference
+    arguments or I/O streams).
+\end{itemize}
+
+These purity conditions are desirable because the former permits a
+very strong form of ``common sub-expression elimination'' and the latter permits a
+very strong form of ``dead code elimination''.  Together
+they allow freedom over the order in which function calls are
+evaluated.  Having these properties at one's disposal permits a large
+class of behavior-preserving program transformations.  The
+transformations can be used by a compiler author (for the purpose of
+optimisation) and a programmer (for the purpose of refactoring).
+
+In a language which allows array mutation to be observed one does not
+have the benefit of freely applying the above transformations.  On the
+other hand, if mutation happens but cannot be observed in other parts
+of the program then we \emph{can} apply the above transformations and
+the benefits of purity continue to hold.
+
+This analysis of the benefits of purity gives us the clue we need to
+resolve the apparent tension between reverse mode AD and purity.  The
+explicit duplication pass described above ensures that every variable
+is used only once.  If a variable referring to an array is used only
+once then we can safely mutate it knowing that the mutation can never
+be observed!\footnote{assuming that no other variable also references
+  the same array, a condition that will indeed be satisfied by the
+  transformation pass we will describe} This might sound like a rhetorical
+sleight of hand, so let us proceed to immediately demonstrate that
+this point of view is actually useful.
+
+\newcommand{\indexL}{\mathrm{index}}
+\newcommand{\incL}{\mathrm{inc}}
+
+\begin{figure}[t]
+\center
+\begin{tabular}[t]{ll|ll}
+  \multicolumn{2}{l|}{primal code}
+  &
+  \multicolumn{2}{l}{derivative code}
+  \\
+
+  \hline
+
+  $v_0$ & $= v[0]$
+  &
+  $\bar{v}[0]$ & $ = \bar{v}[0] + \bar{v}_0$
+  \\
+  
+  $v_1$ & $ = v[1]$
+  &
+  $\bar{v}[1]$ & $ = \bar{v}[1] + \bar{v}_1$
+  \\
+
+  $r$ & $= v_0 * v_1$
+  &
+  $\bar{v}_0$ & $ = v_1 * \bar{r}$
+  \\
+
+  & &
+  $\bar{v}_1$ & $ = v_0 * \bar{r}$
+  \\
+\end{tabular}
+\caption{\label{array-program-mutating} The reverse mode derivative of
+  a pure array program, using mutation}
+\end{figure}
+
+Consider a program, for example the one in the left-hand column of
+Figure \ref{array-program-mutating}, in a pure first-order language
+containing the array index operation
+\[
+\cdot[\cdot] : \mathrm{Array} \, a \to \mathrm{Int} \to a
+\]
+Its reverse derivative will contain array mutation whenever the primal
+program performed array indexing.  Now replace all array index calls
+in the primal program with calls to the function
+\[
+\indexL : \mathrm{Array} \, a \to \mathrm{Int} \to (a, \mathrm{Array}
+\, a)
+\]
+which returns the element of the array at the given index as well as
+the original array unchanged.  This allows us to mention the original
+array later in the program, via the name given to the second component
+of the return tuple, without explicitly duplicating it.  Explicit
+duplication of an array in the primal code gives rise to the sum of
+two arrays in the derivative code, an expensive operation that
+returning the original array unchanged allows us to avoid.  Reuses of
+scalar variables can then be removed by
+transforming to explicit duplication style.
+
+\begin{figure}[t]
+\center
+\begin{tabular}[t]{ll|ll}
+  \multicolumn{2}{l|}{primal code}
+  &
+  \multicolumn{2}{l}{derivative code}
+  \\
+
+  \hline
+
+  $(v_0, v')$ & $ = \indexL \, v \, 0$
+  &
+  $\bar{v}$ & $ = \mathrm{inc} \, \bar{v}' \, 0 \, \bar{v}_0$
+  \\
+  
+  $(v_1, v'')$ & $ = \indexL \, v' \, 1$
+  &
+  $\bar{v}'$ & $ = \mathrm{inc} \, \bar{v}'' \, 1 \, \bar{v}_1$
+  \\
+
+  $r$ & $ = v_0 * v_1$
+  &
+  $\bar{v}_0$ & $ = v_1 * \bar{r}$
+  \\
+
+  & &
+  $\bar{v}_1$ & $ = v_0 * \bar{r}$
+  \\
+\end{tabular}
+\caption{\label{array-program-dup} The reverse mode derivative of
+  a pure array program, in the explicit duplication style using
+  unobservable mutation}
+\end{figure}
+
+After this transformation the primal program has the property that
+every variable is used exactly once, implying that no
+\emph{observable} in-place accumulation will be needed in the reverse
+program.  The reverse mode derivative of $\indexL$ is $\incL$ which
+performs in-place accumulation to an array at a given index, returning the array
+after accumulation.
+\[
+\incL : \mathrm{Array} \, a \to \mathrm{Int} \to a \to \mathrm{Array}
+\, a
+\]
+% or just substitute Float instead of a
+Recall that the input array to $\textrm{inc}$
+cannot subsequently be used in the program so the mutation that
+$\incL$ performs cannot be observed.  Figure \ref{array-program-dup}
+shows the program differentiated in terms of $\incL$.
+We hypothesise that any pure first-order program with array indexing
+can be rewritten to use $\indexL$ instead of $\cdot[\cdot]$.
+
+We have generated two different programs, in Figures
+\ref{array-program-mutating} and \ref{array-program-dup}, which
+perform exactly the same calculation.  The former involves explicit
+mutation that could, in principle, be observed in the rest of the
+program.  The latter shows that the mutation can be made unobservable
+to the rest of the program, preserving the desirable properties of
+purity.
+
+\section{Conclusion and further work}
+
+In this note we presented an approach which, we hypothesise, can
+reconcile efficient reverse mode AD (which seems to inherently require mutation)
+with a desire for purity (which facilitates a large class of useful
+program transformations).  We present only the details needed to
+handle straight line programs (no loops or recursion, no branches, no
+higher-order functions).  Explicit duplication style is a very weak
+form of linear typing and the ideas presented here extend in a natural
+way to the general case, taking further inspiration from the theory of
+linear types.
+
+%% \section{Leftover bits}
+
+%% Put differently with greater symmetry
+
+%% \begin{itemize}
+%%  \item Duplicating the result of a computation is the same as running
+%%    it twice
+
+%%  \item Discarding the result of a computation is the same as not
+%%    running it at all
+%% \end{itemize}
+
+%% The ability to mutate arrays implies that the duplication operation on
+%% arrays must perform a copy.  We need to avoid this copy otherwise we
+%% are back to square one!
+
+\begin{thebibliography}{9}
+
+\bibitem{adml}
+  Automatic differentiation in machine learning: a survey;
+  Atilim Gunes Baydin, Barak A. Pearlmutter, Alexey Andreyevich Radul, Jeffrey Mark Siskind
+  
+https://arxiv.org/abs/1502.05767
+  
+\bibitem{purity}
+  https://en.wikipedia.org/wiki/Pure\_function
+
+  %TODO: Really ought to find a better reference.  Maybe one of the two
+  %books that are referenced in Wikipedia
+
+\bibitem{minka}
+  From automatic differentiation to message passing; Tom Minka
+
+  https://tminka.github.io/papers/acmll2019/
+
+\end{thebibliography}
+
+\end{document}
