@@ -103,5 +103,8 @@ main = do
   print (strict (1, 2))
   print (strict (Just 1))
   print (strict (Nothing :: Maybe Int))
-  -- print (strict (1 :: Int))
+--  print (strict (putStrLn "Hello"))
+--  print (strict (1 :: Int))
+--  print (strict ([] :: [Int]))
+--  print (Strict (Strict (Nothing :: Maybe Int)))
   -- ^ emits custom type error
