@@ -50,7 +50,7 @@ pairFoldStrictPair = foldl' f (StrictPair 0 0) [1..million]
   where f (StrictPair count theSum) x = StrictPair (count + 1) (theSum + x)
 
 pairFoldStrict :: Strict (Integer, Integer)
-pairFoldStrict = foldl' f (strict (0, 0)) [1..million]
+pairFoldStrict = foldl' f (Strict (0, 0)) [1..million]
   where f (Strict (count, theSum)) x = strict (count + 1, theSum + x)
 
 maybeFoldBad :: (Integer, Maybe Integer)
@@ -91,6 +91,12 @@ countParityStrict = foldl' inc (S.fromList [("even", 0), ("odd", 0)])
     where inc m n = if n `mod` 2 == 0
                     then S.adjust (+1) "even" m
                     else S.adjust (+1) "odd" m
+
+foo :: Strict (Int, Int) -> ()
+foo (Strict (a, b)) = a `seq` b `seq` ()
+
+bar :: Strict (Int, Int) -> ()
+bar (unstrict->(a, b)) = a `seq` b `seq` ()
 
 main :: IO ()
 main = do
