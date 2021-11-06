@@ -37,7 +37,7 @@ module Strict
   -- types.  For example, consider the data type
   --
   -- @
-  -- data Foo = Foo { foo1 :: Int, foo2 :: Bool }
+  -- data Foo = Foo Int Bool
   -- @
   --
   -- What possible states can a value of type @Foo@ be in?  There are
@@ -59,7 +59,7 @@ module Strict
   -- strictness annotations thus:
   --
   -- @
-  -- data FooStrict = FooStrict { foo1 :: !Int, foo2 :: !Bool }
+  -- data FooStrict = FooStrict !Int !Bool
   -- @
   --
   -- (or by enabling @StrictData@ which brutally applies the same
@@ -79,7 +79,7 @@ module Strict
   -- | But the above technique is not particularly general.  Consider
   --
   -- @
-  -- data Bar = Bar { bar1 :: !(Int, Bool), bar2 :: !(Maybe Double) }
+  -- data Bar = Bar !(Int, Bool) !(Maybe Double)
   -- @
   --
   -- Despite the strictness annotations this type has many
@@ -124,7 +124,7 @@ module Strict
   -- #barstrict#
   --
   -- @
-  -- data BarStrict = BarStrict { bar1 :: !(Strict (Int, Bool)), bar2 :: !(Strict (Maybe Double)) }
+  -- data BarStrict = BarStrict !(Strict (Int, Bool)) !(Strict (Maybe Double))
   -- @
   --
   -- then only the valid states are representable:
@@ -138,8 +138,7 @@ module Strict
   -- #baz#
   --
   -- @
-  -- data Baz = Baz { baz1 :: !(Strict (Int, Strict (Either Bool Int)))
-  --                , baz2 :: !(Strict (Maybe Double)) }
+  -- data Baz = Baz !(Strict (Int, Strict (Either Bool Int))) !(Strict (Maybe Double))
   -- @
 
   -- ** The API
