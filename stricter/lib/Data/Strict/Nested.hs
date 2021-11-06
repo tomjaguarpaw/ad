@@ -14,20 +14,19 @@ module Data.Strict.Nested
 
   -- ** Summary
 
-  -- | This library defines a newtype
+  -- | This library defines a newtype*
   --
   -- @newtype t'Strict' a = v'Strict' a@
   --
   -- with the special property that the contents of the @Strict@ has
   -- been made strict, in the sense that when it is evaluated its
-  -- immediate children are evaluated too*.  This is useful for
+  -- immediate children are evaluated too.  This is useful for
   -- avoiding <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>
   -- by making invalid states unrepresentable.
   --
-  -- \* Actually @Strict@ is a data family and bidirectional pattern
-  -- synonym.  It is impossible for a newtype to have the special
-  -- property, but if you think of it as a newtype then you'll
-  -- understand immediately how to use it
+  -- \* Actually it's not a newtype but if you think of it as a one
+  -- then you'll understand immediately how to use it.  Read on to
+  -- find out what it actually is.
 
   -- ** The problem
 
@@ -150,13 +149,14 @@ module Data.Strict.Nested
   -- newtype t'Strict' a = v'Strict' a
   -- @
   --
-  -- with the property that the contents of the @Strict@ has been made
-  -- strict, in the sense that when it is evaluated its immediate
-  -- children are evaluated too (see [The mechanism](#themechanism)
-  -- below for details on how this is achieved).  The data definitions
-  -- for [@BarStrict@](#barstrict) and [@Baz@](#baz) above show how to
-  -- use the t'Strict' type constructor*.  The examples below show how
-  -- to use the v'Strict' data constructor and pattern**.
+  -- with the special property that the contents of the @Strict@ has
+  -- been made strict, in the sense that when it is evaluated its
+  -- immediate children are evaluated too (see [The
+  -- mechanism](#themechanism) below for details on how this is
+  -- achieved).  The data definitions for [@BarStrict@](#barstrict)
+  -- and [@Baz@](#baz) above show how to use the t'Strict' type
+  -- constructor*.  The examples below show how to use the v'Strict'
+  -- data constructor and pattern**.
   --
   -- @
   -- usePattern :: BarStrict -> IO ()
@@ -171,15 +171,15 @@ module Data.Strict.Nested
   --         m = if i \`rem\` 3 == 0 then Nothing else fromIntegral i / 3
   -- @
   --
-  -- \* in fact a data family
-  -- \** in fact a bidirectional pattern synonym
+  -- \* actually a data family
+  -- \** actually a bidirectional pattern synonym
 
   -- | #themechanism#
 
   -- ** The mechanism
 
-  -- | The 'Strict' data family maps each type @a@ to a type 'Strict'
-  -- @a@ that is isomorphic to @a@, except that when it is evaluated
+  -- | The t'Strict' data family maps each type @a@ to a type @Strict
+  -- a@ that is isomorphic to @a@, except that when it is evaluated
   -- all its direct children are evaluated too.  For example
   --
   -- @
@@ -248,11 +248,11 @@ module Data.Strict.Nested
   -- *** nothunks
 
   -- |
-  -- <https://hackage.haskell.org/package/nothunks-0.1.3/docs/NoThunks-Class.html
-  -- nothunks> is a debugging tool that allows inspecting a value at
-  -- run time to see if it contains any thunks.  That is, it can check
-  -- at run time whether a value is invalid.  But if you can make the
-  -- invalid states unrepresentable in the first place then why not?
+  -- <https://hackage.haskell.org/package/nothunks-0.1.3/docs/NoThunks-Class.html nothunks>
+  -- is a debugging tool that allows inspecting a value at run time to
+  -- see if it contains any thunks.  That is, it can check at run time
+  -- whether a value is invalid.  But if you can make the invalid
+  -- states /unrepresentable/ then why not do so?
 
   -- * Strict constructor and pattern
 
@@ -262,8 +262,9 @@ module Data.Strict.Nested
   -- * Accessor functions
 
   -- | The accessor functions can be more efficient than the v'Strict'
-  -- constructor and pattern in some circumstances. We don't recommend
-  -- you use them unless you are experiencing performance problems.
+  -- constructor and pattern in some circumstances but we don't
+  -- recommend you use them unless you are experiencing performance
+  -- problems.
 
   , strict
   , unstrict
@@ -355,7 +356,7 @@ instance Strictly (Either a b) where
     Right r -> StrictRight r
 
 -- | Some data types, such as 'Int' and 'Double', are already as
--- strict as they can be.  There is no need to wrap them in 'Strict'!
+-- strict as they can be.  There is no need to wrap them in t'Strict'!
 type family AlreadyStrict t :: Constraint
 type instance AlreadyStrict t =
   TypeError (('ShowType t ':<>: 'Text " is already strict.")

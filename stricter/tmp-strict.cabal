@@ -1,5 +1,8 @@
 cabal-version:      2.4
 name:               strict-nested
+synopsis:           Zero-cost nested strict data
+description:        Create nested strict data types at zero additional run
+                    time cost
 version:            0
 
 executable tmp-strict
