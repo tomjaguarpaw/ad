@@ -42,7 +42,6 @@ pairFoldBangsAwkward2 :: (Integer, Integer)
 pairFoldBangsAwkward2 = foldl' f (0, 0) [1..million]
   where f (count, theSum) _ = ((,) $! count + 1) $! theSum
 
-
 data StrictPair a b = StrictPair !a !b deriving Show
 
 pairFoldStrictPair :: StrictPair Integer Integer
