@@ -14,18 +14,20 @@ module Strict
 
   -- ** Summary
 
-  -- | This library defines a newtype*
+  -- | This library defines a newtype
   --
   -- @newtype t'Strict' a = v'Strict' a@
   --
-  -- with the special property that when the @a@ inside is evaluated
-  -- then its immediate children are evaluated too.  This is useful
-  -- for avoiding <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>
+  -- with the special property that the contents of the @Strict@ has
+  -- been made strict, in the sense that when it is evaluated its
+  -- immediate children are evaluated too*.  This is useful for
+  -- avoiding <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>
   -- by making invalid states unrepresentable.
   --
-  -- \* actually it's a data family and bidirectional pattern synonym
-  -- but if you think of it as a newtype then you'll understand
-  -- immediately how to use it
+  -- \* Actually @Strict@ is a data family and bidirectional pattern
+  -- synonym.  It is impossible for a newtype to have the special
+  -- property, but if you think of it as a newtype then you'll
+  -- understand immediately how to use it
 
   -- ** The problem
 
@@ -53,7 +55,7 @@ module Strict
   -- you should consider which are its valid states.  Haskell is a
   -- lazy language so we cannot forbid state 1*, but are states like 3
   -- and 4 valid?  If not (and it's more likely not than so) then you
-  -- should forbid them statically.  How can we do so?  We can add
+  -- should forbid them statically.  How can you do so?  You can add
   -- strictness annotations thus:
   --
   -- @
@@ -101,9 +103,9 @@ module Strict
   -- 13. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
   --
   -- Plenty of thunks for leaks to hide in!  Perhaps for some use
-  -- cases for @Bar@ all the above states are valid.  On the other
-  -- hand in most cases it overwhelmingly likely that only the
-  -- following states are valid:
+  -- cases of @Bar@ all the above states are valid.  On the other hand
+  -- in /most/ cases it overwhelmingly likely that only the following
+  -- states are valid:
   --
   -- 1. @\<thunk\>@ (because we can't do anything about it anyway)
   -- 2. @Bar (\<evaluated Int\>, \<evaluated Bool\>) Nothing@ @ @
@@ -128,8 +130,8 @@ module Strict
   -- then only the valid states are representable:
   --
   -- 1. @\<thunk\>@ @ @
-  -- 2. @Bar (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict Nothing)@ @ @
-  -- 3. @Bar (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict (Just \<evaluated Double\>))@ @ @
+  -- 2. @BarStrict (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict Nothing)@ @ @
+  -- 3. @BarStrict (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict (Just \<evaluated Double\>))@ @ @
   --
   -- Deeper nesting works too, for example:
   --
@@ -142,8 +144,8 @@ module Strict
 
   -- ** The API
 
-  -- | To use this library you should imagine that there is a type
-  -- definition
+  -- | To understand how to use this library you should imagine that
+  -- there is a newtype definition
   --
   -- @
   -- newtype t'Strict' a = v'Strict' a
@@ -152,11 +154,9 @@ module Strict
   -- with the property that the contents of the @Strict@ has been made
   -- strict, in the sense that when it is evaluated its immediate
   -- children are evaluated too (see [The mechanism](#themechanism)
-  -- below for details on how this is achieved).
-  --
-  -- The data definitions for [@BarStrict@](#barstrict) and
-  -- [@Baz@](#baz) above show how to use the t'Strict' type
-  -- constructor*.  The examples below show how
+  -- below for details on how this is achieved).  The data definitions
+  -- for [@BarStrict@](#barstrict) and [@Baz@](#baz) above show how to
+  -- use the t'Strict' type constructor*.  The examples below show how
   -- to use the v'Strict' data constructor and pattern**.
   --
   -- @
@@ -184,8 +184,8 @@ module Strict
   -- all its direct children are evaluated too.  For example
   --
   -- @
-  -- data Strict (a, b) = StrictPair !a !b
-  -- data Strict (Maybe a) = StrictNothing | StrictJust !a
+  -- data instance Strict (a, b) = StrictPair !a !b
+  -- data instance Strict (Maybe a) = StrictNothing | StrictJust !a
   -- @
   --
   -- The v'Strict' bidirectional pattern synonym is just a
@@ -196,11 +196,13 @@ module Strict
 
   -- *** Efficiency considerations
 
-  -- | The functions 'strict' and 'unstrict' provide the same
-  -- functionality as the v'Strict' pattern/constructor synonym. They
-  -- can be more efficient in particular circumstances but we suggest
-  -- just using v'Strict' until and unless you find a performance
-  -- problem.
+  -- | This library should be zero-cost relative to inserting 'seq' or
+  -- bang patterns manually.  In some cases matching the baseline cost
+  -- will require using the functions 'strict' and 'unstrict'.  They
+  -- provide the same functionality as the v'Strict'
+  -- pattern/constructor synonym but can be more efficient in
+  -- particular circumstances. We suggest just using v'Strict' until
+  -- and unless you find a performance problem.
 
   -- ** The alternatives
 
@@ -224,8 +226,8 @@ module Strict
   -- is an extremely expensive and blunt hammer.  It has to
   -- walk your entire data structure evaluating any thunks it
   -- encounters.  Were those thunks actually part of a valid state of
-  -- your program?  In many (most?) cases they were not!  Therefore it
-  -- would be better to design those thunks out of your data
+  -- your program?  In many (most?) cases they were not!  In those
+  -- cases it would be better to design those thunks out of your data
   -- structures and avoid deepseq entirely.
 
   -- *** strict
@@ -237,20 +239,21 @@ module Strict
   -- transformer types).
   --
   -- This library is a much smaller and more coherent subset of the
-  -- features of @strict@: it only provides /strict/ versions of basic
-  -- types and a class to map between them.  By being more restrictive
-  -- the mapping can be made almost zero-cost (see 'strict' and
-  -- 'unstrict').  Furthermore the v'Strict' pattern/constructor is
-  -- more ergonomic than @toStrict@/@toLazy@ mapping functions.
+  -- features of @strict@: it only provides strict versions of basic
+  -- types and a class to map between them.  In return for being more
+  -- restrictive the mapping can be made almost zero-cost (see
+  -- 'strict' and 'unstrict').  Furthermore the v'Strict'
+  -- pattern\/constructor is more ergonomic than @toStrict@/@toLazy@
+  -- mapping functions.
 
   -- *** nothunks
 
   -- |
-  -- <https://hackage.haskell.org/package/nothunks-0.1.3/docs/NoThunks-Class.html nothunks>
-  -- is a debugging tool that allows inspecting a value at run time
-  -- to see if it contains any thunks.  That is, it can check at run
-  -- time whether a value is invalid.  But if you can, then why not
-  -- make invalid states unrepresentable in the first place?
+  -- <https://hackage.haskell.org/package/nothunks-0.1.3/docs/NoThunks-Class.html
+  -- nothunks> is a debugging tool that allows inspecting a value at
+  -- run time to see if it contains any thunks.  That is, it can check
+  -- at run time whether a value is invalid.  But if you can make the
+  -- invalid states unrepresentable in the first place then why not?
 
   -- * Strict constructor and pattern
 
@@ -260,7 +263,8 @@ module Strict
   -- * Accessor functions
 
   -- | The accessor functions can be more efficient than the v'Strict'
-  -- constructor and pattern in some circumstances.
+  -- constructor and pattern in some circumstances. We don't recommend
+  -- you use them unless you are experiencing performance problems.
 
   , strict
   , unstrict
