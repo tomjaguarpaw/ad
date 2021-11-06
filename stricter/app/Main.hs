@@ -8,7 +8,7 @@
 
 module Main where
 
-import Strict
+import Data.Strict.Nested
 
 import Data.List (foldl')
 

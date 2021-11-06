@@ -8,7 +8,7 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleInstances #-}
 
-module Strict
+module Data.Strict.Nested
   (
   -- * Introduction
 

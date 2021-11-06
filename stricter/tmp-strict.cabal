@@ -1,5 +1,5 @@
 cabal-version:      2.4
-name:               tmp-strict
+name:               strict-nested
 version:            0
 
 executable tmp-strict
@@ -13,5 +13,5 @@ executable tmp-strict
 library stricter
     build-depends:    base
     hs-source-dirs:   lib
-    exposed-modules:  Strict
+    exposed-modules:  Data.Strict.Nested
     ghc-options:      -Wall -O2
