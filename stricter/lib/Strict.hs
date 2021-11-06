@@ -33,12 +33,13 @@ module Strict
   ) where
 
 import Unsafe.Coerce (unsafeCoerce)
-import qualified Data.Strict
 import GHC.TypeLits
 
 -- | A type has a @Strictly@ instance when it has a very cheap
 -- conversion to and from a strict type, @Strict a@.
 class Strictly a where
+  -- | Isomorphic to the type @a@, except that when it is evaulated its
+  -- immediate children are evaluated too.
   data Strict a
   -- | Make a @Strict a@ using 'strict' if you obtained an @a@ from
   -- elsewhere (otherwise, if you have the components of @a@
@@ -59,49 +60,50 @@ class Strictly a where
   -- strictMaybe r f sm = maybe r f (unstrict sm)
   -- @
   unstrict :: Strict a -> a
-  -- | Used to implement the @Strict@ pattern synonym.  You should
-  -- never need to use this directly unless you are defining your own
+  -- | Used to implement the v'Strict' pattern synonym.  You should
+  -- never need to use @matchStrict@ unless you are defining your own
   -- instance of @Strictly@.
   matchStrict :: Strict a -> a
-  -- | Used to implement the @Strict@ constructor.  You should
-  -- never need to use this directly unless you are defining your own
+  -- | Used to implement the v'Strict' constructor.  You should never
+  -- need to use @constructStrict@ unless you are defining your own
   -- instance of @Strictly@.
   constructStrict :: a -> Strict a
 
 instance Strictly (a, b) where
-  newtype Strict (a, b) = StrictPair (Data.Strict.Pair a b) deriving Show
+  -- | Hello
+  data Strict (a, b) = StrictPair !a !b deriving Show
   strict x = unsafeCoerce $ case x of
     (!_, !_) -> x
-  matchStrict (StrictPair x) = case x of
-    a Data.Strict.:!: b -> (a, b)
+  matchStrict = \case
+    StrictPair a b -> (a, b)
   unstrict = unsafeCoerce
-  constructStrict (x, y) = StrictPair (x Data.Strict.:!: y)
+  constructStrict (x, y) = StrictPair x y
 
 instance Strictly (Maybe a) where
-  newtype Strict (Maybe a) = StrictMaybe (Data.Strict.Maybe a) deriving Show
+  data Strict (Maybe a) = StrictNothing | StrictJust !a deriving Show
   strict x = unsafeCoerce $ case x of
     Nothing -> x
     Just !_ -> x
-  matchStrict (StrictMaybe x) = case x of
-    Data.Strict.Just j  -> Just j
-    Data.Strict.Nothing -> Nothing
+  matchStrict = \case
+    StrictJust j  -> Just j
+    StrictNothing -> Nothing
   unstrict = unsafeCoerce
   constructStrict = \case
-    Just j  -> StrictMaybe (Data.Strict.Just j)
-    Nothing -> StrictMaybe Data.Strict.Nothing
+    Just j  -> StrictJust j
+    Nothing -> StrictNothing
 
 instance Strictly (Either a b) where
-  newtype Strict (Either a b) = StrictEither (Data.Strict.Either a b) deriving Show
+  data Strict (Either a b) = StrictLeft a | StrictRight b deriving Show
   strict x = unsafeCoerce $ case x of
     Left !_  -> x
     Right !_ -> x
-  matchStrict (StrictEither x) = case x of
-    Data.Strict.Left l  -> Left l
-    Data.Strict.Right r -> Right r
+  matchStrict = \case
+    StrictLeft l  -> Left l
+    StrictRight r -> Right r
   unstrict = unsafeCoerce
   constructStrict = \case
-    Left l  -> StrictEither (Data.Strict.Left l)
-    Right r -> StrictEither (Data.Strict.Right r)
+    Left l  -> StrictLeft l
+    Right r -> StrictRight r
 
 -- | Some data types, such as 'Int' and 'Double', are already as
 -- strict as they can be.  There is no need to wrap them in 'Strict'!
@@ -120,9 +122,8 @@ instance TypeError (AlreadyStrict Double) => Strictly Double
 
 instance TypeError (Can'tBeStrict [a]) => Strictly [a]
 
--- | Use the @Strict@ pattern if you want to obtain access to the
--- invididual fields of a @Strict a@ (otherwise it is more efficient
--- to use 'unstrict').
+-- | Use the @Strict@ pattern if you want to subsequently match on the
+--  @a@ it contains (otherwise it is more efficient to use 'strict').
 --
 -- @
 -- printIt :: Strict (Maybe Int) -> IO ()
@@ -130,8 +131,9 @@ instance TypeError (Can'tBeStrict [a]) => Strictly [a]
 -- printIt (Strict Nothing)  = putStrLn "Nothing there"
 -- @
 --
--- Make a @Strict a@ using the @Strict@ constructor if you have its
--- individual fields (otherwise it is more efficient to use 'strict').
+-- Make a @Strict a@ using the @Strict@ constructor if you are
+-- constructing it from its individual fields (otherwise it is more
+-- efficient to use 'unstrict').
 --
 -- @
 -- makeStrict :: Int -> Strict (Int, String)
