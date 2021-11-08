@@ -287,6 +287,11 @@ module Data.Strict.Wrapper
   -- whether a value is invalid.  But if you can make the invalid
   -- states /unrepresentable/ then why not do so?
 
+  -- ** Further reading
+
+  -- | You can read <http://h2.jaguarpaw.co.uk/posts/nested-strict-data/ the blog post>
+  -- by Tom Ellis where the design of this library was first proposed.
+
   -- * Strict constructor and pattern
 
   -- | The @Strict@ constructor and pattern are the easiest way to get
