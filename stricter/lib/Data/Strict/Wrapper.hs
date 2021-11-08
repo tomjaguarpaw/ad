@@ -21,7 +21,7 @@ module Data.Strict.Wrapper
   -- @newtype t'Strict' t = v'Strict' t@
   --
   -- with the special property that the @t@ inside the @Strict@ has
-  -- been made strict, in the sense that when it is evaluated its
+  -- been "made strict", in the sense that when it is evaluated its
   -- immediate children are evaluated too.  If, for your uses of @t@,
   -- having unevaluated thunks inside it is an invalid state then
   -- wrapping it in @Strict@ "makes invalid states unrepresentable".
@@ -30,7 +30,7 @@ module Data.Strict.Wrapper
   -- then you'll understand immediately how to use it.  To find out
   -- what it really is, read on.
 
-  -- ** The problem
+  -- ** The problem that @strict-wrapper@ solves
 
   -- *** Lazy and strict data
 
@@ -50,7 +50,7 @@ module Data.Strict.Wrapper
   -- 3. @Foo@ @\<evaluated Int\>@ @\<thunk\>@
   -- 4. @Foo@ @\<thunk\>@ @\<evaluated Bool\>@
   --
-  -- The @\<thunk\>@s there can be arbitrarily large run time data
+  -- The @\<thunk\>@s can be arbitrarily large run time data
   -- structures! Their unexpected occurrence can cause thunk leaks.
   -- What can we do about that?  When programming in a strongly typed
   -- language we aim to "make invalid states unrepresentable" so when
@@ -184,10 +184,11 @@ module Data.Strict.Wrapper
   -- been made strict, in the sense that when it is evaluated its
   -- immediate children are evaluated too (see [The
   -- mechanism](#themechanism) below for details on how this is
-  -- achieved).  The data definitions for [@BarStrict@](#barstrict)
-  -- and [@Baz@](#baz) above show how to use the t'Strict' type
-  -- constructor*.  The examples below show how to use the v'Strict'
-  -- data constructor and pattern**.
+  -- achieved).  The type constructor and data constructor/pattern are
+  -- all you need to use!  The data definitions for
+  -- [@BarStrict@](#barstrict) and [@Baz@](#baz) above show how to use
+  -- the t'Strict' type constructor*.  The examples below show how to
+  -- use the v'Strict' data constructor/pattern**.
   --
   -- @
   -- usePattern :: BarStrict -> IO ()
@@ -241,7 +242,7 @@ module Data.Strict.Wrapper
   -- | It is always possible to use 'seq' (or equivalently bang
   -- patterns) to ensure that invalid thunk states don't arise.  After
   -- all, strictness annotations and strict data types are implemented
-  -- merely by automatic insertion of the former!  However, in pratice
+  -- merely by automatic insertion of 'seq'!  However, in pratice
   -- it is extremely difficult to maintain the level of discipline
   -- required to make sure all the 'seq' calls or bang patterns are
   -- inserted in the correct places (and not in the incorrect places).
@@ -268,13 +269,14 @@ module Data.Strict.Wrapper
   -- lazy types (including @ByteString@ and @Text@ types and monad
   -- transformer types).
   --
-  -- @strict-wrapper@ is a much smaller and more coherent subset of the
-  -- features of @strict@: it only provides strict versions of basic
-  -- types and a class to map between them.  In return for being more
-  -- restrictive the mapping can be made almost zero-cost (see
-  -- 'strict' and 'unstrict').  Furthermore the v'Strict'
-  -- pattern\/constructor is more ergonomic than @toStrict@/@toLazy@
-  -- mapping functions.
+  -- @strict-wrapper@ is a much smaller and more coherent subset of
+  -- the features of @strict@: it only provides strict versions of
+  -- basic types and a class to map between them.  In return for being
+  -- more restrictive the mapping can be made almost zero-cost (see
+  -- 'strict' and 'unstrict').  Furthermore t'Strict' data family
+  -- avoids the need for a whole universe of new strict type names and
+  -- the v'Strict' pattern\/constructor is more ergonomic than
+  -- @toStrict@/@toLazy@ mapping functions.
 
   -- *** nothunks
 
@@ -316,14 +318,14 @@ import Unsafe.Coerce (unsafeCoerce)
 import GHC.TypeLits
 import Data.Kind (Constraint)
 
--- | A type can be given a @Strictly@ instance when it has a very
--- cheap conversion to and from a strict type, @Strict a@.
+-- | A type @t@ can be given a @Strictly@ instance when it has a very
+-- cheap conversion to and from a strict type, @Strict t@.
 class Strictly t where
   -- | Isomorphic to the type @a@, except that when it is evaulated its
   -- immediate children are evaluated too.
   data Strict t
-  -- | Make a @Strict a@ using 'strict' if you obtained an @a@ from
-  -- elsewhere (otherwise, if you have the components of @a@
+  -- | Make a @Strict t@ using 'strict' if you obtained a whole @t@
+  -- from elsewhere (otherwise, if you have the components of @t@
   -- separately, then it is more efficient to use the v'Strict'
   -- constructor instead).
   --
@@ -332,7 +334,7 @@ class Strictly t where
   -- makeStrict (i, s) = i + f (strict s)
   -- @
   strict :: t -> Strict t
-  -- | Access the contents of a @Strict a@, but not its fields, using
+  -- | Access the contents of a @Strict t@, but not its fields, using
   -- @unstrict@ (if you want access to the fields then it is more
   -- efficient to use the v'Strict' pattern).
   --
@@ -439,7 +441,7 @@ instance NotYetImplemented (x1, x2, x3, x4, x5, x6) => Strictly (x1, x2, x3, x4,
 instance NestedStrict t => Strictly (Strict t)
 
 -- | Use the @Strict@ pattern if you want to subsequently match on the
---  @a@ it contains (otherwise it is more efficient to use 'strict').
+--  @t@ it contains (otherwise it is more efficient to use 'strict').
 --
 -- @
 -- printIt :: Strict (Maybe Int) -> IO ()
@@ -447,7 +449,7 @@ instance NestedStrict t => Strictly (Strict t)
 -- printIt (Strict Nothing)  = putStrLn "Nothing there"
 -- @
 --
--- Make a @Strict a@ using the @Strict@ constructor if you are
+-- Make a @Strict t@ using the @Strict@ constructor if you are
 -- constructing it from its individual fields (otherwise it is more
 -- efficient to use 'unstrict').
 --
