@@ -148,14 +148,27 @@ module Data.Strict.Wrapper
   --
   -- @
   -- example_leak = 'Data.List.foldl'' f (0, 0) [1..1000]
-  --     where f (n, s) i = (n + 1, s + i)
+  --     where f :: (Int, Int) -> Int -> (Int, Int)
+  --           f (n, s) i = (n + 1, s + i)
   -- @
   --
-  -- but rewriting it in terms of @Strict@ avoids the space leak:
+  -- Manually adding strictness avoids the space leak but reads
+  -- clumsily:
+  --
+  -- @
+  -- example_leak = 'Data.List.foldl'' f (0, 0) [1..1000]
+  --     where f :: (Int, Int) -> Int -> (Int, Int)
+  --           f (n, s) i = ((,) $! n + 1) $! s + i
+  -- @
+  --
+  -- Using @Strict@ avoids the space leak in a way that is both
+  -- syntactically convenient /and/ reflected in the type of the
+  -- accumulator function @f@:
   --
   -- @
   -- example_leak = 'Data.List.foldl'' f (Strict (0, 0)) [1..1000]
-  --     where f (Strict (n, s)) i = Strict (n + 1, s + i)
+  --     where f :: Strict (Int, Int) -> Int -> Strict (Int, Int)
+  --           f (Strict (n, s)) i = Strict (n + 1, s + i)
   -- @
 
   -- ** The API
