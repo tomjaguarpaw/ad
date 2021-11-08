@@ -156,7 +156,7 @@ module Data.Strict.Wrapper
   -- clumsily:
   --
   -- @
-  -- example_leak = 'Data.List.foldl'' f (0, 0) [1..1000]
+  -- example_manual = 'Data.List.foldl'' f (0, 0) [1..1000]
   --     where f :: (Int, Int) -> Int -> (Int, Int)
   --           f (n, s) i = ((,) $! n + 1) $! s + i
   -- @
@@ -166,7 +166,7 @@ module Data.Strict.Wrapper
   -- accumulator function @f@:
   --
   -- @
-  -- example_leak = 'Data.List.foldl'' f (Strict (0, 0)) [1..1000]
+  -- example_Strict = 'Data.List.foldl'' f (Strict (0, 0)) [1..1000]
   --     where f :: Strict (Int, Int) -> Int -> Strict (Int, Int)
   --           f (Strict (n, s)) i = Strict (n + 1, s + i)
   -- @
