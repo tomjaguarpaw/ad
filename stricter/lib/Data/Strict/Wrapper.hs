@@ -318,6 +318,13 @@ import Unsafe.Coerce (unsafeCoerce)
 import GHC.TypeLits
 import Data.Kind (Constraint)
 
+-- WARNING: For 'strict' and 'unstrict' to have zero run time cost
+-- they are implemented in terms of 'unsafeCoerce'.  This will lead to
+-- CATASTROPHIC BREAKAGE unless you are very careful to ensure that
+-- 'Strict a' has the same run time representation as a
+-- fully-evaulated 'a', and that when mapping from 'a' to 'Strict a'
+-- you ensure all its fields are fully evaluated.
+
 -- | A type @t@ can be given a @Strictly@ instance when it has a very
 -- cheap conversion to and from a strict type, @Strict t@.
 class Strictly t where
