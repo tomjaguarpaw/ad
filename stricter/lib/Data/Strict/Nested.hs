@@ -14,48 +14,52 @@ module Data.Strict.Nested
 
   -- ** Summary
 
-  -- | This library defines a newtype*
+  -- | @strict-nested@ is a library that helps you avoid space leaks,
+  -- specifically <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>.
+  -- It defines a newtype*
   --
-  -- @newtype t'Strict' a = v'Strict' a@
+  -- @newtype t'Strict' t = v'Strict' t@
   --
-  -- with the special property that the contents of the @Strict@ has
+  -- with the special property that the @t@ inside the @Strict@ has
   -- been made strict, in the sense that when it is evaluated its
-  -- immediate children are evaluated too.  This is useful for
-  -- avoiding <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>
-  -- by making invalid states unrepresentable.
+  -- immediate children are evaluated too.  If, for your uses of @t@,
+  -- having unevaluated thunks inside it is an invalid state then
+  -- wrapping it in @Strict@ "makes invalid states unrepresentable".
   --
   -- \* Actually it's not a newtype but if you think of it as a one
-  -- then you'll understand immediately how to use it.  Read on to
-  -- find out what it actually is.
+  -- then you'll understand immediately how to use it.  To find out
+  -- what it really is, read on.
 
   -- ** The problem
 
   -- *** Lazy and strict data
 
-  -- | Sometimes thunk leaks occur because of lazy fields in data
-  -- types.  For example, consider the data type
+  -- | One circumstance in which thunk leaks occur is when a lazy
+  -- field of a data type remains unevaluated for longer than
+  -- expected.  By way of example consider the following data type:
   --
   -- @
   -- data Foo = Foo Int Bool
   -- @
   --
-  -- What possible states can a value of type @Foo@ be in?  There are
-  -- broadly four:
+  -- During execution of a program what possible states can a value of
+  -- type @Foo@ be in?  There are broadly four:
   --
   -- 1. @\<thunk\>@ @ @
   -- 2. @Foo@ @\<evaluated Int\>@ @\<evaluated Bool\>@
   -- 3. @Foo@ @\<evaluated Int\>@ @\<thunk\>@
   -- 4. @Foo@ @\<thunk\>@ @\<evaluated Bool\>@
   --
-  -- Thunks can be arbitrarily large so when they occur unexpectedly
-  -- they can cause thunk leaks.  What can we do about that?  When
-  -- programming in a strongly typed language we aim to "make invalid
-  -- states unrepresentable".  When you define a data type like @Foo@
-  -- you should consider which are its valid states.  Haskell is a
-  -- lazy language so we cannot forbid state 1*, but are states like 3
-  -- and 4 valid?  If not (and it's more likely not than so) then you
-  -- should forbid them statically.  How can you do so?  You can add
-  -- strictness annotations thus:
+  -- The @\<thunk\>@s there can be arbitrarily large run time data
+  -- structures! Their unexpected occurrence can cause thunk leaks.
+  -- What can we do about that?  When programming in a strongly typed
+  -- language we aim to "make invalid states unrepresentable" so when
+  -- we define a data type like @Foo@ we should consider which are its
+  -- valid states.  Haskell is a lazy language so we cannot forbid
+  -- state 1*, but are states like 3 and 4 valid?  Perhaps.  We should
+  -- carefully consider our use case; but if not (and it's more likely
+  -- not than so) then we should forbid those states statically.  How
+  -- can we do so?  We can add strictness annotations thus:
   --
   -- @
   -- data FooStrict = FooStrict !Int !Bool
@@ -102,21 +106,20 @@ module Data.Strict.Nested
   -- 13. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
   --
   -- Plenty of thunks for leaks to hide in!  Perhaps for some use
-  -- cases of @Bar@ all the above states are valid.  On the other hand
-  -- in /most/ cases it overwhelmingly likely that only the following
-  -- states are valid:
+  -- cases all the above states are valid but in most cases it is
+  -- overwhelmingly likely that only the following states are valid:
   --
   -- 1. @\<thunk\>@ (because we can't do anything about it anyway)
   -- 2. @Bar (\<evaluated Int\>, \<evaluated Bool\>) Nothing@ @ @
   -- 3. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
   --
-  -- But no clever application of strictness annotations can restrict
-  -- us to this set of states!  The problem is that there's no way of
+  -- No clever application of strictness annotations can restrict us
+  -- to this set of states!  The problem is that there's no way of
   -- "applying strictness inside" the nested data types.
 
   -- ** The solution
 
-  -- | This library allows you to "apply strictness inside" nested
+  -- | @strict-nested@ allows you to "apply strictness inside" nested
   -- data types.  For example, if we rewrite @Bar@ as
   --
   --
@@ -142,14 +145,14 @@ module Data.Strict.Nested
 
   -- ** The API
 
-  -- | To understand how to use this library you should imagine that
-  -- there is a newtype definition
+  -- | To understand how to use @strict-nested@ you should imagine
+  -- that there is a newtype definition
   --
   -- @
-  -- newtype t'Strict' a = v'Strict' a
+  -- newtype t'Strict' t = v'Strict' t
   -- @
   --
-  -- with the special property that the contents of the @Strict@ has
+  -- with the special property that the @t@ inside the @Strict@ has
   -- been made strict, in the sense that when it is evaluated its
   -- immediate children are evaluated too (see [The
   -- mechanism](#themechanism) below for details on how this is
@@ -178,9 +181,9 @@ module Data.Strict.Nested
 
   -- ** The mechanism
 
-  -- | The t'Strict' data family maps each type @a@ to a type @Strict
-  -- a@ that is isomorphic to @a@, except that when it is evaluated
-  -- all its direct children are evaluated too.  For example
+  -- | t'Strict' is a data family that maps each type @t@ to a type
+  -- @Strict t@ that is isomorphic to @t@, except that when it is
+  -- evaluated all its direct children are evaluated too.  For example
   --
   -- @
   -- data instance Strict (a, b) = StrictPair !a !b
@@ -188,17 +191,17 @@ module Data.Strict.Nested
   -- @
   --
   -- The v'Strict' bidirectional pattern synonym is just a
-  -- mutually-inverse* pair of functions @a -> Strict a@ and @Strict a
-  -- -> a@.
+  -- mutually-inverse* pair of functions @t -> Strict t@ and @Strict t
+  -- -> t@.
   --
   -- \* modulo strictness
 
   -- *** Efficiency considerations
 
-  -- | This library should be zero-cost relative to inserting 'seq' or
-  -- bang patterns manually.  In some cases matching the baseline cost
-  -- will require using the functions 'strict' and 'unstrict'.  They
-  -- provide the same functionality as the v'Strict'
+  -- | Using @strict-nested@ should be zero-cost relative to inserting
+  -- 'seq' or bang patterns manually.  In some cases matching the
+  -- baseline cost will require using the functions 'strict' and
+  -- 'unstrict'.  They provide the same functionality as the v'Strict'
   -- pattern/constructor synonym but can be more efficient in
   -- particular circumstances. We suggest just using v'Strict' until
   -- and unless you find a performance problem.
@@ -225,9 +228,9 @@ module Data.Strict.Nested
   -- is an extremely expensive and blunt hammer.  It has to
   -- walk your entire data structure evaluating any thunks it
   -- encounters.  Were those thunks actually part of a valid state of
-  -- your program?  In many (most?) cases they were not!  In those
-  -- cases it would be better to design those thunks out of your data
-  -- structures and avoid deepseq entirely.
+  -- your program?  In many (perhaps most) cases they were not!  In those
+  -- cases would it not be better to design those thunks out of your data
+  -- structures and avoid deepseq entirely?
 
   -- *** strict
 
@@ -237,7 +240,7 @@ module Data.Strict.Nested
   -- lazy types (including @ByteString@ and @Text@ types and monad
   -- transformer types).
   --
-  -- This library is a much smaller and more coherent subset of the
+  -- @strict-nested@ is a much smaller and more coherent subset of the
   -- features of @strict@: it only provides strict versions of basic
   -- types and a class to map between them.  In return for being more
   -- restrictive the mapping can be made almost zero-cost (see
@@ -257,14 +260,14 @@ module Data.Strict.Nested
   -- * Strict constructor and pattern
 
   -- | The @Strict@ constructor and pattern are the easiest way to get
-  -- started with this library.
+  -- started with @strict-nested@.
   pattern Strict
   -- * Accessor functions
 
   -- | The accessor functions can be more efficient than the v'Strict'
   -- constructor and pattern in some circumstances but we don't
-  -- recommend you use them unless you are experiencing performance
-  -- problems.
+  -- recommend that you use them unless you are experiencing
+  -- performance problems.
 
   , strict
   , unstrict
@@ -287,10 +290,10 @@ import Data.Kind (Constraint)
 
 -- | A type can be given a @Strictly@ instance when it has a very
 -- cheap conversion to and from a strict type, @Strict a@.
-class Strictly a where
+class Strictly t where
   -- | Isomorphic to the type @a@, except that when it is evaulated its
   -- immediate children are evaluated too.
-  data Strict a
+  data Strict t
   -- | Make a @Strict a@ using 'strict' if you obtained an @a@ from
   -- elsewhere (otherwise, if you have the components of @a@
   -- separately, then it is more efficient to use the v'Strict'
@@ -300,7 +303,7 @@ class Strictly a where
   -- makeStrict :: (Int, Strict (Int, String)) -> Int
   -- makeStrict (i, s) = i + f (strict s)
   -- @
-  strict :: a -> Strict a
+  strict :: t -> Strict t
   -- | Access the contents of a @Strict a@, but not its fields, using
   -- @unstrict@ (if you want access to the fields then it is more
   -- efficient to use the v'Strict' pattern).
@@ -309,15 +312,15 @@ class Strictly a where
   -- strictMaybe :: r -> (a -> r) -> Strict (Maybe a) -> r
   -- strictMaybe r f sm = maybe r f (unstrict sm)
   -- @
-  unstrict :: Strict a -> a
+  unstrict :: Strict t -> t
   -- | Used to implement the v'Strict' pattern synonym.  You should
   -- never need to use @matchStrict@ unless you are defining your own
   -- instance of @Strictly@.
-  matchStrict :: Strict a -> a
+  matchStrict :: Strict t -> t
   -- | Used to implement the v'Strict' constructor.  You should never
   -- need to use @constructStrict@ unless you are defining your own
   -- instance of @Strictly@.
-  constructStrict :: a -> Strict a
+  constructStrict :: t -> Strict t
 
 instance Strictly (a, b) where
   -- | Hello
@@ -382,10 +385,10 @@ type instance NotYetImplemented t =
 -- | It is redundant to nest t'Strict', e.g. @Strict (Strict (a, b))@.
 -- Just use one layer of t'Strict'.
 type family NestedStrict t :: Constraint
-type instance NestedStrict a =
+type instance NestedStrict t =
   TypeError ('Text "It is redundant to nest Strict"
-             ':$$: 'Text "In type Strict (Strict (" ':<>: 'ShowType a ':<>: 'Text "))"
-             ':$$: 'Text "Just use Strict (" ':<>: 'ShowType a ':<>: 'Text ") instead")
+             ':$$: 'Text "In type Strict (Strict (" ':<>: 'ShowType t ':<>: 'Text "))"
+             ':$$: 'Text "Just use Strict (" ':<>: 'ShowType t ':<>: 'Text ") instead")
 
 instance AlreadyStrict () => Strictly ()
 instance AlreadyStrict Bool => Strictly Bool
@@ -397,7 +400,7 @@ instance AlreadyStrict Double => Strictly Double
 instance AlreadyStrict Ordering => Strictly Ordering
 instance AlreadyStrict Char => Strictly Char
 
-instance Can'tBeStrict [a] => Strictly [a]
+instance Can'tBeStrict [t] => Strictly [t]
 instance Can'tBeStrict (IO a) => Strictly (IO a)
 
 instance NotYetImplemented (x1, x2, x3) => Strictly (x1, x2, x3)
@@ -405,7 +408,7 @@ instance NotYetImplemented (x1, x2, x3, x4) => Strictly (x1, x2, x3, x4)
 instance NotYetImplemented (x1, x2, x3, x4, x5) => Strictly (x1, x2, x3, x4, x5)
 instance NotYetImplemented (x1, x2, x3, x4, x5, x6) => Strictly (x1, x2, x3, x4, x5, x6)
 
-instance NestedStrict a => Strictly (Strict a)
+instance NestedStrict t => Strictly (Strict t)
 
 -- | Use the @Strict@ pattern if you want to subsequently match on the
 --  @a@ it contains (otherwise it is more efficient to use 'strict').
@@ -424,7 +427,7 @@ instance NestedStrict a => Strictly (Strict a)
 -- makeStrict :: Int -> Strict (Int, String)
 -- makeStrict i = Strict (i + 1, show i)
 -- @
-pattern Strict :: Strictly a => a -> Strict a
+pattern Strict :: Strictly t => t -> Strict t
 pattern Strict x <- (matchStrict->x)
   where Strict = constructStrict
 
