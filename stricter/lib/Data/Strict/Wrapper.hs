@@ -141,6 +141,22 @@ module Data.Strict.Wrapper
   -- @
   -- data Baz = Baz !(Strict (Int, Strict (Either Bool Int))) !(Strict (Maybe Double))
   -- @
+  --
+  -- @Strict@ also works well as a wrapper for types whose values will
+  -- be passed as strict function arguments.  For example, the
+  -- following function has a space leak:
+  --
+  -- @
+  -- example_leak = 'Data.List.foldl'' f (0, 0) [1..1000]
+  --     where f (n, s) i = (n + 1, s + i)
+  -- @
+  --
+  -- but rewriting it in terms of @Strict@ avoids the space leak:
+  --
+  -- @
+  -- example_leak = 'Data.List.foldl'' f (Strict (0, 0)) [1..1000]
+  --     where f (Strict (n, s)) i = Strict (n + 1, s + i)
+  -- @
 
   -- ** The API
 
