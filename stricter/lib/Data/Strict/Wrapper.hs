@@ -122,7 +122,6 @@ module Data.Strict.Wrapper
   -- | @strict-wrapper@ allows you to "apply strictness inside" nested
   -- data types.  For example, if we rewrite @Bar@ as
   --
-  --
   -- #barstrict#
   --
   -- @
