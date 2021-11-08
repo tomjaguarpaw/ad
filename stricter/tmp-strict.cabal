@@ -1,20 +1,20 @@
 cabal-version:      2.4
-name:               strict-nested
-synopsis:           Zero-cost nested strict data
-description:        Create nested strict data types at zero additional run
-                    time cost
+name:               strict-wrapper
+synopsis:           Zero-cost strict types
+description:        Use strict versions of basic data types at zero additional
+                    run time cost
 version:            0
 
 executable tmp-strict
     main-is:          Main.hs
 
-    build-depends:    base ^>=4.14.3.0, containers, stricter
+    build-depends:    base ^>=4.14.3.0, containers, strict-wrapper-lib
     hs-source-dirs:   app
     default-language: Haskell2010
     ghc-options:      -rtsopts
 
-library stricter
+library strict-wrapper-lib
     build-depends:    base
     hs-source-dirs:   lib
-    exposed-modules:  Data.Strict.Nested
+    exposed-modules:  Data.Strict.Wrapper
     ghc-options:      -Wall -O2
