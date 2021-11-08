@@ -14,7 +14,7 @@ module Data.Strict.Wrapper
 
   -- ** Summary
 
-  -- | @strict-nested@ is a library that helps you avoid space leaks,
+  -- | @strict-wrapper@ is a library that helps you avoid space leaks,
   -- specifically <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>.
   -- It defines a newtype*
   --
@@ -119,7 +119,7 @@ module Data.Strict.Wrapper
 
   -- ** The solution
 
-  -- | @strict-nested@ allows you to "apply strictness inside" nested
+  -- | @strict-wrapper@ allows you to "apply strictness inside" nested
   -- data types.  For example, if we rewrite @Bar@ as
   --
   --
@@ -145,7 +145,7 @@ module Data.Strict.Wrapper
 
   -- ** The API
 
-  -- | To understand how to use @strict-nested@ you should imagine
+  -- | To understand how to use @strict-wrapper@ you should imagine
   -- that there is a newtype definition
   --
   -- @
@@ -198,7 +198,7 @@ module Data.Strict.Wrapper
 
   -- *** Efficiency considerations
 
-  -- | Using @strict-nested@ should be zero-cost relative to inserting
+  -- | Using @strict-wrapper@ should be zero-cost relative to inserting
   -- 'seq' or bang patterns manually.  In some cases matching the
   -- baseline cost will require using the functions 'strict' and
   -- 'unstrict'.  They provide the same functionality as the v'Strict'
@@ -240,7 +240,7 @@ module Data.Strict.Wrapper
   -- lazy types (including @ByteString@ and @Text@ types and monad
   -- transformer types).
   --
-  -- @strict-nested@ is a much smaller and more coherent subset of the
+  -- @strict-wrapper@ is a much smaller and more coherent subset of the
   -- features of @strict@: it only provides strict versions of basic
   -- types and a class to map between them.  In return for being more
   -- restrictive the mapping can be made almost zero-cost (see
@@ -260,7 +260,7 @@ module Data.Strict.Wrapper
   -- * Strict constructor and pattern
 
   -- | The @Strict@ constructor and pattern are the easiest way to get
-  -- started with @strict-nested@.
+  -- started with @strict-wrapper@.
   pattern Strict
   -- * Accessor functions
 
