@@ -12,221 +12,131 @@ module Data.Strict.Wrapper
   (
   -- * Introduction
 
-  -- ** Summary
+  -- ** Background
 
-  -- | @strict-wrapper@ is a library that helps you avoid space leaks,
-  -- specifically <http://blog.ezyang.com/2011/05/space-leak-zoo/ thunk leaks>.
-  -- It defines a newtype*
+  -- | To avoid space leaks it is important to ensure that strictness
+  -- annotations are inserted appropriately.  For example, instead of
+  -- writing
   --
-  -- @newtype t'Strict' t = v'Strict' t@
+  -- @
+  -- pairFoldBad :: (Integer, Integer)
+  -- pairFoldBad = foldl' f (0, 0) [1..million]
+  --  where f (count, theSum) x = (count + 1, theSum + x)
+  -- @
   --
-  -- with the special property that the @t@ inside the @Strict@ has
-  -- been "made strict", in the sense that when it is evaluated its
-  -- immediate children are evaluated too.  If, for your uses of @t@,
-  -- having unevaluated thunks inside it is an invalid state then
-  -- wrapping it in @Strict@ "makes invalid states unrepresentable".
+  -- we could write
   --
-  -- \* Actually it's not a newtype but if you think of it as a one
-  -- then you'll understand immediately how to use it.  To find out
-  -- what it really is, read on.
+  -- @
+  -- pairFoldBangs :: (Integer, Integer)
+  -- pairFoldBangs = foldl' f (0, 0) [1..million]
+  --  where f (!count, !theSum) x = (count + 1, theSum + x)
+  -- @
+  --
+  -- The downside of avoiding the space leak by inserting those bang
+  -- patterns is that we have to remember to do so.  Nothing in the
+  -- types guides us to insert them.  One way of addressing that
+  -- problem is to define a type of "strict pairs" and use it instead
+  -- of Haskell's built-in (lazy) pair.
+  --
+  -- @
+  -- data StrictPair a b = StrictPair !a !b
+  --
+  -- pairFoldStrictPair :: StrictPair Integer Integer
+  -- pairFoldStrictPair = foldl' f (StrictPair 0 0) [1..million]
+  --  where f (StrictPair count theSum) x = StrictPair (count + 1) (theSum + x)
+  -- @
+  --
+  -- The strictness annotations on the fields of the @StrictPair@
+  -- constructor cause the compiler to evaluate the fields before the
+  -- pair is constructed.  The syntax above desugars to the form
+  -- below:
+  --
+  -- @
+  -- pairFoldStrictPair_Desugared :: StrictPair Integer Integer
+  -- pairFoldStrictPair_Desugared = foldl' f (StrictPair 0 0) [1..million]
+  --  where f (StrictPair count theSum) x = let !count'  = count + 1
+  --                                            !theSum' = theSum + x
+  --                                        in StrictPair count' theSum'
+  -- @
+  --
+  -- (@pairFoldStrictPair_Desugared@ forces the fields at construction
+  -- time and @pairFoldBangs@ forces the fields when the pair is
+  -- pattern matched but the consequences are the same: the space leak
+  -- is avoided.)
+  --
+  -- Using `StrictPair` is helpful because we can't forget to evaluate
+  -- the components.  It happens automatically.
+  --
+  -- If we take the "define strict data types" approach to solving
+  -- space leaks then we need a strict version of every basic data
+  -- type.  For example, to fix the space leak in the following:
+  --
+  -- @
+  -- maybeFoldBad :: (Integer, Maybe Integer)
+  -- maybeFoldBad = foldl' f (0, Nothing) [1..million]
+  --  where f (i, Nothing) x = (i + 1, Just x)
+  --        f (i, Just j)  x = (i + 2, Just (j + x))
+  -- @
+  --
+  -- we need to define @StrictMaybe@ and use it as below:
+  --
+  -- @
+  -- data StrictMaybe a = StrictNothing | StrictJust !a
+  --
+  -- maybeFoldStrictMaybe :: StrictPair Integer (StrictMaybe Integer)
+  -- maybeFoldStrictMaybe = foldl' f (StrictPair 0 StrictNothing) [1..million]
+  --  where f (StrictPair i StrictNothing)  x = StrictPair (i + 1) (StrictJust x)
+  --        f (StrictPair i (StrictJust j)) x = StrictPair (i + 2) (StrictJust (j + x))
+  -- @
+  --
+  -- The "define strict data types" approach requires a whole
+  -- "parallel universe" of strict versions of basic types and is
+  -- likely to become very tedious very quickly.
+  -- (<https://hackage.haskell.org/package/strict strict> is one
+  -- library providing such functionality.)
 
-  -- ** The problem that @strict-wrapper@ solves
+  -- ** @strict-wrapper@
 
-  -- *** Lazy and strict data
-
-  -- | One circumstance in which thunk leaks occur is when a lazy
-  -- field of a data type remains unevaluated for longer than
-  -- expected.  By way of example consider the following data type:
+  -- | @strict-wrapper@ provides a convenient way of using strict
+  -- versions of basic data types without requiring a strict "parallel
+  -- universe".  It provides a data family t'Strict' that maps basic
+  -- types to their strict versions
   --
   -- @
-  -- data Foo = Foo Int Bool
+  -- data instance t'Strict' (a, b)    = StrictPair !a !b
+  -- data instance t'Strict' (Maybe a) = StrictNothing | StrictJust !a
+  -- ...
   -- @
   --
-  -- During execution of a program what possible states can a value of
-  -- type @Foo@ be in?  There are broadly four:
-  --
-  -- 1. @\<thunk\>@ @ @
-  -- 2. @Foo@ @\<evaluated Int\>@ @\<evaluated Bool\>@
-  -- 3. @Foo@ @\<evaluated Int\>@ @\<thunk\>@
-  -- 4. @Foo@ @\<thunk\>@ @\<evaluated Bool\>@
-  -- 5. @Foo@ @\<thunk\>@ @\<thunk\>@
-  --
-  -- The @\<thunk\>@s can be arbitrarily large run time data
-  -- structures! Their unexpected occurrence can cause thunk leaks.
-  -- What can we do about that?  When programming in a strongly typed
-  -- language we aim to "make invalid states unrepresentable" so when
-  -- we define a data type like @Foo@ we should consider which are its
-  -- valid states.  Haskell is a lazy language so we cannot forbid
-  -- state 1*, but are states like 3, 4 and 5 valid?  Perhaps.  We should
-  -- carefully consider our use case; but if not (and it's more likely
-  -- not than so) then we should forbid those states statically.  How
-  -- can we do so?  We can add strictness annotations thus:
+  -- and a bidirectional pattern synonym, also called v'Strict', for
+  -- mapping between the lazy and strict versions.  By using
+  -- @strict-wrapper@ the example above, @maybeFoldStrictMaybe@, can
+  -- be written as
   --
   -- @
-  -- data FooStrict = FooStrict !Int !Bool
+  -- maybeFoldStrict :: Strict (Integer, Strict (Maybe Integer))
+  -- maybeFoldStrict = foldl' f (strict (0, Strict Nothing)) [1..million]
+  --  where f (Strict (i, Strict Nothing))  x = Strict (i + 1, Strict (Just x))
+  --        f (Strict (i, Strict (Just j))) x = Strict (i + 2, Strict (Just (j + x)))
   -- @
   --
-  -- (or by enabling @StrictData@ which brutally applies the same
-  -- transformation to /every/ data type definition, or @Strict@ which
-  -- is even more brutal). @FooStrict@ has only two possible states:
-  --
-  -- 1. @\<thunk\>@ @ @
-  -- 2. @Foo@ @\<evaluated Int\>@ @\<evaluated Bool\>@
-  --
-  -- Much better!
-  --
-  -- \* barring unlifted data types, which are out of scope for this
-  -- discussion and this library.
-
-  -- *** Nested strict data
-
-  -- | But the above technique is not particularly general.  Consider
-  --
-  -- @
-  -- data Bar = Bar !(Int, Bool) !(Maybe Double)
-  -- @
-  --
-  -- Despite the strictness annotations this type has many
-  -- possible states:
-  --
-  -- 1. @\<thunk\>@ @ @
-  --
-  -- 2. @Bar (\<thunk\>, \<thunk\>) Nothing@ @ @
-  -- 3. @Bar (\<evaulated Int\>, \<thunk\>) Nothing@ @ @
-  -- 4. @Bar (\<thunk\>, \<evaluated Bool\>) Nothing@ @ @
-  -- 5. @Bar (\<evaluated Int\>, \<evaluated Bool\>) Nothing@ @ @
-  --
-  -- 6. @Bar (\<thunk\>, \<thunk\>) (Just \<thunk\>)@ @ @
-  -- 7. @Bar (\<evaluated Int\>, \<thunk\>) (Just \<thunk\>)@ @ @
-  -- 8. @Bar (\<thunk\>, \<evaluated Bool\>) (Just \<thunk\>)@ @ @
-  -- 9. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<thunk\>)@ @ @
-  --
-  -- 10. @Bar (\<thunk\>, \<thunk\>) (Just \<evaluated Double\>)@ @ @
-  -- 11. @Bar (\<evaluated Int\>, \<thunk\>) (Just \<evaluated Double\>)@ @ @
-  -- 12. @Bar (\<thunk\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
-  -- 13. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
-  --
-  -- Plenty of thunks for leaks to hide in!  Perhaps for some use
-  -- cases all the above states are valid but in most cases it is
-  -- overwhelmingly likely that only the following states are valid:
-  --
-  -- 1. @\<thunk\>@ (because we can't do anything about it anyway)
-  -- 2. @Bar (\<evaluated Int\>, \<evaluated Bool\>) Nothing@ @ @
-  -- 3. @Bar (\<evaluated Int\>, \<evaluated Bool\>) (Just \<evaluated Double\>)@ @ @
-  --
-  -- No clever application of strictness annotations can restrict us
-  -- to this set of states!  The problem is that there's no way of
-  -- "applying strictness inside" the nested data types.
-
-  -- ** The solution
-
-  -- | @strict-wrapper@ allows you to "apply strictness inside" nested
-  -- data types.  For example, if we rewrite @Bar@ as
-  --
-  -- #barstrict#
-  --
-  -- @
-  -- data BarStrict = BarStrict !(Strict (Int, Bool)) !(Strict (Maybe Double))
-  -- @
-  --
-  -- then only the valid states are representable:
-  --
-  -- 1. @\<thunk\>@ @ @
-  -- 2. @BarStrict (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict Nothing)@ @ @
-  -- 3. @BarStrict (Strict (\<evaluated Int\>, \<evaluated Bool\>)) (Strict (Just \<evaluated Double\>))@ @ @
-  --
-  -- Deeper nesting works too, for example:
-  --
-  -- #baz#
-  --
-  -- @
-  -- data Baz = Baz !(Strict (Int, Strict (Either Bool Int))) !(Strict (Maybe Double))
-  -- @
-  --
-  -- @Strict@ also works well as a wrapper for types whose values will
-  -- be passed as strict function arguments.  For example, the
-  -- following function has a space leak:
-  --
-  -- @
-  -- example_leak = 'Data.List.foldl'' f (0, 0) [1..1000]
-  --     where f :: (Int, Int) -> Int -> (Int, Int)
-  --           f (n, s) i = (n + 1, s + i)
-  -- @
-  --
-  -- Manually adding strictness avoids the space leak but reads
-  -- clumsily:
-  --
-  -- @
-  -- example_manual = 'Data.List.foldl'' f (0, 0) [1..1000]
-  --     where f :: (Int, Int) -> Int -> (Int, Int)
-  --           f (n, s) i = ((,) $! n + 1) $! s + i
-  -- @
-  --
-  -- Using @Strict@ avoids the space leak in a way that is both
-  -- syntactically convenient /and/ reflected in the type of the
-  -- accumulator function @f@:
-  --
-  -- @
-  -- example_Strict = 'Data.List.foldl'' f (Strict (0, 0)) [1..1000]
-  --     where f :: Strict (Int, Int) -> Int -> Strict (Int, Int)
-  --           f (Strict (n, s)) i = Strict (n + 1, s + i)
-  -- @
+  -- When using @strict-wrapper@ there is no need to have a parallel
+  -- universe of strict types with new names that we must remember
+  -- (@StrictPair@, @StrictMaybe@, @StrictJust@, @StrictNothing@,
+  -- ...).  All that we need to do is to insert the v'Strict'
+  -- constructor or pattern in the places that we are guided to do so
+  -- by the type checker.
 
   -- ** The API
 
-  -- | To understand how to use @strict-wrapper@ you should imagine
-  -- that there is a newtype definition
-  --
-  -- @
-  -- newtype t'Strict' t = v'Strict' t
-  -- @
-  --
-  -- with the special property that the @t@ inside the @Strict@ has
-  -- been made strict, in the sense that when it is evaluated its
-  -- immediate children are evaluated too (see [The
-  -- mechanism](#themechanism) below for details on how this is
-  -- achieved).  The type constructor and data constructor/pattern are
-  -- all you need to use!  The data definitions for
-  -- [@BarStrict@](#barstrict) and [@Baz@](#baz) above show how to use
-  -- the t'Strict' type constructor*.  The examples below show how to
-  -- use the v'Strict' data constructor/pattern**.
-  --
-  -- @
-  -- usePattern :: BarStrict -> IO ()
-  -- usePattern (BarStrict (Strict (i, b)) (Strict Nothing)) =
-  --   putStrLn (show i ++ ": " ++ show b)
-  -- usePattern (BarStrict (Strict (i, b)) (Strict (Just d))) =
-  --   putStrLn (show i ++ ": " ++ show b ++ " (" ++ show d ++ ")")
-  --
-  -- useConstructor :: Int -> Bar
-  -- useConstructor i = Bar (Strict (i, b)) (Strict m)
-  --   where b = isEven i
-  --         m = if i \`rem\` 3 == 0 then Nothing else fromIntegral i / 3
-  -- @
-  --
-  -- \* actually a data family
-  -- \** actually a bidirectional pattern synonym
+  -- | To use @strict-wrapper@ all that you need is the data family
+  -- t'Strict' and the bidirectional pattern synonym v'Strict'.  For
+  -- example, instead of using @StrictPair a b@ as defined above, use
+  -- @Strict (a, b)@.  To create a @Strict (a, b)@ wrap an @(a, b)@ in
+  -- the v'Strict' constructor; to extract an @(a, b)@, pattern match
+  -- with t'Strict'.
 
-  -- | #themechanism#
-
-  -- ** The mechanism
-
-  -- | t'Strict' is a data family that maps each type @t@ to a type
-  -- @Strict t@ that is isomorphic to @t@, except that when it is
-  -- evaluated all its direct children are evaluated too.  For example
-  --
-  -- @
-  -- data instance Strict (a, b) = StrictPair !a !b
-  -- data instance Strict (Maybe a) = StrictNothing | StrictJust !a
-  -- @
-  --
-  -- The v'Strict' bidirectional pattern synonym is just a
-  -- mutually-inverse* pair of functions @t -> Strict t@ and @Strict t
-  -- -> t@.
-  --
-  -- \* modulo strictness
-
-  -- *** Efficiency considerations
+  -- ** Efficiency considerations
 
   -- | Using @strict-wrapper@ should be zero-cost relative to inserting
   -- 'seq' or bang patterns manually.  In some cases matching the
@@ -235,58 +145,6 @@ module Data.Strict.Wrapper
   -- pattern/constructor synonym but can be more efficient in
   -- particular circumstances. We suggest just using v'Strict' until
   -- and unless you find a performance problem.
-
-  -- ** The alternatives
-
-  -- *** @seq@/bang patterns
-
-  -- | It is always possible to use 'seq' (or equivalently bang
-  -- patterns) to ensure that invalid thunk states don't arise.  After
-  -- all, strictness annotations and strict data types are implemented
-  -- merely by automatic insertion of 'seq'!  However, in pratice
-  -- it is extremely difficult to maintain the level of discipline
-  -- required to make sure all the 'seq' calls or bang patterns are
-  -- inserted in the correct places (and not in the incorrect places).
-  -- The benefit of programming in a strongly typed functional
-  -- language is that we can make invalid states unrepresentable.
-  -- That principle applies as much to data type strictness as to any
-  -- other use case.
-
-  -- *** deepseq
-
-  -- | <https://hackage.haskell.org/package/deepseq-1.4.5.0/docs/Control-DeepSeq.html deepseq>
-  -- is an extremely expensive and blunt hammer.  It has to
-  -- walk your entire data structure evaluating any thunks it
-  -- encounters.  Were those thunks actually part of a valid state of
-  -- your program?  In many (perhaps most) cases they were not!  In those
-  -- cases would it not be better to design those thunks out of your data
-  -- structures and avoid deepseq entirely?
-
-  -- *** strict
-
-  -- | <https://hackage.haskell.org/package/strict strict> provides a
-  -- grab-bag of features related to strictness: strict versions of
-  -- basic types, strict I/O, and a class to map between strict and
-  -- lazy types (including @ByteString@ and @Text@ types and monad
-  -- transformer types).
-  --
-  -- @strict-wrapper@ is a much smaller and more coherent subset of
-  -- the features of @strict@: it only provides strict versions of
-  -- basic types and a class to map between them.  In return for being
-  -- more restrictive the mapping can be made almost zero-cost (see
-  -- 'strict' and 'unstrict').  Furthermore t'Strict' data family
-  -- avoids the need for a whole universe of new strict type names and
-  -- the v'Strict' pattern\/constructor is more ergonomic than
-  -- @toStrict@/@toLazy@ mapping functions.
-
-  -- *** nothunks
-
-  -- |
-  -- <https://hackage.haskell.org/package/nothunks-0.1.3/docs/NoThunks-Class.html nothunks>
-  -- is a debugging tool that allows inspecting a value at run time to
-  -- see if it contains any thunks.  That is, it can check at run time
-  -- whether a value is invalid.  But if you can make the invalid
-  -- states /unrepresentable/ then why not do so?
 
   -- ** Further reading
 
