@@ -236,6 +236,24 @@ instance Strictly (a, b) where
   unstrict = unsafeCoerce
   constructStrict (x, y) = StrictPair x y
 
+instance Strictly (t1, t2, t3) where
+  data Strict (t1, t2, t3) = StrictT3 !t1 !t2 !t3 deriving Show
+  strict x = unsafeCoerce $ case x of
+    (!_, !_, !_) -> x
+  matchStrict = \case
+    StrictT3 x1 x2 x3 -> (x1, x2, x3)
+  unstrict = unsafeCoerce
+  constructStrict (x1, x2, x3) = StrictT3 x1 x2 x3
+
+instance Strictly (t1, t2, t3, t4) where
+  data Strict (t1, t2, t3, t4) = StrictT4 !t1 !t2 !t3 !t4 deriving Show
+  strict x = unsafeCoerce $ case x of
+    (!_, !_, !_, !_) -> x
+  matchStrict = \case
+    StrictT4 x1 x2 x3 x4 -> (x1, x2, x3, x4)
+  unstrict = unsafeCoerce
+  constructStrict (x1, x2, x3, x4) = StrictT4 x1 x2 x3 x4
+
 instance Strictly (Maybe a) where
   data Strict (Maybe a) = StrictNothing | StrictJust !a deriving Show
   strict x = unsafeCoerce $ case x of
@@ -307,8 +325,6 @@ instance AlreadyStrict Char => Strictly Char
 instance Can'tBeStrict [t] => Strictly [t]
 instance Can'tBeStrict (IO a) => Strictly (IO a)
 
-instance NotYetImplemented (x1, x2, x3) => Strictly (x1, x2, x3)
-instance NotYetImplemented (x1, x2, x3, x4) => Strictly (x1, x2, x3, x4)
 instance NotYetImplemented (x1, x2, x3, x4, x5) => Strictly (x1, x2, x3, x4, x5)
 instance NotYetImplemented (x1, x2, x3, x4, x5, x6) => Strictly (x1, x2, x3, x4, x5, x6)
 
