@@ -156,6 +156,11 @@ module Data.Strict.Wrapper
   -- | The @Strict@ constructor and pattern are the easiest way to get
   -- started with @strict-wrapper@.
   pattern Strict
+
+  -- * Types that have a strict version
+
+  , Strict
+
   -- * Accessor functions
 
   -- | The accessor functions can be more efficient than the v'Strict'
@@ -167,7 +172,6 @@ module Data.Strict.Wrapper
   , unstrict
   -- * Class
   , Strictly(matchStrict, constructStrict)
-  , Strict
   -- * Error messages
 
   -- | These diagnostic error messages can appear when you try to use
