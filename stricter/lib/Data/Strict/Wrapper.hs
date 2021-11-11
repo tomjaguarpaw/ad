@@ -228,7 +228,6 @@ class Strictly t where
   constructStrict :: t -> Strict t
 
 instance Strictly (a, b) where
-  -- | Hello
   data Strict (a, b) = StrictPair !a !b deriving Show
   strict x = unsafeCoerce $ case x of
     (!_, !_) -> x
