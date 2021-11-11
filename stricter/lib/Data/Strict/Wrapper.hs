@@ -192,7 +192,7 @@ import Data.Kind (Constraint)
 -- | A type @t@ can be given a @Strictly@ instance when it has a very
 -- cheap conversion to and from a strict type, @Strict t@.
 class Strictly t where
-  -- | Isomorphic to the type @a@, except that when it is evaulated its
+  -- | Isomorphic to the type @t@, except that when it is evaulated its
   -- immediate children are evaluated too.
   data Strict t
   -- | Make a @Strict t@ using 'strict' if you obtained a whole @t@
