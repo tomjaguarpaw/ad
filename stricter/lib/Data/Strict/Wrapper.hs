@@ -127,6 +127,32 @@ module Data.Strict.Wrapper
   -- constructor or pattern in the places that we are guided to do so
   -- by the type checker.
 
+  -- *** Nested strict data
+
+  -- | It is common in the Haskell world to see strict data field
+  -- definitions like
+  --
+  -- @
+  -- data MyData = MyData { field1 :: !(Maybe Bool)
+  --                      , field2 :: !(Either (Int, Double) Float)
+  --                      }
+  -- @
+  --
+  -- Those strict fields probably don't do what the author hoped!
+  -- They are almost entirely pointless.  The bang annotations on the
+  -- @Maybe@ ensure only that is is evaluated to a @Nothing@ or
+  -- @Just@.  The @Bool@ is left unevaluated.  Similarly the @Either@
+  -- is evaluated only as far as a @Left@ or @Right@.  The pair and
+  -- @Float@ inside are left unevaluated.  @strict-wrapper@ can help
+  -- here.  Wrap both the @Maybe@ and the pair in @Strict@ and the
+  -- type becomes fully strict!
+  --
+  -- @
+  -- data MyDataStrict = MyDataStrict { field1 :: !(Strict (Maybe Bool))
+  --                                  , field2 :: !(Strict (Either (Strict (Int, Double)) Float))
+  --                                  }
+  -- @
+
   -- ** The API
 
   -- | To use @strict-wrapper@ all that you need is the data family
