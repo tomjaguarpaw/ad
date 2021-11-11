@@ -343,8 +343,8 @@ instance AlreadyStrict Bool => Strictly Bool
 instance AlreadyStrict Int => Strictly Int
 instance AlreadyStrict Integer => Strictly Integer
 instance AlreadyStrict Float => Strictly Float
-instance AlreadyStrict Word => Strictly Word
 instance AlreadyStrict Double => Strictly Double
+instance AlreadyStrict Word => Strictly Word
 instance AlreadyStrict Ordering => Strictly Ordering
 instance AlreadyStrict Char => Strictly Char
 
