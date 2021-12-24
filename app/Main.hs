@@ -42,8 +42,9 @@ main = do
            _ <- forkIO $ fix (\readAgain -> do
              threadWaitRead connFd
              msg <- recv conn 1024
-             if C.null msg then
-               pure ()
+             if C.null msg then do
+               close conn
+               close write
              else do
                n <- send write msg
                print n
@@ -52,8 +53,9 @@ main = do
            _ <- forkIO $ fix (\readAgain -> do
              threadWaitRead writeFd
              msg <- recv write 1024
-             if C.null msg then
-               pure ()
+             if C.null msg then do
+               close conn
+               close write
              else do
                n <- send conn msg
                print n
