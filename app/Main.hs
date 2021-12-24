@@ -1,69 +1,115 @@
+-- | An X11 Unix sockets proxy.  Proxies X11 data between your
+-- currently running display, on display number @$DISPLAY@, and
+-- display number 111 (hardcoded).
+
 {-# OPTIONS_GHC -Wall #-}
 {-# LANGUAGE LambdaCase #-}
-{-# OPTIONS_GHC -Wno-unused-imports #-}
 
 module Main where
 
-import Prelude hiding (read)
-
 import Network.Socket
-import Network.Socket.ByteString
-import Data.Function (fix)
-import System.Posix.IO.Select
-import System.Posix.IO.Select.Types (Timeout (Never))
-import System.Posix.Types (Fd(Fd))
-import qualified Data.ByteString.Char8 as C
-import Control.Concurrent (forkIO, threadDelay, threadWaitRead)
+    ( close,
+      connect,
+      accept,
+      maxListenQueue,
+      listen,
+      bind,
+      socket,
+      SockAddr(SockAddrUnix),
+      SocketType(Stream),
+      Family(AF_UNIX),
+      Socket )
+import Network.Socket.ByteString ( recv, sendAll )
+import Control.Concurrent (forkIO)
+import Control.Exception (try)
+import Control.Monad (forever)
+import System.Environment (getEnv)
+import Data.ByteString (ByteString)
+import qualified Data.ByteString as BS
 
-
--- See https://stackoverflow.com/questions/29593116/simple-unix-domain-sockets-server
-main :: IO ()
+-- | The type @IO a@ means that we will never terminate normally.
+-- You'll have to Ctrl-C!
+main :: IO a
 main = do
-       read <- socket AF_UNIX Stream 0
-       bind read (SockAddrUnix "/tmp/.X11-unix/X111")
-       listen read maxListenQueue
+  ':' : serverDisplayNumber <- getEnv "DISPLAY"
 
-       _FIXME_never_get_here <- fix (\acceptAgain -> do
-         print "Waiting for new connection"
-         (conn, _) <- accept read
-         print "Got connection"
-         _ <- forkIO $ do
-           write <- socket AF_UNIX Stream 0
-           connect write (SockAddrUnix "/tmp/.X11-unix/X1000")
+  -- I hope display number 111 wasn't already running!
+  let proxyPath = "/tmp/.X11-unix/X111"
 
-           print "Opened new socket for writing"
+  -- Establish the named socket that we will listen on
+  proxyListenSocket <- do
+    proxyListenSocket <- socket AF_UNIX Stream 0
+    bind proxyListenSocket (SockAddrUnix proxyPath)
+    listen proxyListenSocket maxListenQueue
+    pure proxyListenSocket
 
-           connFd <- Fd <$> unsafeFdSocket conn
-           writeFd <- Fd <$> unsafeFdSocket write
+  let mkServerSocket = do
+        write <- socket AF_UNIX Stream 0
+        connect write (SockAddrUnix ("/tmp/.X11-unix/X" <> serverDisplayNumber))
+        pure write
 
-           print connFd
-           print writeFd
+  runXProxyOn proxyListenSocket mkServerSocket
 
-           _ <- forkIO $ fix (\readAgain -> do
-             threadWaitRead connFd
-             msg <- recv conn 1024
-             if C.null msg then do
-               close conn
-               close write
-             else do
-               n <- send write msg
-               print n
-               readAgain)
+-- | Whenever we receive a connection on the proxy listen socket make
+-- a new connection to the server and proxy data between them until
+-- one side is closed.
+runXProxyOn :: Socket
+            -- ^ The proxy listen socket
+            -> IO Socket
+            -- ^ Make a new connection to the server
+            -> IO a
+runXProxyOn proxyListenSocket mkServerSocket = do
+  forever $ do
+    -- Wait for a connection on our proxy socket
+    (proxySocket, _) <- accept proxyListenSocket
 
-           _ <- forkIO $ fix (\readAgain -> do
-             threadWaitRead writeFd
-             msg <- recv write 1024
-             if C.null msg then do
-               close conn
-               close write
-             else do
-               n <- send conn msg
-               print n
-               readAgain)
+    -- When we receive a connection, fork off a thread
+    forkIO $ do
+      -- Set up the socket on which to communicate with the server
+      serverSocket <- mkServerSocket
 
-           -- FIXME: need to close file descriptors
-           pure ()
+      -- How we close our sockets when we're done
+      let closeThem = do
+            close proxySocket
+            close serverSocket
 
-         acceptAgain)
+      -- Listens for data on @from :: Socket@ and then sends it to
+      -- @to_ :: Socket@
+      let proxyDataFromTo from to_ = do
+            untilJust $ do
+              recv' from 1024 >>= \case
+                SocketClosed -> pure (Just ())
+                ConnectionClosed -> pure (Just ())
+                Read msg -> do
+                  sendAll to_ msg
+                  pure Nothing
 
-       close read
+            -- If the reading side was closed then we have no more use
+            -- for either socket.
+            closeThem
+
+      _ <- forkIO $ proxyDataFromTo proxySocket serverSocket
+      _ <- forkIO $ proxyDataFromTo serverSocket proxySocket
+
+      pure ()
+
+data ReadResult = SocketClosed | ConnectionClosed | Read ByteString
+
+-- | Block the thread until we have something to read from the socket,
+-- or the socket is closed.
+recv' :: Socket
+      -> Int
+      -- ^ Read at most this many bytes
+      -> IO ReadResult
+recv' socket_ n = do
+  try (recv socket_ n) >>= \case
+    Left e -> let _ = e :: IOError
+              in pure SocketClosed
+    Right msg ->
+      pure (if BS.null msg then ConnectionClosed else Read msg)
+
+untilJust :: Monad m => m (Maybe b) -> m b
+untilJust m = go
+  where go = m >>= \case
+          Nothing -> go
+          Just a -> pure a
