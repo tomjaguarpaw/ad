@@ -26,10 +26,11 @@ import Control.Monad (forever)
 import System.Environment (getEnv)
 import Data.ByteString (ByteString)
 import qualified Data.ByteString as BS
+import GHC.Conc (threadDelay)
 
 -- | The type @IO a@ means that we will never terminate normally.
 -- You'll have to Ctrl-C!
-main :: IO a
+main :: IO ()
 main = do
   ':' : serverDisplayNumber <- getEnv "DISPLAY"
 
@@ -57,9 +58,9 @@ runXProxyOn :: Socket
             -- ^ The proxy listen socket
             -> IO Socket
             -- ^ Make a new connection to the server
-            -> IO a
+            -> IO ()
 runXProxyOn proxyListenSocket mkServerSocket = do
-  forever $ do
+  _ <- do
     -- Wait for a connection on our proxy socket
     (proxySocket, _) <- accept proxyListenSocket
 
@@ -92,6 +93,8 @@ runXProxyOn proxyListenSocket mkServerSocket = do
       _ <- forkIO $ proxyDataFromTo serverSocket proxySocket
 
       pure ()
+
+  threadDelay (1000 * 1000 * 1000)
 
 data ReadResult = SocketClosed | ConnectionClosed | Read ByteString
 
