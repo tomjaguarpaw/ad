@@ -2,25 +2,60 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
 
+{-# OPTIONS_GHC -Wall #-}
+
 module Main where
 
 import Prelude hiding (Word)
 import Control.Applicative (Const(Const), getConst)
+import Data.Foldable (minimum)
+import qualified Data.Foldable
 import Data.Traversable (mapAccumL)
+import qualified Data.Map.Strict as Data.Map
+import Data.Ord (comparing)
+import Data.List (minimumBy)
+import Data.Function (fix)
+import Data.Maybe (fromJust)
 
 data Word a = Word a a a a a
-  deriving (Functor, Foldable, Traversable, Show)
+  deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 
 instance Applicative Word where
   pure x = Word x x x x x
   Word f1 f2 f3 f4 f5 <*> Word x1 x2 x3 x4 x5
     = Word (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5)
 
+readWord :: [a] -> Maybe (Word a)
+readWord = \case
+  [a,b,c,d,e] -> Just (Word a b c d e)
+  _ -> Nothing
+
+showWord :: Word a -> [a]
+showWord = Data.Foldable.toList
+
+readResult :: String -> Maybe (Word Scored)
+readResult = \case
+  [a,b,c,d,e] -> traverse readScore (Word a b c d e)
+  _ -> Nothing
+
+showResult :: Word Scored -> String
+showResult = showWord . fmap (\case
+  Green  -> 'g'
+  Yellow -> 'y'
+  Grey   -> ' ')
+
+readScore :: Char -> Maybe Scored
+readScore = \case
+  'g' -> Just Green
+  'y' -> Just Yellow
+  'x' -> Just Grey
+  _ -> Nothing
+
 data Located a = CorrectLocation
                | NotCorrectLocation a
                deriving (Functor, Foldable, Traversable)
 
-data Scored = Green | Yellow | Grey deriving Show
+data Scored = Green | Yellow | Grey deriving (Show, Eq, Ord)
 
 toList :: ((a -> Const [a] a) -> (s -> Const [a] s))
           -> s -> [a]
@@ -58,5 +93,68 @@ score (===) target candidate =
                            else (targets, Grey)
                          ) remaining located
 
+goodness :: (a -> b -> Bool)
+         -> [Word a]
+         -> Word b
+         -> (Int, Data.Map.Map (Word Scored) [Word a])
+goodness (===) possibles guess =
+  let scoredPossibles = map (\possible -> (score (===) possible guess, [possible])) possibles
+
+      groupedPossibles = Data.Map.fromListWith (++) scoredPossibles
+
+      minMax = Data.Foldable.minimum (Data.Map.map length groupedPossibles)
+
+  in (minMax, groupedPossibles)
+
+bestGoodness :: Ord a
+             => (a -> b -> Bool)
+             -> [Word b]
+             -> [Word a]
+             -> (Word b, Data.Map.Map (Word Scored) [Word a])
+bestGoodness (===) guesses possibles =
+  let foo = map (\guess -> (guess, goodness (===) possibles guess)) guesses
+      (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (snd . snd)) foo
+
+  in (bestGuess, subsequentPossibles)
+
 main :: IO ()
-main = putStrLn "Hello, Haskell!"
+main = do
+  let target_ = "boost"
+      target = fromJust (readWord target_)
+
+  wordsString <- readFile "/tmp/five"
+  let words_ = case flip traverse (lines wordsString) (\word -> case readWord word of
+                                                          Nothing -> Left word
+                                                          Just w -> Right w) of
+                 Left word -> error word
+                 Right w -> w
+
+  flip fix words_ $ \loop possibles -> do
+    let bestGoodness_ = bestGoodness (==) words_
+        score_ = score (==) target
+
+    let (bestGuess, subsequentPossibles) = bestGoodness_ possibles
+
+    putStrLn (showWord bestGuess)
+
+{-
+    result <- fix $ \tryAgain -> do
+      (readResult <$> getLine) >>= \case
+        Nothing -> do
+          putStrLn "Couldn't understand htat"
+          tryAgain
+        Just r -> pure r
+-}
+
+    let result = score_ bestGuess
+
+    putStrLn (showResult result)
+
+    case result of
+      Word Green Green Green Green Green -> pure ()
+      _ -> do
+        let nextPossibles = case Data.Map.lookup result subsequentPossibles of
+              Nothing -> error "Not found"
+              Just n -> n
+
+        loop nextPossibles
