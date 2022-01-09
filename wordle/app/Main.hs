@@ -8,7 +8,6 @@ module Main where
 
 import Prelude hiding (Word)
 import Control.Applicative (Const(Const), getConst)
-import Data.Foldable (minimum)
 import qualified Data.Foldable
 import Data.Traversable (mapAccumL)
 import qualified Data.Map.Strict as Data.Map
@@ -93,26 +92,26 @@ score (===) target candidate =
                            else (targets, Grey)
                          ) remaining located
 
-goodness :: (a -> b -> Bool)
-         -> [Word a]
-         -> Word b
-         -> (Int, Data.Map.Map (Word Scored) [Word a])
-goodness (===) possibles guess =
+badness :: (a -> b -> Bool)
+        -> [Word a]
+        -> Word b
+        -> (Int, Data.Map.Map (Word Scored) [Word a])
+badness (===) possibles guess =
   let scoredPossibles = map (\possible -> (score (===) possible guess, [possible])) possibles
 
       groupedPossibles = Data.Map.fromListWith (++) scoredPossibles
 
-      minMax = Data.Foldable.minimum (Data.Map.map length groupedPossibles)
+      minMax = Data.Foldable.maximum (Data.Map.map length groupedPossibles)
 
   in (minMax, groupedPossibles)
 
-bestGoodness :: Ord a
-             => (a -> b -> Bool)
-             -> [Word b]
-             -> [Word a]
-             -> (Word b, Data.Map.Map (Word Scored) [Word a])
-bestGoodness (===) guesses possibles =
-  let foo = map (\guess -> (guess, goodness (===) possibles guess)) guesses
+leastBad :: Ord a
+         => (a -> b -> Bool)
+         -> [Word b]
+         -> [Word a]
+         -> (Word b, Data.Map.Map (Word Scored) [Word a])
+leastBad (===) guesses possibles =
+  let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
       (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (snd . snd)) foo
 
   in (bestGuess, subsequentPossibles)
@@ -130,10 +129,10 @@ main = do
                  Right w -> w
 
   flip fix words_ $ \loop possibles -> do
-    let bestGoodness_ = bestGoodness (==) words_
+    let leastBad_ = leastBad (==) words_
         score_ = score (==) target
 
-    let (bestGuess, subsequentPossibles) = bestGoodness_ possibles
+    let (bestGuess, subsequentPossibles) = leastBad_ possibles
 
     putStrLn (showWord bestGuess)
 
