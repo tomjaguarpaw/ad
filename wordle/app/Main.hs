@@ -112,7 +112,7 @@ leastBad :: Ord a
          -> (Word b, Data.Map.Map (Word Scored) [Word a])
 leastBad (===) guesses possibles =
   let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
-      (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (snd . snd)) foo
+      (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
 
   in (bestGuess, subsequentPossibles)
 
