@@ -109,12 +109,17 @@ leastBad :: Ord a
          => (a -> b -> Bool)
          -> [Word b]
          -> [Word a]
-         -> (Word b, Data.Map.Map (Word Scored) [Word a])
-leastBad (===) guesses possibles =
-  let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
-      (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
+         -> Either (Word a)
+                   (Word b, Data.Map.Map (Word Scored) [Word a])
+leastBad (===) guesses possibles' =
+  case possibles' of
+    [] -> error "No possibles"
+    [onlyPossible] -> Left onlyPossible
+    possibles ->
+      let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
+          (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
 
-  in (bestGuess, subsequentPossibles)
+      in Right (bestGuess, subsequentPossibles)
 
 main :: IO ()
 main = do
@@ -132,7 +137,9 @@ main = do
     let leastBad_ = leastBad (==) words_
         score_ = score (==) target
 
-    let (bestGuess, subsequentPossibles) = leastBad_ possibles
+    let (bestGuess, subsequentPossibles) = case leastBad_ possibles of
+          Right r -> r
+          Left l -> (l, Data.Map.empty)
 
     putStrLn (showWord bestGuess)
 
