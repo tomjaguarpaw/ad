@@ -15,11 +15,15 @@ import Network.Socket
       listen,
       bind,
       socket,
+      Cmsg,
       SockAddr(SockAddrUnix),
       SocketType(Stream),
       Family(AF_UNIX),
       Socket )
-import Network.Socket.ByteString ( recv, sendAll )
+import Network.Socket.ByteString ( recv, sendAll, recvMsg, sendMsgNoAddr )
+-- sendMsgNoAddr requires the following patch
+--
+-- https://github.com/tomjaguarpaw/network/commit/b118d6df2c5e9da7279d5f508010626e81a20b87
 import Control.Concurrent (forkIO)
 import Control.Exception (try)
 import Control.Monad (forever)
@@ -77,11 +81,11 @@ runXProxyOn proxyListenSocket mkServerSocket = do
       -- @to_ :: Socket@
       let proxyDataFromTo from to_ = do
             untilJust $ do
-              recv' from 1024 >>= \case
-                SocketClosed -> pure (Just ())
-                ConnectionClosed -> pure (Just ())
-                Read msg -> do
-                  sendAll to_ msg
+              recvMsg' from 1024 >>= \case
+                SocketClosedMsg -> pure (Just ())
+                ConnectionClosedMsg -> pure (Just ())
+                ReadMsg msgs cmsgs -> do
+                  sendMsgNoAddr to_ msgs cmsgs mempty
                   pure Nothing
 
             -- If the reading side was closed then we have no more use
@@ -95,6 +99,8 @@ runXProxyOn proxyListenSocket mkServerSocket = do
 
 data ReadResult = SocketClosed | ConnectionClosed | Read ByteString
 
+data ReadMsgResult = SocketClosedMsg | ConnectionClosedMsg | ReadMsg [ByteString] [Cmsg]
+
 -- | Block the thread until we have something to read from the socket,
 -- or the socket is closed.
 recv' :: Socket
@@ -107,6 +113,16 @@ recv' socket_ n = do
               in pure SocketClosed
     Right msg ->
       pure (if BS.null msg then ConnectionClosed else Read msg)
+
+recvMsg' :: Socket
+         -> Int
+         -> IO ReadMsgResult
+recvMsg' socket_ n = do
+  try (recvMsg socket_ n n mempty) >>= \case
+    Left e -> let _ = e :: IOError
+              in pure SocketClosedMsg
+    Right (_, msg, cmsgs, _) ->
+      pure (if BS.null msg then ConnectionClosedMsg else ReadMsg [msg] cmsgs)
 
 untilJust :: Monad m => m (Maybe b) -> m b
 untilJust m = go
