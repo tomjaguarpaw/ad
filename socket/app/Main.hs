@@ -20,7 +20,7 @@ import Network.Socket
       SocketType(Stream),
       Family(AF_UNIX),
       Socket )
-import Network.Socket.ByteString ( recv, sendAll, recvMsg, sendMsgNoAddr )
+import Network.Socket.ByteString ( recv, recvMsg, sendMsgNoAddr )
 -- sendMsgNoAddr requires the following patch
 --
 -- https://github.com/tomjaguarpaw/network/commit/b118d6df2c5e9da7279d5f508010626e81a20b87
