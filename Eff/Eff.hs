@@ -1,4 +1,6 @@
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE GADTs            #-}
 {-# LANGUAGE KindSignatures   #-}
 {-# LANGUAGE RankNTypes       #-}
 {-# LANGUAGE TypeOperators    #-}
@@ -6,6 +8,7 @@
 
 module Main where
 
+import           Control.Applicative
 import           Control.Monad
 import           Control.Monad.Morph
 import           Control.Monad.Trans.Writer
@@ -15,6 +18,7 @@ import           Control.Monad.Trans.Maybe
 import           Control.Monad.Trans.State
 import           Control.Monad.Trans.Free
 import           Control.Monad.Trans.Identity
+import           Control.Exception
 
 -- In this example we work in the category of monad morphisms.  They
 -- are rank-2 maps between type constructors.  (They are supposed to
@@ -127,6 +131,121 @@ instance MApplicative (ExceptT e) where
 
 liftState :: Functor m => m ~> StateT s m
 liftState m = StateT $ \ s -> flip fmap m $ \a -> (a, s)
+
+-- [Hoists]
+
+type Hoist t = forall m n a. (m ~> n) -> t m a -> t n a
+
+hoistExcept :: Hoist (ExceptT e)
+hoistExcept f = ExceptT . f . runExceptT
+
+hoistMaybe :: Hoist MaybeT
+hoistMaybe nat = MaybeT . nat . runMaybeT
+
+hoistReader :: Hoist (ReaderT r)
+hoistReader nat m = ReaderT (\i -> nat (runReaderT m i))
+
+hoistState :: Hoist (StateT s)
+hoistState nat m = StateT (\s -> nat (runStateT m s))
+
+hoistWriter :: Hoist (WriterT w)
+hoistWriter nat m = WriterT (nat (runWriterT m))
+
+-- Bracket
+
+data BracketArg m c where
+  BracketArg :: m a -> (a -> m b) -> (a -> m c) -> BracketArg m c
+
+instance Functor m => Functor (BracketArg m) where
+  fmap f (BracketArg ma mb mc) = BracketArg ma mb ((fmap . fmap) f mc)
+
+instance Applicative m => Applicative (BracketArg m) where
+  pure x = BracketArg (pure ()) (const (pure ())) (const (pure x))
+  BracketArg fa fb fc <*> BracketArg xa xb xc =
+    BracketArg ((,) <$> fa <*> xa) (\(f, x) -> (,) <$> fb f <*> xb x)
+               (\(f, x) -> fc f <*> xc x)
+
+bracketT :: BracketArg IO c -> IO c
+bracketT (BracketArg ma mb mc) = bracket ma mb mc
+
+data BracketT m c where
+  Done :: c -> BracketT m c
+  BracketT :: m (IO (), BracketT m c) -> BracketT m c
+
+instance Functor m => Functor (BracketT m) where
+  fmap f = \case
+    Done c -> Done (f c)
+    BracketT m -> BracketT ((fmap . fmap . fmap) f m)
+
+instance Applicative m => Applicative (BracketT m) where
+  pure = Done
+  -- This is sort of "parallel".  It doesn't actually match ap.
+  BracketT f <*> BracketT x =
+    BracketT ((\(af, mf) (ax, mx) -> (af *> ax, mf <*> mx)) <$> f <*> x)
+
+instance Applicative m => Monad (BracketT m) where
+  Done c >>= f = f c
+  BracketT m >>= f = BracketT ((fmap . fmap) (>>= f) m)
+
+instance MonadTrans BracketT where
+  lift = liftBracketT
+
+liftBracketT :: Applicative m => m ~> BracketT m
+liftBracketT m = BracketT (fmap (\x -> (pure (), pure x)) m)
+
+instance MFunctor BracketT where
+  hoist f = \case
+    Done c -> Done c
+    BracketT m -> BracketT (f ((fmap . fmap) (hoist f) m))
+
+addRelease :: Applicative m => IO () -> BracketT m a -> BracketT m a
+addRelease release = \case
+  Done c -> BracketT (pure (release, pure c))
+  BracketT m -> BracketT $ flip fmap m $ \(release1, m') ->
+    (release1 *> release, m')
+
+acquire :: Functor m => m (IO (), a) -> BracketT m a
+acquire m = BracketT ((fmap . fmap) Done m)
+
+runBracketT :: (MonadTrans t, MFunctor t, Monad (t (BracketT IO)))
+            => BracketT (t IO) a -> t IO a
+runBracketT = hoist runBracketIO . commuteBracketT
+  where runBracketIO :: BracketT IO a -> IO a
+        runBracketIO = \case
+          Done a -> pure a
+          BracketT m -> bracket m fst (runBracketIO . snd)
+
+commuteBracketT :: (Monad m, MonadTrans t, MFunctor t, Monad (t (BracketT m)))
+                => BracketT (t m) a
+                -> t (BracketT m) a
+commuteBracketT = \case
+  Done c -> lift (Done c)
+  BracketT m -> do
+    (release, body) <- hoist liftBracketT m
+    hoist (addRelease release) (commuteBracketT body)
+
+example = flip runStateT () $ runBracketT $ BracketT $ do
+  lift (putStrLn "Acquiring resource")
+
+  pure (putStrLn "Releasing resource",
+        do
+          (lift . lift) (putStrLn "v-- Release?")
+          error "Foo"
+       )
+
+example' = flip runStateT "Hello" $ runBracketT $ do
+  s <- lift get
+  (lift . lift) (putStrLn s)
+  lift (put "bar")
+
+  s2 <- acquire $ do
+    s1 <- get
+    lift (putStrLn ("Acquiring resource based on " ++ s1))
+    pure (putStrLn ("Releasing resource based on " ++ s1), s1)
+
+  (lift . lift) (putStrLn ("Using resource based on " ++ s2))
+  (lift . lift) (putStrLn "v-- Release?")
+  error "Foo"
 
 -- [Commutors]: Commutors for various monad transformers
 
