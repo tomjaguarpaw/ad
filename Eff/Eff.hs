@@ -51,9 +51,16 @@ affineState f s = commuteStateT (hoist f s)
 -- constraint.
 
 transformed
+  :: (Monad a, MFunctor t)
+  => ASetter (t a) (t b) a b
+transformed f = IdentityT . hoist (runIdentityT . f)
+
+-- A worse way of doing transformed because it picks up an extra
+-- constraint.
+transformed'
   :: (Monad a, Monad b, MFunctor t)
   => ASetter (t a) (t b) a b
-transformed f = uncommuteIdentityT . hoist f
+transformed' f = uncommuteIdentityT . hoist f
 
 -- In fact we can literally just crib some of the definitions from
 -- lens.
@@ -92,9 +99,7 @@ squashState f = over transformed f . sequenceOf affineState
 -- haven't looked in detail into why not.
 
 
--- over transformed picks up an additional constraint compared to
--- hoist.  I'm not sure why.
-overTransformed :: (MFunctor t, Monad a, Monad b) => (a ~> b) -> (t a ~> t b)
+overTransformed :: (MFunctor t, Monad a) => (a ~> b) -> (t a ~> t b)
 overTransformed = over transformed
 
 hoist' :: (MFunctor t, Monad a) => (a ~> b) -> (t a ~> t b)
