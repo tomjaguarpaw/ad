@@ -123,6 +123,11 @@ class MApplicative t where
 instance MApplicative (ExceptT e) where
   liftMA2 f eax ebx = ExceptT (f (runExceptT eax) (runExceptT ebx))
 
+-- [Lifts]
+
+liftState :: Functor m => m ~> StateT s m
+liftState m = StateT $ \ s -> flip fmap m $ \a -> (a, s)
+
 -- [Commutors]: Commutors for various monad transformers
 
 commuteIdentityT
