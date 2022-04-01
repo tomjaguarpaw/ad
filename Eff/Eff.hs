@@ -113,6 +113,13 @@ hoist' = hoist
 --    http://web.jaguarpaw.co.uk/~tom/contact
 
 
+-- [Applicatives]
+
+class MApplicative t where
+  liftMA2 :: (forall x. a x -> b x -> c x) -> t a x -> t b x -> t c x
+
+instance MApplicative (ExceptT e) where
+  liftMA2 f eax ebx = ExceptT (f (runExceptT eax) (runExceptT ebx))
 
 -- [Commutors]: Commutors for various monad transformers
 
