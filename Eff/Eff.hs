@@ -4,6 +4,8 @@
 {-# LANGUAGE TypeOperators    #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
+module Main where
+
 import           Control.Monad
 import           Control.Monad.Morph
 import           Control.Monad.Trans.Writer
