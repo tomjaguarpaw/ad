@@ -261,6 +261,30 @@ example' = flip runStateT "Hello" $ runBracketT $ do
   (lift . lift) (putStrLn "v-- Release?")
   error "Foo"
 
+exampleFree = iterT (\(s, io) -> putStrLn s *> io) $ runBracketTG hoistFreeT $ do
+  lift (write "Hello")
+
+  () <- acquire $ do
+    lift (putStrLn "Acquiring resource")
+    pure (putStrLn "Releasing resource", ())
+
+  lift $ do
+    lift (putStrLn "A")
+    lift (putStrLn "A12")
+    write "There"
+    lift (putStrLn "B")
+    write "Bob"
+    lift (putStrLn "C")
+    write "Baz"
+    lift (putStrLn "D")
+
+  (lift . lift) (putStrLn "Using resource")
+
+  (lift . lift) (putStrLn "v-- Release?")
+  error "Foo"
+
+  where write s = liftF (s, ())
+
 -- [Commutors]: Commutors for various monad transformers
 
 -- See https://www.reddit.com/r/haskell/comments/cualvg/does_this_monadcommute_exist/
