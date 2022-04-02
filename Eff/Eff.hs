@@ -100,7 +100,7 @@ sequenceOf l = l id
 -- Squash the StateT next to the b, pulling the f outsite
 squashState :: (Monad b, Monad n, MFunctor f, MonadTrans f,
                 Monad (f (StateT s b)))
-            => ((StateT s b ~> n) -> (StateT s (f b) ~> f n))
+            => (StateT s b ~> n) -> (StateT s (f b) ~> f n)
 squashState f = over transformed f . sequenceOf affineState
 
 commuteStateViaLens :: (MonadTrans t, MFunctor t,
