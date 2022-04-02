@@ -25,6 +25,8 @@ import           Control.Exception
 -- preserve the monad operations, but we can't check that in the type
 -- system.)
 
+-- See https://www.reddit.com/r/haskell/comments/cury0b/monad_transformer_optics/
+
 type a ~> b = forall r . a r -> b r
 
 -- It turns out that using the functions that commute monad
@@ -242,6 +244,8 @@ example' = flip runStateT "Hello" $ runBracketT $ do
   error "Foo"
 
 -- [Commutors]: Commutors for various monad transformers
+
+-- See https://www.reddit.com/r/haskell/comments/cualvg/does_this_monadcommute_exist/
 
 commuteIdentityT
   :: (MFunctor t, Monad m) => IdentityT (t m) b -> t (IdentityT m) b
