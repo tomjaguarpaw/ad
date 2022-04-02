@@ -253,13 +253,12 @@ exampleFree =
 
   where write s = liftF (s, ())
 
-        go :: FreeT ((,) String) (BracketT IO) a -> IO ()
+        go :: FreeT ((,) String) (BracketT IO) a -> IO a
         go (FreeT (BracketT ma mb mc)) = do
           bracket ma mb (\a -> do
                             mc a >>= \case
-                              Pure c -> pure ()
+                              Pure c -> pure c
                               Free (s, rest) -> do
-                                putStrLn s
                                 go rest)
 
 -- [Commutors]: Commutors for various monad transformers
