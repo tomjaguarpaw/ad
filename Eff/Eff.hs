@@ -153,21 +153,6 @@ hoistWriter nat m = WriterT (nat (runWriterT m))
 
 -- Bracket
 
-data BracketArg m c where
-  BracketArg :: m a -> (a -> m b) -> (a -> m c) -> BracketArg m c
-
-instance Functor m => Functor (BracketArg m) where
-  fmap f (BracketArg ma mb mc) = BracketArg ma mb ((fmap . fmap) f mc)
-
-instance Applicative m => Applicative (BracketArg m) where
-  pure x = BracketArg (pure ()) (const (pure ())) (const (pure x))
-  BracketArg fa fb fc <*> BracketArg xa xb xc =
-    BracketArg ((,) <$> fa <*> xa) (\(f, x) -> (,) <$> fb f <*> xb x)
-               (\(f, x) -> fc f <*> xc x)
-
-bracketT :: BracketArg IO c -> IO c
-bracketT (BracketArg ma mb mc) = bracket ma mb mc
-
 data BracketT m c where
   Done :: c -> BracketT m c
   BracketT :: m (IO (), BracketT m c) -> BracketT m c
@@ -240,10 +225,19 @@ example' = flip runStateT "Hello" $ runBracketT $ do
 
   s2 <- acquire $ do
     s1 <- get
-    lift (putStrLn ("Acquiring resource based on " ++ s1))
-    pure (putStrLn ("Releasing resource based on " ++ s1), s1)
+    lift (putStrLn ("Acquiring resource 1 based on " ++ s1))
+    pure (putStrLn ("Releasing resource 1 based on " ++ s1), s1)
 
-  (lift . lift) (putStrLn ("Using resource based on " ++ s2))
+  lift (put "baz")
+
+  s3 <- acquire $ do
+    s1 <- get
+    lift (putStrLn ("Acquiring resource 2 based on " ++ s1))
+    pure (putStrLn ("Releasing resource 2 based on " ++ s1), s1)
+
+  (lift . lift) (putStrLn ("Using resource 1 based on " ++ s2))
+  (lift . lift) (putStrLn ("Using resource 2 based on " ++ s3))
+
   (lift . lift) (putStrLn "v-- Release?")
   error "Foo"
 
