@@ -270,7 +270,16 @@ exampleFree =
         go2 (FreeT (BracketT ma mb mc)) = do
           FreeT $ bracket ma mb (\a -> do
                                     mca <- mc a
-                                    pure (fmap go2 mca))
+                                    case mca of
+                                            Pure a -> pure (Pure a)
+                                            -- go2 doesn't work
+                                            -- because the pure that
+                                            -- wraps here is the one
+                                            -- that is masked.  Once
+                                            -- it (immediately)
+                                            -- finishes we run the
+                                            -- cleanup.
+                                            Free f -> pure (Free (fmap go2 f)))
 
 -- [Commutors]: Commutors for various monad transformers
 
