@@ -103,6 +103,11 @@ squashState :: (Monad b, Monad n, MFunctor f, MonadTrans f,
             => ((StateT s b ~> n) -> (StateT s (f b) ~> f n))
 squashState f = over transformed f . sequenceOf affineState
 
+commuteStateViaLens :: (MonadTrans t, MFunctor t,
+                        Monad (t (StateT s m)), Monad m)
+                    => StateT s (t m) r -> t (StateT s m) r
+commuteStateViaLens = squashState id
+
 -- I can't imagine that we can write `set` or `view` although I
 -- haven't looked in detail into why not.
 
