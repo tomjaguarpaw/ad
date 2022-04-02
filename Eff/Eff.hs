@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs            #-}
 {-# LANGUAGE KindSignatures   #-}
 {-# LANGUAGE RankNTypes       #-}
@@ -158,132 +159,116 @@ hoistState nat m = StateT (\s -> nat (runStateT m s))
 hoistWriter :: Hoist (WriterT w)
 hoistWriter nat m = WriterT (nat (runWriterT m))
 
+hoistFreeT :: (Functor m, Functor f) => (forall a. m a -> n a) -> FreeT f m b -> FreeT f n b
+hoistFreeT mh = FreeT . mh . fmap (fmap (Main.hoistFreeT mh)) . runFreeT
+
+hoist1FreeT :: (Functor m, Functor f)
+            => (forall a. m a -> m a)
+            -> FreeT f m b
+            -> FreeT f m b
+hoist1FreeT f (FreeT m) = FreeT (f m)
+
 -- Bracket
 
+-- FIXME: Add a part that is not masked
 data BracketT m c where
-  Done :: c -> BracketT m c
-  BracketT :: m (IO (), BracketT m c) -> BracketT m c
+  BracketT :: m a -> (a -> IO b) -> (a -> m c) -> BracketT m c
 
 instance Functor m => Functor (BracketT m) where
-  fmap f = \case
-    Done c -> Done (f c)
-    BracketT m -> BracketT ((fmap . fmap . fmap) f m)
+  fmap f (BracketT ma mb mc) = BracketT ma mb ((fmap . fmap) f mc)
 
 instance Applicative m => Applicative (BracketT m) where
-  pure = Done
-  -- This is sort of "parallel".  It doesn't actually match ap.
-  BracketT f <*> BracketT x =
-    BracketT ((\(af, mf) (ax, mx) -> (af *> ax, mf <*> mx)) <$> f <*> x)
+  pure c = BracketT (pure ()) (const (pure ())) (const (pure c))
+  BracketT fa fb fc <*> BracketT xa xb xc =
+    BracketT ((,) <$> fa <*> xa) (\(f, x) -> fb f *> xb x) (\(f, x) -> fc f <*> xc x)
 
-instance Applicative m => Monad (BracketT m) where
-  Done c >>= f = f c
-  BracketT m >>= f = BracketT ((fmap . fmap) (>>= f) m)
-
-instance MonadTrans BracketT where
-  lift = liftBracketT
+instance Monad (BracketT IO) where
+  BracketT ma mb mc >>= f =
+    let m = do
+          BracketT ma' mb' mc' <- bracket ma mb ((fmap . fmap) f mc)
+          a <- ma'
+          -- FIXME: get rid of this pure () with another existential
+          pure (mb' a *> pure (), mc' a)
+    in BracketT m fst snd
 
 liftBracketT :: Applicative m => m ~> BracketT m
-liftBracketT m = BracketT (fmap (\x -> (pure (), pure x)) m)
+liftBracketT m = BracketT m pure pure
 
-instance MFunctor BracketT where
-  hoist f = \case
-    Done c -> Done c
-    BracketT m -> BracketT (f ((fmap . fmap) (hoist f) m))
+runBracketIO :: BracketT IO ~> IO
+runBracketIO (BracketT ma mb mc) = bracket ma mb mc
 
-addRelease :: Applicative m => IO () -> BracketT m a -> BracketT m a
-addRelease release = \case
-  Done c -> BracketT (pure (release, pure c))
-  BracketT m -> BracketT $ flip fmap m $ \(release1, m') ->
-    (release1 *> release, m')
+hoistBracketT :: (forall a. m a -> n a) -> BracketT m a -> BracketT n a
+hoistBracketT f (BracketT ma mb mc) = BracketT (f ma) mb (f. mc)
 
-acquire :: Functor m => m (IO (), a) -> BracketT m a
-acquire m = BracketT ((fmap . fmap) Done m)
+addRelease :: Applicative m => IO b -> BracketT m a -> BracketT m a
+addRelease release (BracketT ma mb mc) = BracketT ma (\x -> mb x *> release) mc
+
+commuteBracketTG :: (Monad m, MonadTrans t, Monad (t (BracketT m)),
+                     Monad (BracketT m))
+                 => (forall m n a. Monad n
+                       => (forall a. n a -> m a) -> t n a -> t m a)
+                 -> (forall m n a. Monad n
+                       => (forall a. n a -> n a) -> t n a -> t n a)
+                 -> BracketT (t m) a
+                 -> t (BracketT m) a
+commuteBracketTG hoist' hoist1 (BracketT ma mb mc) = do
+  a <- hoist' liftBracketT ma
+  let mb' = mb a
+  let mc' = hoist' liftBracketT (mc a)
+
+  let r = hoist1 (addRelease mb') mc'
+
+  r
 
 runBracketTG :: (MonadTrans t, Monad (t (BracketT IO)))
              => (forall m n a. Monad n
                        => (forall a. n a -> m a) -> t n a -> t m a)
+                 -> (forall m n a. Monad n
+                       => (forall a. n a -> n a) -> t n a -> t n a)
              -> BracketT (t IO) a -> t IO a
-runBracketTG hoist' = hoist' runBracketIO . commuteBracketTG hoist'
-  where runBracketIO :: BracketT IO a -> IO a
-        runBracketIO = \case
-          Done a -> pure a
-          BracketT m -> bracket m fst (runBracketIO . snd)
+runBracketTG hoist' hoist1 = hoist' runBracketIO . commuteBracketTG hoist' hoist1
 
-commuteBracketTG :: (Monad m, MonadTrans t, Monad (t (BracketT m)))
-                 => (forall m n a. Monad n
-                       => (forall a. n a -> m a) -> t n a -> t m a)
-                 -> BracketT (t m) a
-                 -> t (BracketT m) a
-commuteBracketTG hoist' = \case
-  Done c -> lift (Done c)
-  BracketT m -> do
-    (release, body) <- hoist' liftBracketT m
-    hoist' (addRelease release) (commuteBracketTG hoist' body)
+exampleFree :: IO ()
+exampleFree =
+  let foo = commuteBracketTG Main.hoistFreeT hoist1FreeT $
+            BracketT (do
+               write "Hello"
+               lift (putStrLn "Acquiring resource")
+               pure ())
+           (\() -> putStrLn "Releasing resource")
+           (\() -> do
+               lift (putStrLn "A")
+               lift (putStrLn "A12")
+               write "There"
+               lift (putStrLn "B")
+               write "Bob"
+               lift (putStrLn "C")
+               write "Baz"
+               lift (putStrLn "D")
 
-runBracketT :: (MonadTrans t, MFunctor t, Monad (t (BracketT IO)))
-            => BracketT (t IO) a -> t IO a
-runBracketT = runBracketTG hoist
+               lift (putStrLn "v-- Release?")
+               lift (putStrLn "Foo"))
 
-commuteBracketT :: (Monad m, MonadTrans t, MFunctor t, Monad (t (BracketT m)))
-                => BracketT (t m) a
-                -> t (BracketT m) a
-commuteBracketT = commuteBracketTG hoist
-
-example = flip runStateT () $ runBracketT $ BracketT $ do
-  lift (putStrLn "Acquiring resource")
-
-  pure (putStrLn "Releasing resource",
-        do
-          (lift . lift) (putStrLn "v-- Release?")
-          error "Foo"
-       )
-
-example' = flip runStateT "Hello" $ runBracketT $ do
-  s <- lift get
-  (lift . lift) (putStrLn s)
-  lift (put "bar")
-
-  s2 <- acquire $ do
-    s1 <- get
-    lift (putStrLn ("Acquiring resource 1 based on " ++ s1))
-    pure (putStrLn ("Releasing resource 1 based on " ++ s1), s1)
-
-  lift (put "baz")
-
-  s3 <- acquire $ do
-    s1 <- get
-    lift (putStrLn ("Acquiring resource 2 based on " ++ s1))
-    pure (putStrLn ("Releasing resource 2 based on " ++ s1), s1)
-
-  (lift . lift) (putStrLn ("Using resource 1 based on " ++ s2))
-  (lift . lift) (putStrLn ("Using resource 2 based on " ++ s3))
-
-  (lift . lift) (putStrLn "v-- Release?")
-  error "Foo"
-
-exampleFree = iterT (\(s, io) -> putStrLn s *> io) $ runBracketTG hoistFreeT $ do
-  lift (write "Hello")
-
-  () <- acquire $ do
-    lift (putStrLn "Acquiring resource")
-    pure (putStrLn "Releasing resource", ())
-
-  lift $ do
-    lift (putStrLn "A")
-    lift (putStrLn "A12")
-    write "There"
-    lift (putStrLn "B")
-    write "Bob"
-    lift (putStrLn "C")
-    write "Baz"
-    lift (putStrLn "D")
-
-  (lift . lift) (putStrLn "Using resource")
-
-  (lift . lift) (putStrLn "v-- Release?")
-  error "Foo"
+  in go foo
 
   where write s = liftF (s, ())
+
+        go :: FreeT ((,) String) (BracketT IO) a -> IO ()
+        go (FreeT (BracketT ma mb mc)) = do
+          putStrLn "Acquiring."
+          a <- ma
+          putStrLn "Acquired."
+          mc a >>= \case
+            Pure z -> do
+              putStrLn "Finished."
+              pure ()
+            Free (s, r) -> do
+              putStrLn "Running."
+              go r
+
+          putStrLn "Ran. Finally freeing."
+          mb a
+          pure ()
 
 -- [Commutors]: Commutors for various monad transformers
 
