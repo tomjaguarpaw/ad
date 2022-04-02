@@ -249,7 +249,7 @@ exampleFree =
                lift (putStrLn "v-- Release?")
                error "Foo")
 
-  in go foo
+  in go' foo
 
   where write s = liftF (s, ())
 
@@ -260,6 +260,17 @@ exampleFree =
                               Pure c -> pure c
                               Free (s, rest) -> do
                                 go rest)
+
+        go' = go3 . go2
+
+        go3 :: FreeT ((,) String) IO a -> IO a
+        go3 = iterT (\(s, io) -> putStrLn s *> io)
+
+        go2 :: FreeT ((,) String) (BracketT IO) a -> FreeT ((,) String) IO a
+        go2 (FreeT (BracketT ma mb mc)) = do
+          FreeT $ bracket ma mb (\a -> do
+                                    mca <- mc a
+                                    pure (fmap go2 mca))
 
 -- [Commutors]: Commutors for various monad transformers
 
