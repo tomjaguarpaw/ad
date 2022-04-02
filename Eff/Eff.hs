@@ -247,7 +247,7 @@ exampleFree =
                lift (putStrLn "D")
 
                lift (putStrLn "v-- Release?")
-               lift (putStrLn "Foo"))
+               error "Foo")
 
   in go foo
 
@@ -255,20 +255,12 @@ exampleFree =
 
         go :: FreeT ((,) String) (BracketT IO) a -> IO ()
         go (FreeT (BracketT ma mb mc)) = do
-          putStrLn "Acquiring."
-          a <- ma
-          putStrLn "Acquired."
-          mc a >>= \case
-            Pure z -> do
-              putStrLn "Finished."
-              pure ()
-            Free (s, r) -> do
-              putStrLn "Running."
-              go r
-
-          putStrLn "Ran. Finally freeing."
-          mb a
-          pure ()
+          bracket ma mb (\a -> do
+                            mc a >>= \case
+                              Pure c -> pure ()
+                              Free (s, rest) -> do
+                                putStrLn s
+                                go rest)
 
 -- [Commutors]: Commutors for various monad transformers
 
