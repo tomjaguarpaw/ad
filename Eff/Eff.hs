@@ -199,22 +199,35 @@ addRelease release = \case
 acquire :: Functor m => m (IO (), a) -> BracketT m a
 acquire m = BracketT ((fmap . fmap) Done m)
 
-runBracketT :: (MonadTrans t, MFunctor t, Monad (t (BracketT IO)))
-            => BracketT (t IO) a -> t IO a
-runBracketT = hoist runBracketIO . commuteBracketT
+runBracketTG :: (MonadTrans t, Monad (t (BracketT IO)))
+             => (forall m n a. Monad n
+                       => (forall a. n a -> m a) -> t n a -> t m a)
+             -> BracketT (t IO) a -> t IO a
+runBracketTG hoist' = hoist' runBracketIO . commuteBracketTG hoist'
   where runBracketIO :: BracketT IO a -> IO a
         runBracketIO = \case
           Done a -> pure a
           BracketT m -> bracket m fst (runBracketIO . snd)
 
+commuteBracketTG :: (Monad m, MonadTrans t, Monad (t (BracketT m)))
+                 => (forall m n a. Monad n
+                       => (forall a. n a -> m a) -> t n a -> t m a)
+                 -> BracketT (t m) a
+                 -> t (BracketT m) a
+commuteBracketTG hoist' = \case
+  Done c -> lift (Done c)
+  BracketT m -> do
+    (release, body) <- hoist' liftBracketT m
+    hoist' (addRelease release) (commuteBracketTG hoist' body)
+
+runBracketT :: (MonadTrans t, MFunctor t, Monad (t (BracketT IO)))
+            => BracketT (t IO) a -> t IO a
+runBracketT = runBracketTG hoist
+
 commuteBracketT :: (Monad m, MonadTrans t, MFunctor t, Monad (t (BracketT m)))
                 => BracketT (t m) a
                 -> t (BracketT m) a
-commuteBracketT = \case
-  Done c -> lift (Done c)
-  BracketT m -> do
-    (release, body) <- hoist liftBracketT m
-    hoist (addRelease release) (commuteBracketT body)
+commuteBracketT = commuteBracketTG hoist
 
 example = flip runStateT () $ runBracketT $ BracketT $ do
   lift (putStrLn "Acquiring resource")
