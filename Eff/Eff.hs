@@ -50,9 +50,9 @@ unlensIdentity f = hoist runIdentityT . f . IdentityT
 --
 -- https://www.reddit.com/r/haskell/comments/60fha5/affine_traversal/df6830k/
 affineState
-  :: (MonadTrans t, MFunctor t, Monad (t (StateT s b)), Monad a, Monad b)
+  :: (MonadTrans t, MFunctor t, Monad (t (StateT s b)), Monad b)
   => LensLike t (StateT s a) (StateT s b) a b
-affineState f s = commuteStateT (hoist f s)
+affineState f s = commuteStateT (hoistState f s)
 
 -- Affine traversals will exist for WriterT, ReaderT, ExceptT, MaybeT
 -- and FreeT, because their commutors all have that MonadTrans
@@ -99,7 +99,7 @@ sequenceOf l = l id
 
 -- Squash the StateT next to the b, pulling the f outsite
 squashState :: (Monad b, Monad n, MFunctor f, MonadTrans f,
-                Monad (f (StateT s b)), Monad (f b))
+                Monad (f (StateT s b)))
             => ((StateT s b ~> n) -> (StateT s (f b) ~> f n))
 squashState f = over transformed f . sequenceOf affineState
 
