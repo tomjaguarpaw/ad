@@ -43,8 +43,9 @@ if [ -n "$CURRENT_BRANCH" ]; then
 else
     CURRENT_BRANCH_OR_SHORT=$CURRENT_SHORT
 fi
-COMBINED=$(git rev-parse $2)
-COMBINED_SHORT=$(git rev-parse --short $2)
+COMBINED_PROVIDED=$2
+COMBINED=$(git rev-parse $COMBINED_PROVIDED)
+COMBINED_SHORT=$(git rev-parse --short $COMBINED_PROVIDED)
 HANDLER=$1
 
 COMBINED_PARENT=$(git rev-parse $COMBINED^)
