@@ -48,6 +48,10 @@ COMBINED=$(git rev-parse $COMBINED_PROVIDED)
 COMBINED_SHORT=$(git rev-parse --short $COMBINED_PROVIDED)
 HANDLER=$1
 
+# This is the best way I know of to (print an error message and then
+# exit) on failure when set -e is set
+git merge-base --is-ancestor $COMBINED $CURRENT || (echo "$COMBINED_PROVIDED is not an ancestor of $CURRENT_BRANCH"; false) || exit
+
 COMBINED_PARENT=$(git rev-parse $COMBINED^)
 COMBINED_PARENT_SHORT=$(git rev-parse --short $COMBINED^)
 
