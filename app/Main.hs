@@ -5,6 +5,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE KindSignatures #-}
@@ -18,13 +19,16 @@
 
 module Main where
 
-import Control.Exception (Exception, throw, try)
+import Control.Exception (Exception, throw, throwIO, try, tryJust)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
 import Data.Typeable (Typeable)
+import qualified Data.Unique
+import Data.Void (Void)
 import GHC.IO.Unsafe (unsafePerformIO)
 import GHC.IORef (IORef, newIORef, readIORef, writeIORef)
+import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (read)
 
 newtype Eff (es :: [Type]) a = Eff {unsafeUnEff :: IO a}
@@ -107,7 +111,7 @@ example4 = pure
 -- ‘s’ would escape its scope
 -- exampleDoesn'tWork = handleError example4
 
-example5 :: (e' :> es, e :> es) => Error String e' -> State Int e -> Eff es ()
+example5 :: (e :> es, s :> es) => Error [Char] s -> State Int e -> Eff es ()
 example5 e s = do
   foo <- read s
   modify s (+ 1)
@@ -117,7 +121,7 @@ example5 e s = do
 example6 :: e' :> es => Error String e' -> Eff es ((), Int)
 example6 = \e -> handleState 10 (example5 e)
 
-example6a :: e :> es => State Int e -> Eff es (Either String ())
+example6a :: st :> es => State Int st -> Eff es (Either [Char] ())
 example6a = \s -> handleError (\e -> example5 e s)
 
 example7 :: Eff es (Either String ((), Int))
@@ -193,3 +197,33 @@ example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
 
 example7S :: Eff ss (Either String (), Int)
 example7S = handleStateS 10 (\(Proxy :: Proxy st) -> example6S @st)
+
+-- withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
+
+scopedExceptionExample :: IO (Either String (Either Int Void))
+scopedExceptionExample = do
+  withScopedException $ \throw1 ->
+    withScopedException $ \throw2 ->
+      if (1 :: Int) < 0
+        then throw1 "Hello"
+        else throw2 1234
+
+-- ghci> scopedExceptionExample
+-- Left "Hello"
+
+data MyException where
+  MyException :: e -> Data.Unique.Unique -> MyException
+
+instance Show MyException where
+  show _ = "<MyException>"
+
+instance Exception MyException
+
+withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
+withScopedException f = do
+  fresh <- Data.Unique.newUnique
+
+  flip tryJust (f (\e -> throwIO (MyException e fresh))) $ \case
+    MyException e tag ->
+      -- unsafeCoerce is very unpleasant
+      if tag == fresh then Just (unsafeCoerce e) else Nothing
