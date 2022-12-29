@@ -202,8 +202,8 @@ example7S = handleStateS 10 (\(Proxy :: Proxy st) -> example6S @st)
 
 scopedExceptionExample :: IO (Either String (Either Int Void))
 scopedExceptionExample = do
-  withScopedException $ \throw1 ->
-    withScopedException $ \throw2 ->
+  withScopedException_ $ \throw1 ->
+    withScopedException_ $ \throw2 ->
       if (1 :: Int) < 0
         then throw1 "Hello"
         else throw2 1234
@@ -219,11 +219,38 @@ instance Show MyException where
 
 instance Exception MyException
 
-withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
-withScopedException f = do
+withScopedException_ :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
+withScopedException_ f = do
   fresh <- Data.Unique.newUnique
 
   flip tryJust (f (\e -> throwIO (MyException e fresh))) $ \case
     MyException e tag ->
       -- unsafeCoerce is very unpleasant
       if tag == fresh then Just (unsafeCoerce e) else Nothing
+
+data PromptTag a = PromptTag
+
+newPromptTag :: IO (PromptTag a)
+newPromptTag = undefined
+
+prompt :: PromptTag a -> IO a -> IO a
+prompt = undefined
+
+control0 :: PromptTag a -> ((IO b -> IO a) -> IO a) -> IO b
+control0 = undefined
+
+withScopedExceptionBad :: ((e -> IO (Either e r)) -> IO r) -> IO (Either e r)
+withScopedExceptionBad body = do
+  promptTag <- newPromptTag
+  prompt promptTag $ do
+    l <- control0 promptTag $ \myThrow -> do
+      r <- body (myThrow . pure)
+      pure (Right r)
+    pure (Left l)
+
+withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
+withScopedException body = do
+  promptTag <- newPromptTag
+  prompt promptTag $ do
+    r <- body (\e -> control0 promptTag (\_ -> pure (Left e)))
+    pure (Right r)
