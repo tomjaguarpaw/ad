@@ -48,31 +48,31 @@ instance {-# OVERLAPPING #-} e :> (e : es)
 
 instance e :> es => e :> (x : es)
 
-raise :: s :> ss => Error e s -> e -> Eff ss a
+raise :: err :> effs => Error e err -> e -> Eff effs a
 raise (Error throw) e = Eff (throw e)
 
 handleError ::
-  (forall s. Error e s -> Eff (s : ss) a) ->
-  Eff ss (Either e a)
+  (forall err. Error e err -> Eff (err : effs) a) ->
+  Eff effs (Either e a)
 handleError f =
   Eff $ withScopedException_ (\throw -> unsafeUnEff (f (Error throw)))
 
-read :: e :> es => State s e -> Eff es s
+read :: st :> effs => State s st -> Eff effs s
 read (State r) = Eff (readIORef r)
 
-write :: e :> es => State s e -> s -> Eff es ()
+write :: st :> effs => State s st -> s -> Eff effs ()
 write (State r) s = Eff (writeIORef r s)
 
-modify :: (e :> es) => State t e -> (t -> t) -> Eff es ()
+modify :: st :> effs => State s st -> (s -> s) -> Eff effs ()
 modify state f = do
   s <- read state
   write state (f s)
 
 handleState ::
-  forall a s es.
+  forall a s effs.
   s ->
-  (forall e. State s e -> Eff (e : es) a) ->
-  Eff es (a, s)
+  (forall st. State s st -> Eff (st : effs) a) ->
+  Eff effs (a, s)
 handleState s f = Eff $ do
   r <- newIORef s
   let state = State r :: State s ()
@@ -85,44 +85,46 @@ handleState s f = Eff $ do
 main :: IO ()
 main = putStrLn "Hello, Haskell!"
 
-example :: s :> ss => Error String s -> Eff ss a
+example :: err :> effs => Error String err -> Eff effs a
 example = (\e -> raise e "My error")
 
-example2 :: Eff ss (Either String a)
+example2 :: Eff effs (Either String a)
 example2 = handleError example
 
 example3 :: Either String a
 example3 = runEff example2
 
-example4 :: Error String s -> Eff ss (Error String s)
+example4 :: Error String err -> Eff effs (Error String err)
 example4 = pure
 
 -- Couldn't match type ‘a’ with ‘Error String s’ because type variable
 -- ‘s’ would escape its scope
 -- exampleDoesn'tWork = handleError example4
 
-example5 :: (e :> es, s :> es) => Error String s -> State Int e -> Eff es ()
+example5 ::
+  (st :> effs, err :> effs) =>
+  Error String err ->
+  State Int st ->
+  Eff effs ()
 example5 e s = do
   foo <- read s
   modify s (+ 1)
   _ <- raise e ("Hello " ++ show foo)
   modify s (+ 1)
 
-example6 :: e' :> es => Error String e' -> Eff es ((), Int)
+example6 :: err :> effs => Error String err -> Eff effs ((), Int)
 example6 = \e -> handleState 10 (example5 e)
 
-example6a :: st :> es => State Int st -> Eff es (Either String ())
+example6a :: st :> effs => State Int st -> Eff effs (Either String ())
 example6a = \s -> handleError (\e -> example5 e s)
 
-example7 :: Eff es (Either String ((), Int))
+example7 :: Eff effs (Either String ((), Int))
 example7 = handleError example6
 
-example7a :: Eff es (Either String (), Int)
+example7a :: Eff effs (Either String (), Int)
 example7a = handleState 10 example6a
 
-data TypeLevel s a
-
-data TypeLevel' s
+data Tag s
 
 class Has t s | s -> t where
   have :: forall s'. t s'
@@ -130,26 +132,34 @@ class Has t s | s -> t where
 data Forall f where
   Forall :: {unForall :: forall a. f a} -> Forall f
 
-instance Reifies s (Forall t) => Has t (TypeLevel' s) where
+instance Reifies s (Forall t) => Has t (Tag s) where
   have = unForall (reflect @s Proxy)
 
 type HasError e s = Has (Error e) s
 
 type HasState s = Has (State s)
 
-raiseE :: forall s e ss a. (HasError e s, s :> ss) => e -> Eff ss a
-raiseE = raise (have @(Error e) @s @s)
+raiseE ::
+  forall err e effs a.
+  (Has (Error e) err, err :> effs) =>
+  e ->
+  Eff effs a
+raiseE = raise (have @(Error e) @err @err)
 
-readS :: forall s e ss. s :> ss => HasState e s => Eff ss e
-readS = read (have @(State e) @s @s)
+readS :: forall st s effs. st :> effs => Has (State s) st => Eff effs s
+readS = read (have @(State s) @st @st)
 
-writeS :: forall s e ss. (HasState e s, s :> ss) => e -> Eff ss ()
-writeS = write (have @(State e) @s @s)
+writeS :: forall st s effs. (Has (State s) st, st :> effs) => s -> Eff effs ()
+writeS = write (have @(State s) @st @st)
 
-modifyS :: forall e s ss. (HasState s e, e :> ss) => (s -> s) -> Eff ss ()
+modifyS ::
+  forall st s effs.
+  (Has (State s) st, st :> effs) =>
+  (s -> s) ->
+  Eff effs ()
 modifyS f = do
-  s <- readS @e
-  writeS @e (f s)
+  s <- readS @st
+  writeS @st (f s)
 
 exampleS5 ::
   forall ex st ss.
@@ -162,16 +172,16 @@ exampleS5 = do
   modifyS @st (+ 1)
 
 handleErrorE ::
-  forall e ss a.
-  (forall s. HasError e s => Proxy s -> Eff (s : ss) a) ->
-  Eff ss (Either e a)
+  forall e effs a.
+  (forall err. Has (Error e) err => Proxy err -> Eff (err : effs) a) ->
+  Eff effs (Either e a)
 handleErrorE f =
   handleError
     ( \(e :: Error e s') ->
         reify @(Forall (Error e))
           (forallError e)
           ( \(_ :: Proxy s) ->
-              coerceEff (f @(TypeLevel' s) (Proxy @_))
+              coerceEff (f @(Tag s) Proxy)
           )
     )
   where
@@ -181,7 +191,7 @@ handleErrorE f =
 handleStateS ::
   forall st a es.
   st ->
-  (forall e. HasState st e => Proxy e -> Eff (e : es) a) ->
+  (forall e. Has (State st) e => Proxy e -> Eff (e : es) a) ->
   Eff es (a, st)
 handleStateS st f =
   handleState
@@ -190,14 +200,17 @@ handleStateS st f =
         reify @(Forall (State st))
           (forallState s)
           ( \(_ :: Proxy s) ->
-              coerceEff (f @(TypeLevel' s) (Proxy @_))
+              coerceEff (f @(Tag s) Proxy)
           )
     )
   where
     coerceEff = Eff . unsafeUnEff
     forallState e = Forall (let State t = e in State t)
 
-example6S :: forall st ss. (HasState Int st, st :> ss) => Eff ss (Either String ())
+example6S ::
+  forall st effs.
+  (HasState Int st, st :> effs) =>
+  Eff effs (Either String ())
 example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
 
 example7S :: Eff ss (Either String (), Int)
