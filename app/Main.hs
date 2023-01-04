@@ -48,14 +48,14 @@ instance {-# OVERLAPPING #-} e :> (e : es)
 
 instance e :> es => e :> (x : es)
 
-raise :: err :> effs => Error e err -> e -> Eff effs a
-raise (Error throw) e = Eff (throw e)
+throw :: err :> effs => Error e err -> e -> Eff effs a
+throw (Error throw_) e = Eff (throw_ e)
 
 handleError ::
   (forall err. Error e err -> Eff (err : effs) a) ->
   Eff effs (Either e a)
 handleError f =
-  Eff $ withScopedException_ (\throw -> unsafeUnEff (f (Error throw)))
+  Eff $ withScopedException_ (\throw_ -> unsafeUnEff (f (Error throw_)))
 
 read :: st :> effs => State s st -> Eff effs s
 read (State r) = Eff (readIORef r)
@@ -74,8 +74,7 @@ handleState ::
   (forall st. State s st -> Eff (st : effs) a) ->
   Eff effs (a, s)
 handleState s f = Eff $ do
-  r <- newIORef s
-  let state = State r :: State s ()
+  state <- fmap State (newIORef s)
 
   unsafeUnEff $ do
     a <- f state
@@ -86,7 +85,7 @@ main :: IO ()
 main = putStrLn "Hello, Haskell!"
 
 example :: err :> effs => Error String err -> Eff effs a
-example = (\e -> raise e "My error")
+example = (\e -> throw e "My error")
 
 example2 :: Eff effs (Either String a)
 example2 = handleError example
@@ -109,7 +108,7 @@ example5 ::
 example5 e s = do
   foo <- read s
   modify s (+ 1)
-  _ <- raise e ("Hello " ++ show foo)
+  _ <- throw e ("Hello " ++ show foo)
   modify s (+ 1)
 
 example6 :: err :> effs => Error String err -> Eff effs ((), Int)
@@ -139,12 +138,12 @@ type HasError e s = Has (Error e) s
 
 type HasState s = Has (State s)
 
-raiseE ::
+throwE ::
   forall err e effs a.
   (Has (Error e) err, err :> effs) =>
   e ->
   Eff effs a
-raiseE = raise (have @(Error e) @err @err)
+throwE = throw (have @(Error e) @err @err)
 
 readS :: forall st s effs. st :> effs => Has (State s) st => Eff effs s
 readS = read (have @(State s) @st @st)
@@ -168,7 +167,7 @@ exampleS5 ::
 exampleS5 = do
   foo <- readS @st
   modifyS @st (+ 1)
-  _ <- raiseE @ex ("Hello " ++ show foo)
+  _ <- throwE @ex ("Hello " ++ show foo)
   modifyS @st (+ 1)
 
 handleErrorE ::
