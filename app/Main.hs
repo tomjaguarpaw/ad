@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -130,20 +131,20 @@ example7 = handleError example6
 example7a :: Eff es (Either String (), Int)
 example7a = handleState 10 example6a
 
+data TypeLevel s a
+
 class HasError e s | s -> e where
   haveError :: Error e s
+
+instance Reifies s (Error e s') => HasError e (TypeLevel s s') where
+  haveError = let !Error = reflect @s Proxy in Error
 
 class HasState s e | e -> s where
   haveState :: State s e
 
-instance
-  Reifies s (IORef st) =>
-  HasState st (State st s)
-  where
-  haveState = State (reflect @s Proxy)
-
-instance HasError ex ex where
-  haveError = Error
+instance Reifies s (State s' e) => HasState s' (TypeLevel s e) where
+  haveState =
+    let State s = reflect @s @(State s' e) Proxy in State s
 
 raiseE :: forall s e ss a. (Typeable e, HasError e s, s :> ss) => e -> Eff ss a
 raiseE = raise (haveError @e @s)
@@ -174,23 +175,35 @@ handleErrorE ::
   Typeable e =>
   (forall s. HasError e s => Proxy s -> Eff (s : ss) a) ->
   Eff ss (Either e a)
-handleErrorE f = Eff $ do
-  flip fmap (try (unsafeUnEff (f @e Proxy))) $ \case
-    Left (ErrorT e) -> Left e
-    Right r -> Right r
+handleErrorE f =
+  handleError
+    ( \(e :: Error e s') ->
+        reify @(Error e s')
+          e
+          ( \(_ :: Proxy s) ->
+              coerceEff (f @(TypeLevel s s') (Proxy @_))
+          )
+    )
+  where
+    coerceEff = Eff . unsafeUnEff
 
 handleStateS ::
   forall st a es.
   st ->
   (forall e. HasState st e => Proxy e -> Eff (e : es) a) ->
   Eff es (a, st)
-handleStateS s f = Eff $ do
-  r <- newIORef s
-
-  do
-    a <- reify r (\(Proxy :: Proxy s) -> unsafeUnEff $ f @(State st s) Proxy)
-    s' <- readIORef r
-    pure (a, s')
+handleStateS st f =
+  handleState
+    st
+    ( \(s :: State st e) ->
+        reify @(State st e)
+          s
+          ( \(_ :: Proxy s) ->
+              coerceEff (f @(TypeLevel s e) (Proxy @_))
+          )
+    )
+  where
+    coerceEff = Eff . unsafeUnEff
 
 example6S :: forall st ss. (HasState Int st, st :> ss) => Eff ss (Either String ())
 example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
