@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -23,7 +24,6 @@ import Control.Exception (Exception, throwIO, tryJust)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
-import Data.Typeable (Typeable)
 import qualified Data.Unique
 import Data.Void (Void)
 import GHC.IO.Unsafe (unsafePerformIO)
@@ -52,7 +52,6 @@ raise :: s :> ss => Error e s -> e -> Eff ss a
 raise (Error throw) e = Eff (throw e)
 
 handleError ::
-  Typeable e =>
   (forall s. Error e s -> Eff (s : ss) a) ->
   Eff ss (Either e a)
 handleError f =
@@ -123,27 +122,29 @@ example7a = handleState 10 example6a
 
 data TypeLevel s a
 
-class HasError e s | s -> e where
-  haveError :: Error e s
+data TypeLevel' s
 
-instance Reifies s (Error e s') => HasError e (TypeLevel s s') where
-  haveError = let Error throw = reflect @s Proxy in Error throw
+class Has t s | s -> t where
+  have :: forall s'. t s'
 
-class HasState s e | e -> s where
-  haveState :: State s e
+data Forall f where
+  Forall :: {unForall :: forall a. f a} -> Forall f
 
-instance Reifies s (State s' e) => HasState s' (TypeLevel s e) where
-  haveState =
-    let State s = reflect @s @(State s' e) Proxy in State s
+instance Reifies s (Forall t) => Has t (TypeLevel' s) where
+  have = unForall (reflect @s Proxy)
 
-raiseE :: forall s e ss a. (Typeable e, HasError e s, s :> ss) => e -> Eff ss a
-raiseE = raise (haveError @e @s)
+type HasError e s = Has (Error e) s
+
+type HasState s = Has (State s)
+
+raiseE :: forall s e ss a. (HasError e s, s :> ss) => e -> Eff ss a
+raiseE = raise (have @(Error e) @s @s)
 
 readS :: forall s e ss. s :> ss => HasState e s => Eff ss e
-readS = read (haveState @e @s)
+readS = read (have @(State e) @s @s)
 
 writeS :: forall s e ss. (HasState e s, s :> ss) => e -> Eff ss ()
-writeS = write (haveState @e @s)
+writeS = write (have @(State e) @s @s)
 
 modifyS :: forall e s ss. (HasState s e, e :> ss) => (s -> s) -> Eff ss ()
 modifyS f = do
@@ -162,20 +163,20 @@ exampleS5 = do
 
 handleErrorE ::
   forall e ss a.
-  Typeable e =>
   (forall s. HasError e s => Proxy s -> Eff (s : ss) a) ->
   Eff ss (Either e a)
 handleErrorE f =
   handleError
     ( \(e :: Error e s') ->
-        reify @(Error e s')
-          e
+        reify @(Forall (Error e))
+          (forallError e)
           ( \(_ :: Proxy s) ->
-              coerceEff (f @(TypeLevel s s') (Proxy @_))
+              coerceEff (f @(TypeLevel' s) (Proxy @_))
           )
     )
   where
     coerceEff = Eff . unsafeUnEff
+    forallError e = Forall (let Error t = e in Error t)
 
 handleStateS ::
   forall st a es.
@@ -186,14 +187,15 @@ handleStateS st f =
   handleState
     st
     ( \(s :: State st e) ->
-        reify @(State st e)
-          s
+        reify @(Forall (State st))
+          (forallState s)
           ( \(_ :: Proxy s) ->
-              coerceEff (f @(TypeLevel s e) (Proxy @_))
+              coerceEff (f @(TypeLevel' s) (Proxy @_))
           )
     )
   where
     coerceEff = Eff . unsafeUnEff
+    forallState e = Forall (let State t = e in State t)
 
 example6S :: forall st ss. (HasState Int st, st :> ss) => Eff ss (Either String ())
 example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
