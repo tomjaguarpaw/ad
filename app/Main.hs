@@ -1,5 +1,4 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -20,7 +19,7 @@
 
 module Main where
 
-import Control.Exception (Exception, throw, throwIO, try, tryJust)
+import Control.Exception (Exception, throwIO, tryJust)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
@@ -39,14 +38,7 @@ newtype Eff (es :: [Type]) a = Eff {unsafeUnEff :: IO a}
 runEff :: Eff '[] a -> a
 runEff = unsafePerformIO . unsafeUnEff
 
-newtype ErrorT e = ErrorT e
-
-instance Show (ErrorT e) where
-  show = pure "<ErrorT e>"
-
-instance Typeable e => Exception (ErrorT e)
-
-data Error e s = Error
+newtype Error e s = Error (forall a. e -> IO a)
 
 newtype State s e = State (IORef s)
 
@@ -56,17 +48,15 @@ instance {-# OVERLAPPING #-} e :> (e : es)
 
 instance e :> es => e :> (x : es)
 
-raise :: (Typeable e, s :> ss) => Error e s -> e -> Eff ss a
-raise Error e = Eff (throw (ErrorT e))
+raise :: s :> ss => Error e s -> e -> Eff ss a
+raise (Error throw) e = Eff (throw e)
 
 handleError ::
   Typeable e =>
   (forall s. Error e s -> Eff (s : ss) a) ->
   Eff ss (Either e a)
-handleError f = Eff $ do
-  flip fmap (try (unsafeUnEff (f Error))) $ \case
-    Left (ErrorT e) -> Left e
-    Right r -> Right r
+handleError f =
+  Eff $ withScopedException_ (\throw -> unsafeUnEff (f (Error throw)))
 
 read :: e :> es => State s e -> Eff es s
 read (State r) = Eff (readIORef r)
@@ -112,7 +102,7 @@ example4 = pure
 -- ‘s’ would escape its scope
 -- exampleDoesn'tWork = handleError example4
 
-example5 :: (e :> es, s :> es) => Error [Char] s -> State Int e -> Eff es ()
+example5 :: (e :> es, s :> es) => Error String s -> State Int e -> Eff es ()
 example5 e s = do
   foo <- read s
   modify s (+ 1)
@@ -122,7 +112,7 @@ example5 e s = do
 example6 :: e' :> es => Error String e' -> Eff es ((), Int)
 example6 = \e -> handleState 10 (example5 e)
 
-example6a :: st :> es => State Int st -> Eff es (Either [Char] ())
+example6a :: st :> es => State Int st -> Eff es (Either String ())
 example6a = \s -> handleError (\e -> example5 e s)
 
 example7 :: Eff es (Either String ((), Int))
@@ -137,7 +127,7 @@ class HasError e s | s -> e where
   haveError :: Error e s
 
 instance Reifies s (Error e s') => HasError e (TypeLevel s s') where
-  haveError = let !Error = reflect @s Proxy in Error
+  haveError = let Error throw = reflect @s Proxy in Error throw
 
 class HasState s e | e -> s where
   haveState :: State s e
