@@ -162,10 +162,10 @@ exampleNested2 cond = \e st st0 ->
 
 exampleNestedRun cond =
   runEff $
-      handleState 1000 $ \st0 ->
-        handleState 0 $ \st ->
+    handleState 1000 $ \st0 ->
+      handleState 0 $ \st ->
         handleError $ \e ->
-        exampleNested2 cond e st st0
+          exampleNested2 cond e st st0
 
 data Tag s
 
