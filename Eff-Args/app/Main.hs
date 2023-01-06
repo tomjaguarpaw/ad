@@ -163,6 +163,7 @@ data Ravelled effs l l2 r where
     (forall eff. f eff -> Ravelled (eff : effs) l l2 r) ->
     Ravelled effs (f : l) l2 r
   RavelDict ::
+    forall eff effs l l2 r.
     (eff :> effs => Ravelled effs l l2 r) ->
     Ravelled effs l (eff : l2) r
 
@@ -173,6 +174,7 @@ data Dict c where
   Dict :: c => Dict c
 
 exampleRavelled ::
+  forall err st effs.
   (err :> effs, st :> effs) =>
   Bool ->
   Error String err ->
@@ -185,7 +187,7 @@ exampleRavelled cond = \e st ->
     then do
       write st 1
       throw e "Failed"
-    else pure (ForallRavelled $ RavelDict $ RavelArg $ \st0 -> RavelEff (do write st 2; modify st0 (+ 1)))
+    else pure (ForallRavelled $ RavelDict @st $ RavelArg $ \st0 -> RavelEff (do write st 2; modify st0 (+ 1)))
 
 exampleRavelledRun ::
   (err :> effs, st :> effs) =>
