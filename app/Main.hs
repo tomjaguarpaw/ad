@@ -146,8 +146,9 @@ exampleNested1 ::
   State Int st ->
   State Int st0 ->
   Eff effs (Eff effs0 ())
-exampleNested1 cond = \e st st0 ->
-  fmap ($ st0) (exampleNested cond e st)
+exampleNested1 cond = \e st st0 -> do
+  r <- exampleNested cond e st
+  pure (r st0)
 
 exampleNested2 ::
   (err :> effs, st :> effs, st0 :> effs) =>
