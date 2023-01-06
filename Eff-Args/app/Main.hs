@@ -160,7 +160,7 @@ bodyNested cond e st =
 data Ravelled effs l l2 r where
   RavelEff :: Eff effs r -> Ravelled effs '[] '[] r
   RavelArg ::
-    (forall eff. f eff -> Ravelled (eff : effs) l l2 r) ->
+    (forall eff. eff :> effs => f eff -> Ravelled effs l l2 r) ->
     Ravelled effs (f : l) l2 r
   RavelDict ::
     forall eff effs l l2 r.
