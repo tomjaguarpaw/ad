@@ -124,6 +124,97 @@ example7 = handleError example6
 example7a :: Eff effs (Either String (), Int)
 example7a = handleState 10 example6a
 
+simpleExampleNested ::
+  (err :> effs1, st :> effs2, Num s) =>
+  Bool ->
+  Error String err ->
+  Eff effs1 (State s st -> Eff effs2 ())
+simpleExampleNested cond e =
+  if cond
+    then throw e "Failed"
+    else pure (\st -> do write st 100)
+
+simpleExampleNested' ::
+  (st :> effs, Num s) =>
+  Bool ->
+  Either String (State s st -> Eff effs ())
+simpleExampleNested' cond =
+  runEff $ handleError $ \e -> simpleExampleNested cond e
+
+bodyNested ::
+  (err :> effs, st :> effs) =>
+  Bool ->
+  Error [Char] err ->
+  State Int st ->
+  Eff effs ((), Int)
+bodyNested cond e st =
+  if cond
+    then throw e "Failed"
+    else handleState 0 $ \st0 -> do
+      s <- read st
+      write st0 s
+
+-- Needs a type parameter that reflects the structure of the
+-- computation so there's exactly one constructor to match on at each
+-- stage
+data Ravelled effs l l2 r where
+  RavelEff :: Eff effs r -> Ravelled effs '[] '[] r
+  RavelArg ::
+    (forall eff. f eff -> Ravelled (eff : effs) l l2 r) ->
+    Ravelled effs (f : l) l2 r
+  RavelDict ::
+    (eff :> effs => Ravelled effs l l2 r) ->
+    Ravelled effs l (eff : l2) r
+
+data ForallRavelled l l2 r where
+  ForallRavelled :: (forall effs. Ravelled effs l l2 r) -> ForallRavelled l l2 r
+
+data Dict c where
+  Dict :: c => Dict c
+
+exampleRavelled ::
+  (err :> effs, st :> effs) =>
+  Bool ->
+  Error String err ->
+  State Int st ->
+  Eff
+    effs
+    (ForallRavelled '[State Int] '[st] ())
+exampleRavelled cond = \e st ->
+  if cond
+    then do
+      write st 1
+      throw e "Failed"
+    else pure (ForallRavelled $ RavelDict $ RavelArg $ \st0 -> RavelEff (do write st 2; modify st0 (+ 1)))
+
+exampleRavelledRun ::
+  (err :> effs, st :> effs) =>
+  Bool ->
+  Error String err ->
+  State Int st ->
+  Eff effs ((), Int)
+exampleRavelledRun cond e st = do
+  r <- exampleRavelled cond e st
+  handleState
+    100
+    ( \st0 ->
+        case r of
+          ForallRavelled r1 ->
+            case r1 of
+              RavelDict g ->
+                case g of
+                  RavelArg f ->
+                    case f st0 of
+                      RavelEff eff -> eff
+    )
+
+exampleRavelledRunAll :: Bool -> (Either String ((), Int), Int)
+exampleRavelledRunAll cond =
+  runEff $
+    handleState 200 $ \st ->
+      handleError $ \e ->
+        exampleRavelledRun cond e st
+
 exampleNested ::
   (err :> effs, st :> effs, st :> effs0, st0 :> effs0) =>
   Bool ->
