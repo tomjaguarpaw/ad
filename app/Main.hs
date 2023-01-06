@@ -21,6 +21,7 @@
 module Main where
 
 import Control.Exception (Exception, throwIO, tryJust)
+import Control.Monad (join)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
@@ -122,6 +123,48 @@ example7 = handleError example6
 
 example7a :: Eff effs (Either String (), Int)
 example7a = handleState 10 example6a
+
+exampleNested ::
+  (err :> effs, st :> effs, st :> effs0, st0 :> effs0) =>
+  Bool ->
+  Error String err ->
+  State Int st ->
+  Eff
+    effs
+    (State Int st0 -> Eff effs0 ())
+exampleNested cond = \e st ->
+  if cond
+    then do
+      write st 1
+      throw e "Failed"
+    else pure (\st0 -> do write st 2; modify st0 (+ 1))
+
+exampleNested1 ::
+  (err :> effs, st :> effs, st :> effs0, st0 :> effs0) =>
+  Bool ->
+  Error String err ->
+  State Int st ->
+  State Int st0 ->
+  Eff effs (Eff effs0 ())
+exampleNested1 cond = \e st st0 ->
+  fmap ($ st0) (exampleNested cond e st)
+
+exampleNested2 ::
+  (err :> effs, st :> effs, st0 :> effs) =>
+  Bool ->
+  Error String err ->
+  State Int st ->
+  State Int st0 ->
+  Eff effs ()
+exampleNested2 cond = \e st st0 ->
+  join (exampleNested1 cond e st st0)
+
+exampleNestedRun cond =
+  runEff $
+      handleState 1000 $ \st0 ->
+        handleState 0 $ \st ->
+        handleError $ \e ->
+        exampleNested2 cond e st st0
 
 data Tag s
 
