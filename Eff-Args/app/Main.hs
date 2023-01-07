@@ -253,6 +253,7 @@ exampleNested2 ::
 exampleNested2 cond = \e st st0 ->
   join (exampleNested1 cond e st st0)
 
+exampleNestedRun :: Bool -> ((Either String (), Int), Int)
 exampleNestedRun cond =
   runEff $
     handleState 1000 $ \st0 ->
