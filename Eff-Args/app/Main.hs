@@ -21,8 +21,9 @@
 module Main where
 
 import Control.Exception (Exception, throwIO, tryJust)
-import Control.Monad (foldM_, join)
+import Control.Monad (join, when)
 import Data.Kind (Type)
+import Data.Monoid (Ap (Ap, getAp))
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
 import qualified Data.Unique
@@ -90,6 +91,12 @@ handleState s f = Eff $ do
     a <- f state
     s' <- read state
     pure (a, s')
+
+evalState ::
+  s ->
+  (forall st. State s st -> Eff (st : effs) a) ->
+  Eff effs a
+evalState s f = fmap fst (handleState s f)
 
 main :: IO ()
 main = putStrLn "Hello, Haskell!"
@@ -362,11 +369,18 @@ example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
 example7S :: Eff ss (Either String (), Int)
 example7S = handleStateS 10 (\(Proxy :: Proxy st) -> example6S @st)
 
+fold :: (Applicative m, Traversable t) => (a -> m ()) -> t a -> m ()
+fold f = getAp . foldMap (Ap . f)
+
 (!?) :: [a] -> Int -> Maybe a
 xs !? i = runEff $
   handleError' Just $ \e -> do
-    foldM_ (\i' a -> if i == i' then throw e a else pure (i' + 1)) 0 xs
-    pure Nothing
+    evalState 0 $ \s -> do
+      flip fold xs $ \a -> do
+        i' <- read s
+        when (i == i') (throw e a)
+        write s (i' + 1)
+      pure Nothing
 
 -- withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
 
