@@ -70,7 +70,6 @@ modify state f = do
   write state (f s)
 
 handleState ::
-  forall a s effs.
   s ->
   (forall st. State s st -> Eff (st : effs) a) ->
   Eff effs (a, s)
