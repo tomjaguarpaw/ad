@@ -21,7 +21,7 @@
 module Main where
 
 import Control.Exception (Exception, throwIO, tryJust)
-import Control.Monad (join)
+import Control.Monad (foldM_, join)
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
@@ -57,6 +57,16 @@ handleError ::
   Eff effs (Either e a)
 handleError f =
   Eff $ withScopedException_ (\throw_ -> unsafeUnEff (f (Error throw_)))
+
+handleError' ::
+  (e -> r) ->
+  (forall err. Error e err -> Eff (err : effs) r) ->
+  Eff effs r
+handleError' h f = do
+  r1 <- handleError f
+  pure $ case r1 of
+    Right r -> r
+    Left l -> h l
 
 read :: st :> effs => State s st -> Eff effs s
 read (State r) = Eff (readIORef r)
@@ -351,6 +361,12 @@ example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
 
 example7S :: Eff ss (Either String (), Int)
 example7S = handleStateS 10 (\(Proxy :: Proxy st) -> example6S @st)
+
+(!?) :: [a] -> Int -> Maybe a
+xs !? i = runEff $
+  handleError' Just $ \e -> do
+    foldM_ (\i' a -> if i == i' then throw e a else pure (i' + 1)) 0 xs
+    pure Nothing
 
 -- withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
 
