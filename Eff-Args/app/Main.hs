@@ -72,6 +72,11 @@ handleError' h f = do
     Right r -> r
     Left l -> h l
 
+handleError'' ::
+  (forall err. Error r err -> Eff (err : effs) r) ->
+  Eff effs r
+handleError'' = handleError' id
+
 read :: st :> effs => State s st -> Eff effs s
 read (State r) = Eff (readIORef r)
 
