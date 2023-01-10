@@ -12,6 +12,7 @@
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
@@ -105,6 +106,18 @@ evalState ::
   (forall st. State s st -> Eff (st : effs) a) ->
   Eff effs a
 evalState s f = fmap fst (handleState s f)
+
+evalStateT ::
+  forall (t :: (Type -> Type) -> Type -> Type) s effs a.
+  (forall m. Monad m => Monad (t m)) =>
+  (forall m r. Monad m => m r -> t m r) ->
+  (forall m n b. Monad m => (forall r. m r -> n r) -> t m b -> t n b) ->
+  s ->
+  (forall st. State s st -> t (Eff (st : effs)) a) ->
+  t (Eff effs) a
+evalStateT lift hoist s f = hoist Eff $ do
+  state <- lift (fmap State (newIORef s))
+  hoist unsafeUnEff (f state)
 
 main :: IO ()
 main = putStrLn "Hello, Haskell!"
