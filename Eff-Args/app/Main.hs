@@ -40,6 +40,9 @@ newtype Eff (es :: [Type]) a = Eff {unsafeUnEff :: IO a}
 runEff :: Eff '[] a -> a
 runEff = unsafePerformIO . unsafeUnEff
 
+removeEff :: (forall eff. Eff (eff : effs) a) -> Eff effs a
+removeEff = Eff . unsafeUnEff
+
 newtype Error e s = Error (forall a. e -> IO a)
 
 newtype State s e = State (IORef s)
