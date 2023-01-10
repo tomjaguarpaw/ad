@@ -382,13 +382,13 @@ fold f = getAp . foldMap (Ap . f)
 
 (!?) :: [a] -> Int -> Maybe a
 xs !? i = runEff $
-  handleError' Just $ \e -> do
+  handleError'' $ \e -> do
     evalState 0 $ \s -> do
       flip fold xs $ \a -> do
         i' <- read s
-        when (i == i') (throw e a)
+        when (i == i') (throw e (Just a))
         write s (i' + 1)
-      pure Nothing
+      throw e Nothing
 
 -- withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
 
