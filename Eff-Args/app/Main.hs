@@ -24,7 +24,7 @@ module Main where
 import Control.Exception (Exception, throwIO, tryJust)
 import Control.Monad (join, when)
 import Data.Kind (Type)
-import Data.Monoid (Ap (Ap, getAp))
+import Data.Foldable (for_)
 import Data.Proxy (Proxy (Proxy))
 import Data.Reflection
 import qualified Data.Unique
@@ -390,14 +390,11 @@ example6S = handleErrorE (\(Proxy :: Proxy ex) -> exampleS5 @ex @st)
 example7S :: Eff ss (Either String (), Int)
 example7S = handleStateS 10 (\(Proxy :: Proxy st) -> example6S @st)
 
-fold :: (Applicative m, Traversable t) => (a -> m ()) -> t a -> m ()
-fold f = getAp . foldMap (Ap . f)
-
 (!?) :: [a] -> Int -> Maybe a
 xs !? i = runEff $
   handleError'' $ \e -> do
     evalState 0 $ \s -> do
-      flip fold xs $ \a -> do
+      for_ xs $ \a -> do
         i' <- read s
         when (i == i') (throw e (Just a))
         write s (i' + 1)
