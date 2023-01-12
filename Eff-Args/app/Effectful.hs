@@ -14,8 +14,9 @@
 
 module Effectful where
 
-import Control.Monad
-import Data.Foldable
+import Prelude hiding (return)
+import Control.Monad (when)
+import Data.Foldable (for_)
 import Data.Void (Void, absurd)
 import "effectful-core" Effectful (Eff, runPureEff)
 import qualified "effectful-core" Effectful as Eff
@@ -87,9 +88,9 @@ evalState s = from (Eff.evalState s)
 xs !? i = runPureEff $
   withReturn $ \return -> do
     evalState 0 $ \s -> do
-      for_ xs $ \a -> do
+      for_ xs $ \x -> do
         i' <- get s
-        when (i == i') (throwError return (Just a))
+        when (i == i') (throwError return (Just x))
         put s (i' + 1)
       throwError return Nothing
 
@@ -104,6 +105,7 @@ def lookup(xs, i):
       return Nothing
 -}
 
+twoState :: (Int, Int)
 twoState = runPureEff $
   evalState 1 $ \s1 -> do
     evalState 2 $ \s2 -> do
