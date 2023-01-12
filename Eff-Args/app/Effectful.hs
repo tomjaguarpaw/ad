@@ -30,6 +30,7 @@ class a Eff.:> b => a :> b
 
 instance (e :> es) => e :> (x : es)
 
+-- This seems a bit wobbly
 instance {-# INCOHERENT #-} e :> (e : es)
 
 data Dict c where
@@ -40,19 +41,21 @@ newtype Has (eff :: k) (s :: k) = Have# (# #)
 has :: (Has a a -> r) -> r
 has f = f (Have# (##))
 
+{-# INLINE have #-}
+-- This is the only thing that's potentially unsafe
 have :: Has eff s -> Dict (eff ~ s)
 have _ = unsafeCoerce (Dict :: Dict (s ~ s))
 
 thisDivergesFortunately :: ()
 thisDivergesFortunately = have undefined `seq` ()
 
-to :: forall eff es r s. (eff :> es => Eff es r) -> s :> es => Has eff s -> Eff es r
+to :: (eff :> es => t es r) -> s :> es => Has eff s -> t es r
 to k h = case have h of Dict -> k
 
 from ::
-  (Eff (eff : es) a -> Eff es b) ->
-  (forall s. Has eff s -> Eff (s : es) a) ->
-  Eff es b
+  (t (eff : es) a -> t es b) ->
+  (forall s. Has eff s -> t (s : es) a) ->
+  t es b
 from f k = f (has k)
 
 throwError :: s :> es => Has (Error e) s -> e -> Eff es a
