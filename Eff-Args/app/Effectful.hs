@@ -181,9 +181,12 @@ getC = \case Compound _ h -> get h
 throwErrorC :: ss ::> es => Compound e ss -> e -> Eff es a
 throwErrorC = \case Compound h _ -> throwError h
 
+-- This leaks how many effects are inside.  I don't know how to do
+-- better whilst still allowing type inference when doing
+-- runEarlyReturnC of partialC.
 runC ::
   Int ->
-  (forall ss. Compound e ss -> Eff (ss +++ es) r) ->
+  (forall st err. Compound e '[st, err] -> Eff ('[st, err] +++ es) r) ->
   Eff es (Either e r)
 runC st f =
   runErrorNoCallStack $ \e ->
@@ -192,7 +195,7 @@ runC st f =
 
 runEarlyReturnC ::
   Int ->
-  (forall ss. Compound r ss -> Eff (ss +++ es) r) ->
+  (forall st err. Compound r '[st, err] -> Eff ('[st, err] +++ es) r) ->
   Eff es r
 runEarlyReturnC st f = fmap (either id id) (runC st f)
 
@@ -215,14 +218,10 @@ xs !?? i = runPureEff $
     evalState 0 $ \s -> do
       partialC xs i (Compound return s)
 
-
-{-
 (!???) :: [a] -> Int -> Maybe a
 xs !??? i = runPureEff $
   runEarlyReturnC 0 $ \s -> do
-      partialC xs i s -- Could not deduce: ss ::> (ss +++ '[])
--}
-
+    partialC xs i s
 
 {-
 def lookup(xs, i):
