@@ -400,6 +400,16 @@ xs !? i = runEff $
         write s (i' + 1)
       throw e Nothing
 
+(!??) :: [a] -> Int -> Maybe a
+xs !?? i = runEff $
+  handleError' Just $ \e -> do
+    evalState 0 $ \s -> do
+      for_ xs $ \a -> do
+        i' <- read s
+        when (i == i') (throw e a)
+        write s (i' + 1)
+    pure Nothing
+
 -- withScopedException :: ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
 
 scopedExceptionExample :: IO (Either String (Either Int Void))
