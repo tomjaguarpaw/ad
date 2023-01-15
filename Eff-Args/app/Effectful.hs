@@ -156,7 +156,6 @@ xs !?? i = runPureEff $
     evalState 0 $ \s -> do
       partialC (Some (Some None)) xs i (Compound return s)
 
-
 {-
 def lookup(xs, i):
   try:
