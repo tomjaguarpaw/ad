@@ -10,6 +10,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedNewtypes #-}
@@ -18,6 +19,7 @@ module Effectful where
 
 import Control.Monad (when)
 import Data.Foldable (for_)
+import Data.Kind (Constraint)
 import Data.Void (Void, absurd)
 import "effectful-core" Effectful (Eff, runPureEff)
 import qualified "effectful-core" Effectful as Eff
@@ -120,41 +122,69 @@ data Compound e es where
     Has (State Int) st ->
     Compound e es
 
-data (ss :: [Eff.Effect]) ::> es where
-  None :: '[] ::> es
-  Some ::
-    forall (s :: Eff.Effect) (ss :: [Eff.Effect]) (es :: [Eff.Effect]).
-    s :> es =>
-    (ss ::> es) ->
-    ((s : ss) ::> es)
+type family (ss :: [Eff.Effect]) ::> (es :: [Eff.Effect]) :: Constraint
 
-putC :: ss ::> es -> Compound e ss -> Int -> Eff es ()
-putC d = \case Compound _ h -> case d of Some (Some None) -> put h
+type instance '[] ::> es = ()
 
-getC :: ss ::> es -> Compound e ss -> Eff es Int
-getC d = \case Compound _ h -> case d of Some (Some None) -> get h
+type instance (s : ss) ::> es = (s :> es, ss ::> es)
 
-throwErrorC :: ss ::> es -> Compound e ss -> e -> Eff es a
-throwErrorC d = \case Compound h _ -> case d of Some (Some None) -> throwError h
+type family (a :: [r]) +++ (b :: [r]) :: [r]
+
+type instance '[] +++ rs = rs
+
+type instance (a : as) +++ rs = a : (as +++ rs)
+
+putC :: ss ::> es => Compound e ss -> Int -> Eff es ()
+putC = \case Compound _ h -> put h
+
+getC :: ss ::> es => Compound e ss -> Eff es Int
+getC = \case Compound _ h -> get h
+
+throwErrorC :: ss ::> es => Compound e ss -> e -> Eff es a
+throwErrorC = \case Compound h _ -> throwError h
+
+runC ::
+  Int ->
+  (forall ss. Compound e ss -> Eff (ss +++ es) r) ->
+  Eff es (Either e r)
+runC st f =
+  runErrorNoCallStack $ \e ->
+    evalState st $ \s ->
+      f (Compound e s)
+
+runEarlyReturnC ::
+  Int ->
+  (forall ss. Compound r ss -> Eff (ss +++ es) r) ->
+  Eff es r
+runEarlyReturnC st f = fmap (either id id) (runC st f)
 
 partialC ::
-  ss ::> es ->
+  ss ::> es =>
   [a] ->
   Int ->
   Compound (Maybe a) ss ->
   Eff es b
-partialC d xs i s = do
+partialC xs i s = do
   for_ xs $ \x -> do
-    i' <- getC d s
-    when (i == i') (throwErrorC d s (Just x))
-    putC d s (i' + 1)
-  throwErrorC d s Nothing
+    i' <- getC s
+    when (i == i') (throwErrorC s (Just x))
+    putC s (i' + 1)
+  throwErrorC s Nothing
 
 (!??) :: [a] -> Int -> Maybe a
 xs !?? i = runPureEff $
   withReturn $ \return -> do
     evalState 0 $ \s -> do
-      partialC (Some (Some None)) xs i (Compound return s)
+      partialC xs i (Compound return s)
+
+
+{-
+(!???) :: [a] -> Int -> Maybe a
+xs !??? i = runPureEff $
+  runEarlyReturnC 0 $ \s -> do
+      partialC xs i s -- Could not deduce: ss ::> (ss +++ '[])
+-}
+
 
 {-
 def lookup(xs, i):
