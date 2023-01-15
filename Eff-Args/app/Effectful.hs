@@ -128,27 +128,34 @@ data (ss :: [Eff.Effect]) ::> es where
     (ss ::> es) ->
     ((s : ss) ::> es)
 
-putC :: (s : err : '[]) ::> es -> Compound e [s, err] -> Int -> Eff es ()
+putC :: ss ::> es -> Compound e ss -> Int -> Eff es ()
 putC d = \case Compound _ h -> case d of Some (Some None) -> put h
 
-getC :: s :> es => Compound e [s, err] -> Eff es Int
-getC = \case Compound _ h -> get h
+getC :: ss ::> es -> Compound e ss -> Eff es Int
+getC d = \case Compound _ h -> case d of Some (Some None) -> get h
 
-throwErrorC :: err :> es => Compound e [s, err] -> e -> Eff es a
-throwErrorC = \case Compound h _ -> throwError h
+throwErrorC :: ss ::> es -> Compound e ss -> e -> Eff es a
+throwErrorC d = \case Compound h _ -> case d of Some (Some None) -> throwError h
 
 partialC ::
-  (st :> es, err :> es) =>
+  ss ::> es ->
   [a] ->
   Int ->
-  Compound (Maybe a) [st, err] ->
+  Compound (Maybe a) ss ->
   Eff es b
-partialC xs i s = do
+partialC d xs i s = do
   for_ xs $ \x -> do
-    i' <- getC s
-    when (i == i') (throwErrorC s (Just x))
-    putC (Some (Some None)) s (i' + 1)
-  throwErrorC s Nothing
+    i' <- getC d s
+    when (i == i') (throwErrorC d s (Just x))
+    putC d s (i' + 1)
+  throwErrorC d s Nothing
+
+(!??) :: [a] -> Int -> Maybe a
+xs !?? i = runPureEff $
+  withReturn $ \return -> do
+    evalState 0 $ \s -> do
+      partialC (Some (Some None)) xs i (Compound return s)
+
 
 {-
 def lookup(xs, i):
