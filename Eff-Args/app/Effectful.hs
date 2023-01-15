@@ -1,20 +1,21 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PackageImports #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedNewtypes #-}
 
 module Effectful where
 
-import Prelude hiding (return)
 import Control.Monad (when)
 import Data.Foldable (for_)
 import Data.Void (Void, absurd)
@@ -25,6 +26,7 @@ import qualified Effectful.Error.Static as Eff
 import Effectful.State.Static.Local (State)
 import qualified Effectful.State.Static.Local as Eff
 import Unsafe.Coerce
+import Prelude hiding (return)
 
 class a Eff.:> b => a :> b
 
@@ -96,6 +98,57 @@ xs !? i = runPureEff $
         when (i == i') (throwError return (Just x))
         put s (i' + 1)
       throwError return Nothing
+
+partial ::
+  (st :> es, err :> es) =>
+  [a] ->
+  Int ->
+  Has (Error (Maybe a)) err ->
+  Has (State Int) st ->
+  Eff es b
+partial xs i return s = do
+  for_ xs $ \x -> do
+    i' <- get s
+    when (i == i') (throwError return (Just x))
+    put s (i' + 1)
+  throwError return Nothing
+
+data Compound e es where
+  Compound ::
+    es ~ [st, err] =>
+    Has (Error e) err ->
+    Has (State Int) st ->
+    Compound e es
+
+data (ss :: [Eff.Effect]) ::> es where
+  None :: '[] ::> es
+  Some ::
+    forall (s :: Eff.Effect) (ss :: [Eff.Effect]) (es :: [Eff.Effect]).
+    s :> es =>
+    (ss ::> es) ->
+    ((s : ss) ::> es)
+
+putC :: (s : err : '[]) ::> es -> Compound e [s, err] -> Int -> Eff es ()
+putC d = \case Compound _ h -> case d of Some (Some None) -> put h
+
+getC :: s :> es => Compound e [s, err] -> Eff es Int
+getC = \case Compound _ h -> get h
+
+throwErrorC :: err :> es => Compound e [s, err] -> e -> Eff es a
+throwErrorC = \case Compound h _ -> throwError h
+
+partialC ::
+  (st :> es, err :> es) =>
+  [a] ->
+  Int ->
+  Compound (Maybe a) [st, err] ->
+  Eff es b
+partialC xs i s = do
+  for_ xs $ \x -> do
+    i' <- getC s
+    when (i == i') (throwErrorC s (Just x))
+    putC (Some (Some None)) s (i' + 1)
+  throwErrorC s Nothing
 
 {-
 def lookup(xs, i):
