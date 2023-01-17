@@ -30,6 +30,8 @@ import Prelude hiding (read, return)
 
 data Rose a = Leaf a | Branch [Rose a]
 
+type a :& b = 'Branch [a, b]
+
 data Effect
 
 newtype Eff (es :: Rose Effect) a = Eff {unsafeUnEff :: IO a}
@@ -47,20 +49,20 @@ newtype Error e s = Error (forall a. e -> IO a)
 newtype State s e = State (IORef s)
 
 data (a :: Rose r) :~: (b :: Rose r) where
-  R1 :: 'Branch ['Branch [a, b], c] :~: 'Branch [a, 'Branch [b, c]]
+  R1 :: ((a :& b) :& c) :~: (a :& (b :& c))
 
 data (a :: Rose r) :> (b :: Rose r) where
   Eq :: a :> a
-  Here :: a :> b -> a :> 'Branch (b ': as)
-  Drop :: a :> b -> a :> 'Branch [c, b]
-  W :: 'Branch (a ': bs) :> c -> a :> c
-  W2 :: 'Branch [a, b] :> c -> b :> c
+  Here :: a :> b -> a :> (b :& c)
+  Drop :: a :> b -> a :> (c :& b)
+  W :: (a :& b) :> c -> a :> c
+  W2 :: (a :& b) :> c -> b :> c
 
 throw :: err :> effs -> Error e err -> e -> Eff effs a
 throw _ (Error throw_) e = Eff (throw_ e)
 
 handleError ::
-  (forall err. Error e err -> Eff ('Branch [err, effs]) a) ->
+  (forall err. Error e err -> Eff (err :& effs) a) ->
   Eff effs (Either e a)
 handleError f =
   Eff $ withScopedException_ (\throw_ -> unsafeUnEff (f (Error throw_)))
@@ -78,7 +80,7 @@ modify p state f = do
 
 handleState ::
   s ->
-  (forall st. State s st -> Eff ('Branch [st, effs]) a) ->
+  (forall st. State s st -> Eff (st :& effs) a) ->
   Eff effs (a, s)
 handleState s f = Eff $ do
   state <- fmap State (newIORef s)
@@ -197,7 +199,7 @@ exampleNestedRun cond =
 
 handleError' ::
   (e -> r) ->
-  (forall err. Error e err -> Eff ('Branch [err, effs]) r) ->
+  (forall err. Error e err -> Eff (err :& effs) r) ->
   Eff effs r
 handleError' h f = do
   r1 <- handleError f
@@ -207,7 +209,7 @@ handleError' h f = do
 
 evalState ::
   s ->
-  (forall st. State s st -> Eff ('Branch [st, effs]) a) ->
+  (forall st. State s st -> Eff (st :& effs) a) ->
   Eff effs a
 evalState s f = fmap fst (handleState s f)
 
@@ -223,7 +225,7 @@ xs !?? i = runEff $
 
 data Compound e es where
   Compound ::
-    es ~ 'Branch [err, st] =>
+    es ~ err :& st =>
     Error e err ->
     State Int st ->
     Compound e es
@@ -240,7 +242,7 @@ throwErrorC p = \case Compound h _ -> throw (W p) h
 runC ::
   forall e es r.
   Int ->
-  (forall ss. Compound e ss -> Eff ('Branch [ss, es]) r) ->
+  (forall ss. Compound e ss -> Eff (ss :& es) r) ->
   Eff es (Either e r)
 runC st f =
   evalState st $ \s ->
@@ -249,7 +251,7 @@ runC st f =
 
 runC' ::
   Int ->
-  (forall ss. Compound r ss -> Eff ('Branch [ss, es]) r) ->
+  (forall ss. Compound r ss -> Eff (ss :& es) r) ->
   Eff es r
 runC' st f = fmap (either id id) (runC st f)
 
@@ -264,7 +266,7 @@ xs !??? i = runEff $
 
 data Compound2 e es where
   Compound2 ::
-    es ~ 'Branch [er, st] =>
+    es ~ er :& st =>
     Error e er ->
     State Int st ->
     Compound2 e es
@@ -274,7 +276,7 @@ putC2 p = \case Compound2 _ h -> write (W2 p) h
 
 runC2 ::
   State Int st ->
-  (forall ss. Compound2 e ('Branch [ss, st]) -> Eff ('Branch [ss, es]) r) ->
+  (forall ss. Compound2 e (ss :& st) -> Eff (ss :& es) r) ->
   Eff es (Either e r)
 runC2 s f =
   handleError $ \e ->
