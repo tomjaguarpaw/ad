@@ -353,29 +353,45 @@ runC2 s f =
     f (Compound2 e s)
 
 yieldToList ::
-  (forall eff. Yield a () eff -> Eff (eff :& effs) ()) ->
-  Eff effs [a]
+  (forall eff. Yield a () eff -> Eff (eff :& effs) r) ->
+  Eff effs ([a], r)
 yieldToList f =
   evalState [] $ \s -> do
     handleYield
       (\i -> modify (here Eq) s (i :))
-      (\() -> fmap reverse (read (here Eq) s))
+      ( \r -> do
+          as <- read (here Eq) s
+          pure (reverse as, r)
+      )
       (weakenEff (b (drop Eq)) . f)
 
 exampleYield :: [Int]
-exampleYield = runEff $
-  yieldToList $
-    \y' ->
-      forYield
-        ( \y -> do
-            yield (here Eq) y 10
-            yield (here Eq) y 20
-            yield (here Eq) y 30
-        )
-        $ \n -> threeMore (here Eq) y' n
+exampleYield = fst $
+  runEff $
+    yieldToList $
+      \y' ->
+        forYield
+          ( \y -> do
+              yield (here Eq) y 10
+              yield (here Eq) y 20
+              yield (here Eq) y 30
+          )
+          $ \n -> threeMore (here Eq) y' n
 
 threeMore :: eff :> effs -> Yield Int () eff -> Int -> Eff effs ()
 threeMore h y i = do
   yield h y i
   yield h y (i + 1)
   yield h y (i + 2)
+
+(!!??) :: [a] -> Int -> ([String], Maybe a)
+xs !!?? i = runEff $
+  yieldToList $ \y -> do
+    handleError' Just $ \e -> do
+      evalState 0 $ \s -> do
+        for_ xs $ \a -> do
+          i' <- read (here Eq) s
+          yield (drop (drop (here Eq))) y ("At index " ++ show i')
+          when (i == i') (throw (drop (here Eq)) e a)
+          write (here Eq) s (i' + 1)
+      pure Nothing
