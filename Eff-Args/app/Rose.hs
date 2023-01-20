@@ -225,7 +225,7 @@ xs !?? i = runEff $
 
 data Compound e es where
   Compound ::
-    es ~ err :& st =>
+    es ~ (err :& st) =>
     Error e err ->
     State Int st ->
     Compound e es
@@ -266,7 +266,7 @@ xs !??? i = runEff $
 
 data Compound2 e es where
   Compound2 ::
-    es ~ er :& st =>
+    es ~ (er :& st) =>
     Error e er ->
     State Int st ->
     Compound2 e es
