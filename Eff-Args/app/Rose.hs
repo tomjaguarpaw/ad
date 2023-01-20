@@ -49,6 +49,8 @@ newtype Error e s = Error (forall a. e -> IO a)
 
 newtype State s e = State (IORef s)
 
+newtype Yield a b s = Yield (a -> IO b)
+
 data (a :: Rose r) :~: (b :: Rose r) where
   R1 :: ((a :& b) :& c) :~: (a :& (b :& c))
 
@@ -89,6 +91,24 @@ handleState s f = Eff $ do
     a <- f state
     s' <- read (Here Eq) state
     pure (a, s')
+
+yield :: eff :> effs -> Yield a b eff -> a -> Eff effs b
+yield _ (Yield f) a = Eff (f a)
+
+handleYield ::
+  (a -> Eff effs b) ->
+  (z -> Eff effs r) ->
+  (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
+  Eff effs r
+handleYield update finish f = do
+  z <- Eff $ unsafeUnEff (f (Yield (unsafeUnEff . update)))
+  finish z
+
+forYield ::
+  (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
+  (a -> Eff effs b) ->
+  Eff effs z
+forYield f h = handleYield h pure f
 
 example :: err :> effs -> Error String err -> Eff effs a
 example = (\p e -> throw p e "My error")
@@ -282,3 +302,24 @@ runC2 ::
 runC2 s f =
   handleError $ \e ->
     f (Compound2 e s)
+
+exampleYield :: [Int]
+exampleYield = runEff $
+  evalState ([] :: [Int]) $ \s -> do
+    handleYield
+      (\i -> modify (Here Eq) s (i :))
+      (\() -> fmap reverse $ read (Here Eq) s)
+      $ \y' ->
+        forYield
+          ( \y -> do
+              yield (Here Eq) y 10
+              yield (Here Eq) y 20
+              yield (Here Eq) y 30
+          )
+          $ \n -> threeMore (Here Eq) y' n
+
+threeMore :: eff :> effs -> Yield Int () eff -> Int -> Eff effs ()
+threeMore h y i = do
+  yield h y i
+  yield h y (i + 1)
+  yield h y (i + 2)
