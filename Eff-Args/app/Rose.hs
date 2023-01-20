@@ -45,6 +45,9 @@ runEff = unsafePerformIO . unsafeUnEff
 coerceEff :: t :~: t' -> Eff t r -> Eff t' r
 coerceEff _ = Eff . unsafeUnEff
 
+weakenEff :: t :> t' -> Eff t r -> Eff t' r
+weakenEff _ = Eff . unsafeUnEff
+
 newtype Error e s = Error (forall a. e -> IO a)
 
 newtype State s e = State (IORef s)
@@ -60,6 +63,7 @@ data (a :: Rose r) :> (b :: Rose r) where
   Drop :: a :> b -> a :> (c :& b)
   W :: (a :& b) :> c -> a :> c
   W2 :: (a :& b) :> c -> b :> c
+  B :: a :> b -> (c :& a) :> (c :& b)
 
 throw :: err :> effs -> Error e err -> e -> Eff effs a
 throw _ (Error throw_) e = Eff (throw_ e)
@@ -69,6 +73,11 @@ handleError ::
   Eff effs (Either e a)
 handleError f =
   Eff $ withScopedException_ (\throw_ -> unsafeUnEff (f (Error throw_)))
+
+handleErrorX ::
+  (forall err effs'. err :> effs' -> Error e err -> Eff effs' a) ->
+  Eff effs (Either e a)
+handleErrorX f = handleError (f (Here Eq))
 
 read :: st :> effs -> State s st -> Eff effs s
 read _ (State r) = Eff (readIORef r)
@@ -115,6 +124,9 @@ example = (\p e -> throw p e "My error")
 
 example2 :: Eff effs (Either String a)
 example2 = handleError (example (Here Eq))
+
+example2X :: Eff effs (Either String a)
+example2X = handleErrorX example
 
 example3 :: Either String a
 example3 = runEff example2
@@ -218,6 +230,25 @@ exampleNestedRun cond =
         handleError $ \e ->
           exampleNested2 (Here Eq, Drop (Here Eq), Drop (Drop (Here Eq))) cond e st st0
 
+-- This can't work because we have to work out how to find the subtree
+-- relation for a variable of existential type.
+--
+--        handleErrorX $ \h e ->
+--          exampleNested2 (h, _, _) cond e st st0
+--
+-- • Found hole: _ :: st1 :> effs'
+--  Where: ‘effs'’ is a rigid type variable bound by
+--           a type expected by the context:
+--             forall (err :: Rose Effect) (effs' :: Rose Effect).
+--             (err :> effs') -> Error String err -> Eff effs' ()
+--           at /home/tom/Haskell/AD/Eff-Args/app/Rose.hs:(232,24)-(233,48)
+--         ‘st1’ is a rigid type variable bound by
+--           a type expected by the context:
+--             forall (st1 :: Rose Effect).
+--             State Int st1
+--             -> Eff (st1 :& (st :& 'Branch '[])) (Either String ())
+--           at /home/tom/Haskell/AD/Eff-Args/app/Rose.hs:(228,23)-(233,48)
+
 handleError' ::
   (e -> r) ->
   (forall err. Error e err -> Eff (err :& effs) r) ->
@@ -303,20 +334,27 @@ runC2 s f =
   handleError $ \e ->
     f (Compound2 e s)
 
-exampleYield :: [Int]
-exampleYield = runEff $
-  evalState ([] :: [Int]) $ \s -> do
+yieldToList ::
+  (forall eff. Yield a () eff -> Eff (eff :& effs) ()) ->
+  Eff effs [a]
+yieldToList f =
+  evalState [] $ \s -> do
     handleYield
       (\i -> modify (Here Eq) s (i :))
-      (\() -> fmap reverse $ read (Here Eq) s)
-      $ \y' ->
-        forYield
-          ( \y -> do
-              yield (Here Eq) y 10
-              yield (Here Eq) y 20
-              yield (Here Eq) y 30
-          )
-          $ \n -> threeMore (Here Eq) y' n
+      (\() -> fmap reverse (read (Here Eq) s))
+      (weakenEff (B (Drop Eq)) . f)
+
+exampleYield :: [Int]
+exampleYield = runEff $
+  yieldToList $
+    \y' ->
+      forYield
+        ( \y -> do
+            yield (Here Eq) y 10
+            yield (Here Eq) y 20
+            yield (Here Eq) y 30
+        )
+        $ \n -> threeMore (Here Eq) y' n
 
 threeMore :: eff :> effs -> Yield Int () eff -> Int -> Eff effs ()
 threeMore h y i = do
