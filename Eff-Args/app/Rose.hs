@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -75,7 +76,7 @@ write _ (State r) s = Eff (writeIORef r s)
 
 modify :: st :> effs -> State s st -> (s -> s) -> Eff effs ()
 modify p state f = do
-  s <- read p state
+  !s <- read p state
   write p state (f s)
 
 handleState ::
