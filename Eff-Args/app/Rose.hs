@@ -24,7 +24,7 @@ module Rose where
 
 import Control.Monad (join, when)
 import Data.Foldable (for_)
-import Data.IORef (IORef, readIORef, writeIORef, newIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
 import Prelude hiding (read, return)
