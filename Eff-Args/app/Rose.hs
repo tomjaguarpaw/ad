@@ -128,14 +128,14 @@ handleYield ::
   (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
   Eff effs r
 handleYield update finish f = do
-  z <- Eff $ unsafeUnEff (f (Yield (unsafeUnEff . update)))
+  z <- forEach f update
   finish z
 
-forYield ::
+forEach ::
   (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
   (a -> Eff effs b) ->
   Eff effs z
-forYield f h = handleYield h pure f
+forEach f h = Eff $ unsafeUnEff (f (Yield (unsafeUnEff . h)))
 
 example :: err :> effs -> Error String err -> Eff effs a
 example = (\p e -> throw p e "My error")
@@ -353,28 +353,30 @@ runC2 s f =
     f (Compound2 e s)
 
 yieldToList ::
+  forall effs a r.
   (forall eff. Yield a () eff -> Eff (eff :& effs) r) ->
   Eff effs ([a], r)
-yieldToList f =
+yieldToList f = do
   evalState [] $ \s -> do
-    handleYield
-      (\i -> modify (here Eq) s (i :))
-      ( \r -> do
-          as <- read (here Eq) s
-          pure (reverse as, r)
-      )
-      (weakenEff (b (drop Eq)) . f)
+    r <- forEach f' $ \i ->
+      modify (here Eq) s (i :)
+    as <- read (here Eq) s
+    pure (reverse as, r)
+
+  where f' :: Yield a () c1 -> Eff (c1 :& (c0 :& effs)) r
+        f' = weakenEff (b (drop Eq)) . f
 
 exampleYield :: [Int]
 exampleYield = fst $
   runEff $
     yieldToList $
       \y' ->
-        forYield
+        forEach
           ( \y -> do
               yield (here Eq) y 10
               yield (here Eq) y 20
               yield (here Eq) y 30
+              yield (drop (here Eq)) y' 666
           )
           $ \n -> threeMore (here Eq) y' n
 
