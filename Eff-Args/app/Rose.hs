@@ -27,7 +27,7 @@ import Data.Foldable (for_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
-import Prelude hiding (read, return)
+import Prelude hiding (drop, read, return)
 
 data Rose a = Leaf a | Branch [Rose a]
 
@@ -57,13 +57,31 @@ newtype Yield a b s = Yield (a -> IO b)
 data (a :: Rose r) :~: (b :: Rose r) where
   R1 :: ((a :& b) :& c) :~: (a :& (b :& c))
 
+-- Hmm, cartesian category
 data (a :: Rose r) :> (b :: Rose r) where
   Eq :: a :> a
-  Here :: a :> b -> a :> (b :& c)
-  Drop :: a :> b -> a :> (c :& b)
-  W :: (a :& b) :> c -> a :> c
-  W2 :: (a :& b) :> c -> b :> c
-  B :: a :> b -> (c :& a) :> (c :& b)
+  Fst :: a :> (a :& b)
+  Snd :: a :> (b :& a)
+  Cmp :: a :> b -> b :> c -> a :> c
+  Bimap :: a :> b -> c :> d -> (a :& c) :> (b :& d)
+
+drop :: a :> b -> a :> (c :& b)
+drop = w2 . b
+
+here :: a :> b -> a :> (b :& c)
+here = w . b2
+
+w :: (a :& b) :> c -> a :> c
+w = Cmp Fst
+
+w2 :: (b :& a) :> c -> a :> c
+w2 = Cmp Snd
+
+b2 :: (a :> b) -> (a :& c) :> (b :& c)
+b2 = flip Bimap Eq
+
+b :: (a :> b) -> (c :& a) :> (c :& b)
+b = Bimap Eq
 
 throw :: err :> effs -> Error e err -> e -> Eff effs a
 throw _ (Error throw_) e = Eff (throw_ e)
@@ -77,7 +95,7 @@ handleError f =
 handleErrorX ::
   (forall err effs'. err :> effs' -> Error e err -> Eff effs' a) ->
   Eff effs (Either e a)
-handleErrorX f = handleError (f (Here Eq))
+handleErrorX f = handleError (f (here Eq))
 
 read :: st :> effs -> State s st -> Eff effs s
 read _ (State r) = Eff (readIORef r)
@@ -98,7 +116,7 @@ handleState s f = Eff $ do
   state <- fmap State (newIORef s)
   unsafeUnEff $ do
     a <- f state
-    s' <- read (Here Eq) state
+    s' <- read (here Eq) state
     pure (a, s')
 
 yield :: eff :> effs -> Yield a b eff -> a -> Eff effs b
@@ -123,7 +141,7 @@ example :: err :> effs -> Error String err -> Eff effs a
 example = (\p e -> throw p e "My error")
 
 example2 :: Eff effs (Either String a)
-example2 = handleError (example (Here Eq))
+example2 = handleError (example (here Eq))
 
 example2X :: Eff effs (Either String a)
 example2X = handleErrorX example
@@ -143,16 +161,16 @@ example5 (pst, per) e s = do
   modify pst s (+ 1)
 
 example6 :: err :> effs -> Error String err -> Eff effs ((), Int)
-example6 p = \e -> handleState 10 (example5 (Here Eq, Drop p) e)
+example6 p = \e -> handleState 10 (example5 (here Eq, drop p) e)
 
 example6a :: st :> effs -> State Int st -> Eff effs (Either String ())
-example6a p = \s -> handleError (\e -> example5 (Drop p, Here Eq) e s)
+example6a p = \s -> handleError (\e -> example5 (drop p, here Eq) e s)
 
 example7 :: Eff effs (Either String ((), Int))
-example7 = handleError (example6 (Here Eq))
+example7 = handleError (example6 (here Eq))
 
 example7a :: Eff effs (Either String (), Int)
-example7a = handleState 10 (example6a (Here Eq))
+example7a = handleState 10 (example6a (here Eq))
 
 simpleExampleNested ::
   Num s =>
@@ -171,7 +189,7 @@ simpleExampleNested' ::
   Bool ->
   Either String (State s st -> Eff effs ())
 simpleExampleNested' p cond =
-  runEff $ handleError $ \e -> simpleExampleNested (Here Eq, p) cond e
+  runEff $ handleError $ \e -> simpleExampleNested (here Eq, p) cond e
 
 bodyNested ::
   (err :> effs, st :> effs) ->
@@ -183,8 +201,8 @@ bodyNested (per, pst) cond e st =
   if cond
     then throw per e "Failed"
     else handleState 0 $ \st0 -> do
-      s <- read (Drop pst) st
-      write (Here Eq) st0 s
+      s <- read (drop pst) st
+      write (here Eq) st0 s
 
 exampleNested ::
   (err :> effs, st :> effs, st :> effs0, st0 :> effs0) ->
@@ -228,7 +246,7 @@ exampleNestedRun cond =
     handleState 1000 $ \st0 ->
       handleState 0 $ \st ->
         handleError $ \e ->
-          exampleNested2 (Here Eq, Drop (Here Eq), Drop (Drop (Here Eq))) cond e st st0
+          exampleNested2 (here Eq, drop (here Eq), drop (drop (here Eq))) cond e st st0
 
 -- This can't work because we have to work out how to find the subtree
 -- relation for a variable of existential type.
@@ -270,9 +288,9 @@ xs !?? i = runEff $
   handleError' Just $ \e -> do
     evalState 0 $ \s -> do
       for_ xs $ \a -> do
-        i' <- read (Here Eq) s
-        when (i == i') (throw (Drop (Here Eq)) e a)
-        write (Here Eq) s (i' + 1)
+        i' <- read (here Eq) s
+        when (i == i') (throw (drop (here Eq)) e a)
+        write (here Eq) s (i' + 1)
     pure Nothing
 
 data Compound e es where
@@ -283,13 +301,13 @@ data Compound e es where
     Compound e es
 
 putC :: ss :> es -> Compound e ss -> Int -> Eff es ()
-putC p = \case Compound _ h -> write (W2 p) h
+putC p = \case Compound _ h -> write (w2 p) h
 
 getC :: ss :> es -> Compound e ss -> Eff es Int
-getC p = \case Compound _ h -> read (W2 p) h
+getC p = \case Compound _ h -> read (w2 p) h
 
 throwErrorC :: ss :> es -> Compound e ss -> e -> Eff es a
-throwErrorC p = \case Compound h _ -> throw (W p) h
+throwErrorC p = \case Compound h _ -> throw (w p) h
 
 runC ::
   forall e es r.
@@ -311,9 +329,9 @@ runC' st f = fmap (either id id) (runC st f)
 xs !??? i = runEff $
   runC' 0 $ \c -> do
     for_ xs $ \a -> do
-      i' <- getC (Here Eq) c
-      when (i == i') (throwErrorC (Here Eq) c (Just a))
-      putC (Here Eq) c (i' + 1)
+      i' <- getC (here Eq) c
+      when (i == i') (throwErrorC (here Eq) c (Just a))
+      putC (here Eq) c (i' + 1)
     pure Nothing
 
 data Compound2 e es where
@@ -324,7 +342,7 @@ data Compound2 e es where
     Compound2 e es
 
 putC2 :: ss :> es -> Compound2 e ss -> Int -> Eff es ()
-putC2 p = \case Compound2 _ h -> write (W2 p) h
+putC2 p = \case Compound2 _ h -> write (w2 p) h
 
 runC2 ::
   State Int st ->
@@ -340,9 +358,9 @@ yieldToList ::
 yieldToList f =
   evalState [] $ \s -> do
     handleYield
-      (\i -> modify (Here Eq) s (i :))
-      (\() -> fmap reverse (read (Here Eq) s))
-      (weakenEff (B (Drop Eq)) . f)
+      (\i -> modify (here Eq) s (i :))
+      (\() -> fmap reverse (read (here Eq) s))
+      (weakenEff (b (drop Eq)) . f)
 
 exampleYield :: [Int]
 exampleYield = runEff $
@@ -350,11 +368,11 @@ exampleYield = runEff $
     \y' ->
       forYield
         ( \y -> do
-            yield (Here Eq) y 10
-            yield (Here Eq) y 20
-            yield (Here Eq) y 30
+            yield (here Eq) y 10
+            yield (here Eq) y 20
+            yield (here Eq) y 30
         )
-        $ \n -> threeMore (Here Eq) y' n
+        $ \n -> threeMore (here Eq) y' n
 
 threeMore :: eff :> effs -> Yield Int () eff -> Int -> Eff effs ()
 threeMore h y i = do
