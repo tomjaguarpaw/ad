@@ -28,6 +28,7 @@ import Data.Foldable (for_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
+import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (drop, read, return)
 
 data Rose a = Branch (Rose a) (Rose a)
@@ -43,8 +44,8 @@ newtype Eff (es :: Rose Effect) a = Eff {unsafeUnEff :: IO a}
 runEff :: (forall es. Eff es a) -> a
 runEff = unsafePerformIO . unsafeUnEff
 
-weakenEff :: forall t t' r. t :> t' => Eff t r -> Eff t' r
-weakenEff = Eff . unsafeUnEff
+weakenEff :: t `In` t' -> Eff t r -> Eff t' r
+weakenEff _ = Eff . unsafeUnEff
 
 newtype Error e s = Error (forall a. e -> IO a)
 
@@ -55,45 +56,43 @@ newtype Yield a b s = Yield (a -> IO b)
 newtype In (a :: Rose r) (b :: Rose r) = In# (# #)
 
 -- Hmm, cartesian category
-eq :: (a `In` a -> r) -> r
-eq f = f (In# (##))
+--
+-- Or do these as (# #) -> ...
+eq :: (# #) -> a `In` a
+eq (##) = In# (##)
 
-fstI :: (a `In` (a :& b) -> r) -> r
-fstI f = f (In# (##))
+fstI :: (# #) -> a `In` (a :& b)
+fstI (##) = In# (##)
 
-sndI :: (a `In` (b :& a) -> r) -> r
-sndI f = f (In# (##))
+sndI :: (# #) -> a `In` (b :& a)
+sndI (##) = In# (##)
 
-cmp :: a `In` b -> b `In` c -> (a `In` c -> r) -> r
-cmp (In# (##)) (In# (##)) f = f (In# (##))
+cmp :: a `In` b -> b `In` c -> a `In` c
+cmp (In# (##)) (In# (##)) = In# (##)
 
-bimap :: a `In` b -> c `In` d -> ((a :& c) `In` (b :& d) -> r) -> r
-bimap (In# (##)) (In# (##)) f = f (In# (##))
+bimap :: a `In` b -> c `In` d -> (a :& c) `In` (b :& d)
+bimap (In# (##)) (In# (##)) = In# (##)
 
-assoc1 :: (((a :& b) :& c) `In` (a :& (b :& c)) -> r) -> r
-assoc1 f = f (In# (##))
+assoc1 :: (# #) -> ((a :& b) :& c) `In` (a :& (b :& c))
+assoc1 (##) = In# (##)
 
-drop :: a `In` b -> (a `In` (c :& b) -> r) -> r
-drop f k = b f $ \b' -> w2 b' k
+drop :: a `In` b -> a `In` (c :& b)
+drop h = w2 (b h)
 
-here :: a `In` b -> (a `In` (b :& c) -> r) -> r
-here h k = b2 h $ \b' -> w b' k
+here :: a `In` b -> (a `In` (b :& c))
+here h = w (b2 h)
 
-w :: (a :& b) `In` c -> (a `In` c -> r) -> r
-w h k = fstI $ \f ->
-  cmp f h k
+w :: (a :& b) `In` c -> (a `In` c)
+w = cmp (fstI (##))
 
-w2 :: (b :& a) `In` c -> (a `In` c -> r) -> r
-w2 h k = sndI $ \f ->
-  cmp f h k
+w2 :: (b :& a) `In` c -> (a `In` c)
+w2 = cmp (sndI (##))
 
-b2 :: (a `In` b) -> ((a :& c) `In` (b :& c) -> r) -> r
-b2 h k = eq $ \e ->
-  bimap h e k
+b2 :: (a `In` b) -> ((a :& c) `In` (b :& c))
+b2 h = bimap h (eq (##))
 
-b :: (a `In` b) -> ((c :& a) `In` (c :& b) -> r) -> r
-b h k = eq $ \e ->
-  bimap e h k
+b :: (a `In` b) -> (c :& a) `In` (c :& b)
+b = bimap (eq (##))
 
 data InLifted a b = InLifted (In a b)
 
@@ -113,6 +112,16 @@ instance {-# INCOHERENT #-} e :> (e :& es)
 
 throw :: err :> effs => Error e err -> e -> Eff effs a
 throw (Error throw_) e = Eff (throw_ e)
+
+has :: forall a b. a :> b => a `In` b
+has = In# (##)
+
+data Dict c where
+  Dict :: forall c. c => Dict c
+
+-- Seems like it could be better
+have :: forall a b. a `In` b -> Dict (a :> b)
+have = unsafeCoerce (Dict @(a :> (a :& b)))
 
 handleError ::
   (forall err. Error e err -> Eff (err :& effs) a) ->
@@ -335,14 +344,29 @@ data Compound e es where
     State Int st ->
     Compound e es
 
-putC :: ss :> es => Compound e ss -> Int -> Eff es ()
-putC p = undefined -- \case Compound _ h -> write h
+putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
+putC = \case
+  Compound _ (h :: State Int st) ->
+    let d = has :: ss `In` es
+        d1 = sndI (##) :: st `In` ss
+        d2 = cmp d1 d
+     in case have d2 of Dict -> write h
 
-getC :: ss :> es => Compound e ss -> Eff es Int
-getC p = undefined -- \case Compound _ h -> read h
+getC :: forall ss es e. ss :> es => Compound e ss -> Eff es Int
+getC = \case
+  Compound _ (h :: State Int st) ->
+    let d = has :: ss `In` es
+        d1 = sndI (##) :: st `In` ss
+        d2 = cmp d1 d
+     in case have d2 of Dict -> read h
 
-throwErrorC :: ss :> es => Compound e ss -> e -> Eff es a
-throwErrorC p = undefined -- \case Compound h _ -> throw h
+throwErrorC :: forall ss es e a. ss :> es => Compound e ss -> e -> Eff es a
+throwErrorC = \case
+  Compound (h :: Error e err) _->
+    let d = has :: ss `In` es
+        d1 = fstI (##) :: err `In` ss
+        d2 = cmp d1 d
+     in case have d2 of Dict -> throw h
 
 runC ::
   forall e es r.
@@ -352,9 +376,16 @@ runC ::
 runC st f =
   evalState st $ \s ->
     handleError $ \e ->
-      undefined
+      case have (assoc1 (# #)) of
+        Dict -> weakenEff (assoc1 (# #)) (f (Compound e s))
 
--- weakenEff (f (Compound e s))
+runC2 ::
+  State Int st ->
+  (forall ss. Compound e (ss :& st) -> Eff (ss :& es) r) ->
+  Eff es (Either e r)
+runC2 s f =
+  handleError $ \e ->
+    f (Compound e s)
 
 runC' ::
   Int ->
@@ -371,34 +402,13 @@ xs !??? i = runEff $
       putC c (i' + 1)
     pure Nothing
 
-data Compound2 e es where
-  Compound2 ::
-    es ~ (er :& st) =>
-    Error e er ->
-    State Int st ->
-    Compound2 e es
-
-putC2 :: ss :> es => Compound2 e ss -> Int -> Eff es ()
-putC2 p = undefined -- \case Compound2 _ h -> write (w2 p) h
-
-runC2 ::
-  State Int st ->
-  (forall ss. Compound2 e (ss :& st) -> Eff (ss :& es) r) ->
-  Eff es (Either e r)
-runC2 s f =
-  handleError $ \e ->
-    f (Compound2 e s)
-
 yieldToList ::
   forall effs a r.
   (forall eff. Yield a () eff -> Eff (eff :& effs) r) ->
   Eff effs ([a], r)
 yieldToList f = do
   evalState [] $ \(s :: State lo st) -> do
-    -- Hmm
---    r <- forEachP (\(Proxy :: Proxy eff) -> weakenEff @(eff :& effs) @(eff :& (st :& effs)) . f) $ \i ->
---    r <- forEach (weakenEff . f) $ \i ->
-    r <- forEach (undefined . f) $ \i ->
+    r <- forEach (weakenEff (b (drop (eq (# #)))) . f) $ \i ->
       modify s (i :)
     as <- read s
     pure (reverse as, r)
