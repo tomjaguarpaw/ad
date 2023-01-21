@@ -27,6 +27,7 @@ import Control.Monad (join, when)
 import Data.Data (Proxy (Proxy))
 import Data.Foldable (for_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.Void (Void, absurd)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
 import Unsafe.Coerce (unsafeCoerce)
@@ -59,7 +60,7 @@ newtype Coroutine a b s = Coroutine (a -> IO b)
 
 type Stream a s = Coroutine a () s
 
-newtype In (a :: k) (b :: k) = In# (# #)
+newtype In (a :: Rose k) (b :: Rose k) = In# (# #)
 
 -- Hmm, cartesian category
 --
@@ -326,6 +327,16 @@ handleError' h f = do
     Right r -> r
     Left l -> h l
 
+type EarlyReturn = Error
+
+withEarlyReturn ::
+  (forall err. EarlyReturn r err -> Eff (err :& effs) Void) ->
+  Eff effs r
+withEarlyReturn f = handleError' id (fmap absurd . f)
+
+earlyReturn :: err :> effs => EarlyReturn r err -> r -> Eff effs a
+earlyReturn = throw
+
 evalState ::
   s ->
   (forall st. State s st -> Eff (st :& effs) a) ->
@@ -334,13 +345,13 @@ evalState s f = fmap fst (handleState s f)
 
 (!??) :: [a] -> Int -> Maybe a
 xs !?? i = runEff $
-  handleError' Just $ \e -> do
+  withEarlyReturn $ \ret -> do
     evalState 0 $ \s -> do
       for_ xs $ \a -> do
         i' <- read s
-        when (i == i') (throw e a)
+        when (i == i') (earlyReturn ret (Just a))
         write s (i' + 1)
-    pure Nothing
+    earlyReturn ret Nothing
 
 data Compound e es where
   Compound ::
@@ -440,11 +451,11 @@ threeMore y i = do
 (!!??) :: [a] -> Int -> ([String], Maybe a)
 xs !!?? i = runEff $
   yieldToList $ \y -> do
-    handleError' Just $ \e -> do
+    withEarlyReturn $ \ret -> do
       evalState 0 $ \s -> do
         for_ xs $ \a -> do
           i' <- read s
           yield y ("At index " ++ show i')
-          when (i == i') (throw e a)
+          when (i == i') (earlyReturn ret (Just a))
           write s (i' + 1)
-      pure Nothing
+      earlyReturn ret Nothing
