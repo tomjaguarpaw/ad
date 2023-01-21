@@ -56,15 +56,15 @@ runEff = unsafePerformIO . unsafeUnEff
 weakenEff :: t `In` t' -> Eff t r -> Eff t' r
 weakenEff _ = Eff . unsafeUnEff
 
-newtype Error e s = Error (forall a. e -> IO a)
+newtype Error e (s :: Rose Effect) = Error (forall a. e -> IO a)
 
-newtype State s e = State (IORef s)
+newtype State s (e :: Rose Effect) = State (IORef s)
 
 newtype Coroutine a b s = Coroutine (a -> IO b)
 
-type Stream a s = Coroutine a () s
+type Stream a (s :: Rose Effect) = Coroutine a () s
 
-newtype In (a :: Rose k) (b :: Rose k) = In# (# #)
+newtype In (a :: Rose Effect) (b :: Rose k) = In# (# #)
 
 -- Hmm, cartesian category
 --
