@@ -29,9 +29,9 @@ import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
 import Prelude hiding (drop, read, return)
 
-data Rose a = Leaf a | Branch [Rose a]
+data Rose a = Branch (Rose a) (Rose a)
 
-type a :& b = 'Branch [a, b]
+type (:&) = 'Branch
 
 data Effect
 
@@ -39,7 +39,7 @@ newtype Eff (es :: Rose Effect) a = Eff {unsafeUnEff :: IO a}
   deriving stock (Functor)
   deriving newtype (Applicative, Monad)
 
-runEff :: Eff ('Branch '[]) a -> a
+runEff :: (forall es. Eff es a) -> a
 runEff = unsafePerformIO . unsafeUnEff
 
 coerceEff :: t :~: t' -> Eff t r -> Eff t' r
