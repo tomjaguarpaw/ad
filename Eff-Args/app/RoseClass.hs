@@ -23,8 +23,9 @@
 module RoseClass where
 
 import Control.Monad (join, when)
-import Control.Monad.Except (Except, MonadError, runExcept, throwError)
+import Control.Monad.Except (Except, ExceptT, MonadError, runExcept, runExceptT, throwError)
 import Control.Monad.State.Strict (StateT, get, put, runStateT)
+import Control.Monad.Trans (lift)
 import Data.Data (Proxy (Proxy))
 import Data.Foldable (for_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
@@ -606,6 +607,85 @@ insertAwakeSignals1 location stIn insnsIn windowsIn = runExcept $ do
                     Just st' -> do
                       (signal, st'') <- case allocateSignal st' of
                         Nothing -> throwError "Could not allocate signal"
+                        Just j -> pure j
+
+                      put st''
+
+                      go
+                        ( reverse (raiseSignal signal signalTime)
+                            <> reverseDoneInsns
+                        )
+                        (signal : reverseDoneSignals)
+                        afterInsn2
+                        windows
+          _ -> continue
+        where
+          continue =
+            go
+              (insn1 : reverseDoneInsns)
+              reverseDoneSignals
+              afterInsn1
+              (window : windows)
+
+runEarlyReturn :: Monad m => ExceptT r m Void -> m r
+runEarlyReturn e =
+  runExceptT e >>= \case
+    Left l -> pure l
+    Right r -> absurd r
+
+earlyReturnT :: Monad m => r -> ExceptT r m a
+earlyReturnT = throwError
+
+insertAwakeSignals2 ::
+  Location ->
+  SignalState ->
+  [Insn] ->
+  [AwakeWindow] ->
+  Either
+    String
+    ([Insn], [Signal], SignalState)
+insertAwakeSignals2 location stIn insnsIn windowsIn = runExcept $ do
+  ((insnsOut, signals), stOut) <- flip runStateT stIn $ do
+    runEarlyReturn $ go [] [] insnsIn windowsIn
+  pure (insnsOut, signals, stOut)
+  where
+    go ::
+      -- Finished
+      [Insn] ->
+      -- Finished
+      [Signal] ->
+      -- Input
+      [Insn] ->
+      [AwakeWindow] ->
+      ExceptT ([Insn], [Signal]) (StateT SignalState (Except String)) a
+    go _ _ [] (_ : _) = lift (throwError "Had windows left over")
+    go _ _ [_] (_ : _) = lift (throwError "Had windows left over")
+    go reverseDoneInsns reverseDoneSignals insns [] =
+      earlyReturnT (reverse reverseDoneInsns ++ insns, reverse reverseDoneSignals)
+    go
+      reverseDoneInsns
+      reverseDoneSignals
+      (insn1 : afterInsn1@(insn2 : afterInsn2))
+      (window : windows) = do
+        insn1Nop <- lift (isNop1 insn1)
+        insn2Nop <- lift (isNop1 insn2)
+        case (insn1Nop, insn2Nop) of
+          (Just t1, Just t2) -> do
+            let signalTime = t1
+            if
+                | t2 /= signalTime + 1 ->
+                  lift (throwError "Invariant violation: times did not match")
+                | mustSignalOnOrBefore window < signalTime ->
+                  lift (throwError "Failed to find a signal time")
+                | signalTime < maySignalOnOrAfter window ->
+                  continue
+                | otherwise -> do
+                  st <- get
+                  case locationCanSignal st location of
+                    Nothing -> continue
+                    Just st' -> do
+                      (signal, st'') <- case allocateSignal st' of
+                        Nothing -> lift (throwError "Could not allocate signal")
                         Just j -> pure j
 
                       put st''
