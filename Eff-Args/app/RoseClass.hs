@@ -369,12 +369,14 @@ runC ::
   forall e es r.
   Int ->
   (forall ss. Compound e ss -> Eff (ss :& es) r) ->
-  Eff es (Either e r)
+  Eff es (Either e r, Int)
 runC st f =
-  evalState st $ \s ->
-    handleError $ \e ->
+  evalState st $ \s -> do
+    e <- handleError $ \e ->
       case have (assoc1 (##)) of
         Dict -> weakenEff (assoc1 (##)) (f (Compound e s))
+    s' <- read s
+    pure (e, s')
 
 runC2 ::
   State Int st ->
@@ -388,7 +390,9 @@ runC' ::
   Int ->
   (forall ss. Compound r ss -> Eff (ss :& es) r) ->
   Eff es r
-runC' st f = fmap (either id id) (runC st f)
+runC' st f = fmap fst $ do
+  (e, s) <- runC st f
+  pure (either id id e, s)
 
 (!???) :: [a] -> Int -> Maybe a
 xs !??? i = runEff $
