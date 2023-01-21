@@ -58,7 +58,7 @@ executable tmp-eff
     main-is:          Main.hs
 
     -- Modules included in this executable, other than Main.
-    other-modules:    Forall, Effectful, Rose
+    other-modules:    Forall, Effectful, Rose, RoseClass
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
