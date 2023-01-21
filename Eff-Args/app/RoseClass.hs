@@ -361,12 +361,11 @@ xs !?? i = runEff $
 
 data Compound e es where
   Compound ::
-    es ~ (err :& st) =>
     Proxy# err ->
     Proxy# st ->
     Error e err ->
     State Int st ->
-    Compound e es
+    Compound e (err :& st)
 
 inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
