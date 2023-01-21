@@ -353,18 +353,14 @@ runC2 s f =
     f (Compound2 e s)
 
 yieldToList ::
-  forall effs a r.
   (forall eff. Yield a () eff -> Eff (eff :& effs) r) ->
   Eff effs ([a], r)
 yieldToList f = do
   evalState [] $ \s -> do
-    r <- forEach f' $ \i ->
+    r <- forEach (weakenEff (b (drop Eq)) . f) $ \i ->
       modify (here Eq) s (i :)
     as <- read (here Eq) s
     pure (reverse as, r)
-
-  where f' :: Yield a () c1 -> Eff (c1 :& (c0 :& effs)) r
-        f' = weakenEff (b (drop Eq)) . f
 
 exampleYield :: [Int]
 exampleYield = fst $
