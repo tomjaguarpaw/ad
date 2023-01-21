@@ -105,7 +105,7 @@ b2 h = bimap h (eq (##))
 b :: (a `In` b) -> (c :& a) `In` (c :& b)
 b = bimap (eq (##))
 
-class (a :: Rose k) :> (b :: Rose k)
+class (a :: Rose Effect) :> (b :: Rose Effect)
 
 instance {-# INCOHERENT #-} e :> e
 
