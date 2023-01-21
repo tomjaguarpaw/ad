@@ -721,34 +721,29 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
   runEff $
     handleError $ \e -> do
       evalState stIn $ \s -> do
-        (insnsOut, signals) <- withEarlyReturn $ \er ->
-          goOuter e s er [] [] insnsIn windowsIn
+        (signals, (insnsOut, ())) <- yieldToList $ \y -> do
+          yieldToList $ \y' ->
+            goOuter e s y y' insnsIn windowsIn
         stOut <- read s
         pure (insnsOut, signals, stOut)
   where
     -- This type can be inferred if we have NoMonoLocalBinds
     goOuter ::
-      (err :> effs, er :> effs, st :> effs) =>
+      (err :> effs, st :> effs, sig :> effs, insn :> effs) =>
       Error String err ->
       State SignalState st ->
-      EarlyReturn ([Insn], [Signal]) er ->
-      -- Finished
-      [Insn] ->
-      -- Finished
-      [Signal] ->
+      Stream Signal sig ->
+      Stream Insn insn ->
       -- Input
       [Insn] ->
       [AwakeWindow] ->
-      Eff effs a
-    goOuter e s er = go
+      Eff effs ()
+    goOuter e s y y' = go
       where
-        go _ _ [] (_ : _) = throw e "Had windows left over"
-        go _ _ [_] (_ : _) = throw e "Had windows left over"
-        go reverseDoneInsns reverseDoneSignals insns [] =
-          earlyReturn er (reverse reverseDoneInsns ++ insns, reverse reverseDoneSignals)
+        go [] (_ : _) = throw e "Had windows left over"
+        go [_] (_ : _) = throw e "Had windows left over"
+        go insns [] = for_ insns (yield y')
         go
-          reverseDoneInsns
-          reverseDoneSignals
           (insn1 : afterInsn1@(insn2 : afterInsn2))
           (window : windows) = do
             insn1Nop <- isNop3 e insn1
@@ -774,18 +769,18 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
 
                           write s st''
 
+                          yield y signal
+
+                          for_ (raiseSignal signal signalTime) $ \insn ->
+                            yield y' insn
+
                           go
-                            ( reverse (raiseSignal signal signalTime)
-                                <> reverseDoneInsns
-                            )
-                            (signal : reverseDoneSignals)
                             afterInsn2
                             windows
               _ -> continue
             where
-              continue =
+              continue = do
+                yield y' insn1
                 go
-                  (insn1 : reverseDoneInsns)
-                  reverseDoneSignals
                   afterInsn1
                   (window : windows)
