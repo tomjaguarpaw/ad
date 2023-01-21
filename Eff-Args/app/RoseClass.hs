@@ -64,7 +64,7 @@ newtype Coroutine a b s = Coroutine (a -> IO b)
 
 type Stream a (s :: Rose Effect) = Coroutine a () s
 
-newtype In (a :: Rose Effect) (b :: Rose k) = In# (# #)
+newtype In (a :: Rose Effect) (b :: Rose Effect) = In# (# #)
 
 -- Hmm, cartesian category
 --
