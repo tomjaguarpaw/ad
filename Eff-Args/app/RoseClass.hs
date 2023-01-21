@@ -55,7 +55,9 @@ newtype Error e s = Error (forall a. e -> IO a)
 
 newtype State s e = State (IORef s)
 
-newtype Yield a b s = Yield (a -> IO b)
+newtype Coroutine a b s = Coroutine (a -> IO b)
+
+type Stream a s = Coroutine a () s
 
 newtype In (a :: k) (b :: k) = In# (# #)
 
@@ -157,26 +159,29 @@ handleState s f = do
     s' <- read state
     pure (a, s')
 
-yield :: eff :> effs => Yield a b eff -> a -> Eff effs b
-yield (Yield f) a = Eff (f a)
+yieldCoroutine :: eff :> effs => Coroutine a b eff -> a -> Eff effs b
+yieldCoroutine (Coroutine f) a = Eff (f a)
 
-handleYield ::
+yield :: eff :> effs => Stream a eff -> a -> Eff effs ()
+yield = yieldCoroutine
+
+handleCoroutine ::
   (a -> Eff effs b) ->
   (z -> Eff effs r) ->
-  (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
+  (forall eff. Coroutine a b eff -> Eff (eff :& effs) z) ->
   Eff effs r
-handleYield update finish f = do
+handleCoroutine update finish f = do
   z <- forEach f update
   finish z
 
 forEach ::
-  (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
+  (forall eff. Coroutine a b eff -> Eff (eff :& effs) z) ->
   (a -> Eff effs b) ->
   Eff effs z
-forEach f h = unsafeRemoveEff (f (Yield (unsafeUnEff . h)))
+forEach f h = unsafeRemoveEff (f (Coroutine (unsafeUnEff . h)))
 
 forEachP ::
-  (forall eff. Proxy eff -> Yield a b eff -> Eff (eff :& effs) z) ->
+  (forall eff. Proxy eff -> Coroutine a b eff -> Eff (eff :& effs) z) ->
   (a -> Eff effs b) ->
   Eff effs z
 forEachP f = forEach (f Proxy)
@@ -405,7 +410,7 @@ xs !??? i = runEff $
 
 yieldToList ::
   forall effs a r.
-  (forall eff. Yield a () eff -> Eff (eff :& effs) r) ->
+  (forall eff. Stream a eff -> Eff (eff :& effs) r) ->
   Eff effs ([a], r)
 yieldToList f = do
   evalState [] $ \(s :: State lo st) -> do
@@ -414,20 +419,19 @@ yieldToList f = do
     as <- read s
     pure (reverse as, r)
 
-exampleYield :: [Int]
-exampleYield = fst $
+exampleStream :: [Int]
+exampleStream = fst $
   runEff $
     yieldToList $ \y' ->
-      forEach
-        ( \y -> do
-            yield y 10
-            yield y 20
-            yield y 30
-            yield y' 666
-        )
-        $ \n -> threeMore y' n
+      forEach (iter y') $ \n -> threeMore y' n
+  where
+    iter y' y = do
+      yield y 10
+      yield y 20
+      yield y 30
+      yield y' 666
 
-threeMore :: eff :> effs => Yield Int () eff -> Int -> Eff effs ()
+threeMore :: eff :> effs => Stream Int eff -> Int -> Eff effs ()
 threeMore y i = do
   yield y i
   yield y (i + 1)
