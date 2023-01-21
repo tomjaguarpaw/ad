@@ -722,15 +722,14 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
     handleError $ \e -> do
       evalState stIn $ \s -> do
         (insnsOut, signals) <- withEarlyReturn $ \er ->
-          go e s er [] [] insnsIn windowsIn
+          goOuter e s er [] [] insnsIn windowsIn
         stOut <- read s
         pure (insnsOut, signals, stOut)
   where
-    go ::
-      es :> effs =>
-      st :> effs =>
-      er :> effs =>
-      Error String es ->
+    -- This type can be inferred if we have NoMonoLocalBinds
+    goOuter ::
+      (err :> effs, er :> effs, st :> effs) =>
+      Error String err ->
       State SignalState st ->
       EarlyReturn ([Insn], [Signal]) er ->
       -- Finished
@@ -741,59 +740,52 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
       [Insn] ->
       [AwakeWindow] ->
       Eff effs a
-    go e _ _ _ _ [] (_ : _) = throw e "Had windows left over"
-    go e _ _ _ _ [_] (_ : _) = throw e "Had windows left over"
-    go _ _ er reverseDoneInsns reverseDoneSignals insns [] =
-      earlyReturn er (reverse reverseDoneInsns ++ insns, reverse reverseDoneSignals)
-    go
-      e
-      s
-      er
-      reverseDoneInsns
-      reverseDoneSignals
-      (insn1 : afterInsn1@(insn2 : afterInsn2))
-      (window : windows) = do
-        insn1Nop <- isNop3 e insn1
-        insn2Nop <- isNop3 e insn2
-        case (insn1Nop, insn2Nop) of
-          (Just t1, Just t2) -> do
-            let signalTime = t1
-            if
-                | t2 /= signalTime + 1 ->
-                  (throw e "Invariant violation: times did not match")
-                | mustSignalOnOrBefore window < signalTime ->
-                  (throw e "Failed to find a signal time")
-                | signalTime < maySignalOnOrAfter window ->
-                  continue
-                | otherwise -> do
-                  st <- read s
-                  case locationCanSignal st location of
-                    Nothing -> continue
-                    Just st' -> do
-                      (signal, st'') <- case allocateSignal st' of
-                        Nothing -> throw e "Could not allocate signal"
-                        Just j -> pure j
+    goOuter e s er = go
+      where
+        go _ _ [] (_ : _) = throw e "Had windows left over"
+        go _ _ [_] (_ : _) = throw e "Had windows left over"
+        go reverseDoneInsns reverseDoneSignals insns [] =
+          earlyReturn er (reverse reverseDoneInsns ++ insns, reverse reverseDoneSignals)
+        go
+          reverseDoneInsns
+          reverseDoneSignals
+          (insn1 : afterInsn1@(insn2 : afterInsn2))
+          (window : windows) = do
+            insn1Nop <- isNop3 e insn1
+            insn2Nop <- isNop3 e insn2
+            case (insn1Nop, insn2Nop) of
+              (Just t1, Just t2) -> do
+                let signalTime = t1
+                if
+                    | t2 /= signalTime + 1 ->
+                      (throw e "Invariant violation: times did not match")
+                    | mustSignalOnOrBefore window < signalTime ->
+                      (throw e "Failed to find a signal time")
+                    | signalTime < maySignalOnOrAfter window ->
+                      continue
+                    | otherwise -> do
+                      st <- read s
+                      case locationCanSignal st location of
+                        Nothing -> continue
+                        Just st' -> do
+                          (signal, st'') <- case allocateSignal st' of
+                            Nothing -> throw e "Could not allocate signal"
+                            Just j -> pure j
 
-                      write s st''
+                          write s st''
 
-                      go
-                        e
-                        s
-                        er
-                        ( reverse (raiseSignal signal signalTime)
-                            <> reverseDoneInsns
-                        )
-                        (signal : reverseDoneSignals)
-                        afterInsn2
-                        windows
-          _ -> continue
-        where
-          continue =
-            go
-              e
-              s
-              er
-              (insn1 : reverseDoneInsns)
-              reverseDoneSignals
-              afterInsn1
-              (window : windows)
+                          go
+                            ( reverse (raiseSignal signal signalTime)
+                                <> reverseDoneInsns
+                            )
+                            (signal : reverseDoneSignals)
+                            afterInsn2
+                            windows
+              _ -> continue
+            where
+              continue =
+                go
+                  (insn1 : reverseDoneInsns)
+                  reverseDoneSignals
+                  afterInsn1
+                  (window : windows)
