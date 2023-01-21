@@ -19,6 +19,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE UnliftedNewtypes #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module RoseClass where
 
@@ -56,7 +57,7 @@ newtype State s e = State (IORef s)
 
 newtype Yield a b s = Yield (a -> IO b)
 
-newtype In (a :: Rose r) (b :: Rose r) = In# (# #)
+newtype In (a :: k) (b :: k) = In# (# #)
 
 -- Hmm, cartesian category
 --
@@ -97,13 +98,9 @@ b2 h = bimap h (eq (##))
 b :: (a `In` b) -> (c :& a) `In` (c :& b)
 b = bimap (eq (##))
 
-data InLifted a b = InLifted (In a b)
+class (a :: Rose k) :> (b :: Rose k)
 
-class (a :: k) :> (b :: k)
-
--- Hmm, can type class members not have unlifted type?
--- Actually, probably don't need this
---  in_ :: InLifted a b
+instance {-# incoherent #-} e :> e
 
 instance (e :> es) => e :> (x :& es)
 
@@ -347,29 +344,26 @@ data Compound e es where
     State Int st ->
     Compound e es
 
+inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
+inComp k =
+  let d1 = has :: a `In` b
+      d2 = has :: b `In` c
+  in case have (cmp d1 d2) of Dict -> k
+
 putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
 putC = \case
   Compound _ (h :: State Int st) ->
-    let d = has :: ss `In` es
-        d1 = sndI (##) :: st `In` ss
-        d2 = cmp d1 d
-     in case have d2 of Dict -> write h
+    inComp @st @ss @es (write h)
 
 getC :: forall ss es e. ss :> es => Compound e ss -> Eff es Int
 getC = \case
   Compound _ (h :: State Int st) ->
-    let d = has :: ss `In` es
-        d1 = sndI (##) :: st `In` ss
-        d2 = cmp d1 d
-     in case have d2 of Dict -> read h
+    inComp @st @ss @es (read h)
 
 throwErrorC :: forall ss es e a. ss :> es => Compound e ss -> e -> Eff es a
 throwErrorC = \case
-  Compound (h :: Error e err) _->
-    let d = has :: ss `In` es
-        d1 = fstI (##) :: err `In` ss
-        d2 = cmp d1 d
-     in case have d2 of Dict -> throw h
+  Compound (h :: Error e err) _ ->
+    inComp @err @ss @es (throw h)
 
 runC ::
   forall e es r.
