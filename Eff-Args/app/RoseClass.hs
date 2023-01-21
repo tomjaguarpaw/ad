@@ -28,6 +28,8 @@ import Data.Data (Proxy (Proxy))
 import Data.Foldable (for_)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Void (Void, absurd)
+import GHC.Base (Proxy#)
+import GHC.Exts (proxy#)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
 import Unsafe.Coerce (unsafeCoerce)
@@ -360,6 +362,8 @@ xs !?? i = runEff $
 data Compound e es where
   Compound ::
     es ~ (err :& st) =>
+    Proxy# err ->
+    Proxy# st ->
     Error e err ->
     State Int st ->
     Compound e es
@@ -368,18 +372,14 @@ inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
 
 putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
-putC = \case
-  Compound _ (h :: State Int st) ->
-    inComp @st @ss @es (write h)
+putC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (write h)
 
 getC :: forall ss es e. ss :> es => Compound e ss -> Eff es Int
-getC = \case
-  Compound _ (h :: State Int st) ->
-    inComp @st @ss @es (read h)
+getC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (read h)
 
 throwErrorC :: forall ss es e a. ss :> es => Compound e ss -> e -> Eff es a
 throwErrorC = \case
-  Compound (h :: Error e err) _ ->
+  Compound (_ :: Proxy# err) _ h _ ->
     inComp @err @ss @es (throw h)
 
 runC ::
@@ -390,7 +390,7 @@ runC st f =
   evalState st $ \s -> do
     e <- handleError $ \e ->
       case have (assoc1 (##)) of
-        Dict -> weakenEff (assoc1 (##)) (f (Compound e s))
+        Dict -> weakenEff (assoc1 (##)) (f (Compound proxy# proxy# e s))
     s' <- read s
     pure (e, s')
 
@@ -400,7 +400,7 @@ runC2 ::
   Eff es (Either e r)
 runC2 s f =
   handleError $ \e ->
-    f (Compound e s)
+    f (Compound proxy# proxy# e s)
 
 runC' ::
   Int ->
