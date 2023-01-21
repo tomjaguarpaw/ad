@@ -42,9 +42,6 @@ newtype Eff (es :: Rose Effect) a = Eff {unsafeUnEff :: IO a}
 runEff :: (forall es. Eff es a) -> a
 runEff = unsafePerformIO . unsafeUnEff
 
-coerceEff :: t :~: t' -> Eff t r -> Eff t' r
-coerceEff _ = Eff . unsafeUnEff
-
 weakenEff :: t :> t' -> Eff t r -> Eff t' r
 weakenEff _ = Eff . unsafeUnEff
 
@@ -54,9 +51,6 @@ newtype State s e = State (IORef s)
 
 newtype Yield a b s = Yield (a -> IO b)
 
-data (a :: Rose r) :~: (b :: Rose r) where
-  R1 :: ((a :& b) :& c) :~: (a :& (b :& c))
-
 -- Hmm, cartesian category
 data (a :: Rose r) :> (b :: Rose r) where
   Eq :: a :> a
@@ -64,6 +58,7 @@ data (a :: Rose r) :> (b :: Rose r) where
   Snd :: a :> (b :& a)
   Cmp :: a :> b -> b :> c -> a :> c
   Bimap :: a :> b -> c :> d -> (a :& c) :> (b :& d)
+  Assoc1 :: ((a :& b) :& c) :> (a :& (b :& c))
 
 drop :: a :> b -> a :> (c :& b)
 drop = w2 . b
@@ -317,7 +312,7 @@ runC ::
 runC st f =
   evalState st $ \s ->
     handleError $ \e ->
-      coerceEff R1 (f (Compound e s))
+      weakenEff Assoc1 (f (Compound e s))
 
 runC' ::
   Int ->
