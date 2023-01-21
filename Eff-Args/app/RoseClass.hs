@@ -379,8 +379,8 @@ runC ::
 runC st f =
   evalState st $ \s ->
     handleError $ \e ->
-      case have (assoc1 (# #)) of
-        Dict -> weakenEff (assoc1 (# #)) (f (Compound e s))
+      case have (assoc1 (##)) of
+        Dict -> weakenEff (assoc1 (##)) (f (Compound e s))
 
 runC2 ::
   State Int st ->
@@ -411,7 +411,7 @@ yieldToList ::
   Eff effs ([a], r)
 yieldToList f = do
   evalState [] $ \(s :: State lo st) -> do
-    r <- forEach (weakenEff (b (drop (eq (# #)))) . f) $ \i ->
+    r <- forEach (weakenEff (b (drop (eq (##)))) . f) $ \i ->
       modify s (i :)
     as <- read s
     pure (reverse as, r)
