@@ -328,10 +328,15 @@ handleError' h f = do
 
 type EarlyReturn = Error
 
+newtype MustReturnEarly = MustReturnEarly Void
+
+returnedEarly :: MustReturnEarly -> a
+returnedEarly (MustReturnEarly v) = absurd v
+
 withEarlyReturn ::
-  (forall err. EarlyReturn r err -> Eff (err :& effs) Void) ->
+  (forall err. EarlyReturn r err -> Eff (err :& effs) MustReturnEarly) ->
   Eff effs r
-withEarlyReturn f = handleError' id (fmap absurd . f)
+withEarlyReturn f = handleError' id (fmap returnedEarly . f)
 
 earlyReturn :: err :> effs => EarlyReturn r err -> r -> Eff effs a
 earlyReturn = throw
