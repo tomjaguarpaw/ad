@@ -41,6 +41,9 @@ newtype Eff (es :: Rose Effect) a = Eff {unsafeUnEff :: IO a}
   deriving stock (Functor)
   deriving newtype (Applicative, Monad)
 
+unsafeRemoveEff :: Eff (e :& es) a -> Eff es a
+unsafeRemoveEff = Eff . unsafeUnEff
+
 runEff :: (forall es. Eff es a) -> a
 runEff = unsafePerformIO . unsafeUnEff
 
@@ -150,9 +153,9 @@ handleState ::
   s ->
   (forall st. State s st -> Eff (st :& effs) a) ->
   Eff effs (a, s)
-handleState s f = Eff $ do
-  state <- fmap State (newIORef s)
-  unsafeUnEff $ do
+handleState s f = do
+  state <- Eff (fmap State (newIORef s))
+  unsafeRemoveEff $ do
     a <- f state
     s' <- read state
     pure (a, s')
@@ -173,7 +176,7 @@ forEach ::
   (forall eff. Yield a b eff -> Eff (eff :& effs) z) ->
   (a -> Eff effs b) ->
   Eff effs z
-forEach f h = Eff $ unsafeUnEff (f (Yield (unsafeUnEff . h)))
+forEach f h = unsafeRemoveEff (f (Yield (unsafeUnEff . h)))
 
 forEachP ::
   (forall eff. Proxy eff -> Yield a b eff -> Eff (eff :& effs) z) ->
