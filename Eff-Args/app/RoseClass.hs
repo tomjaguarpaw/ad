@@ -753,9 +753,9 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
                 let signalTime = t1
                 if
                     | t2 /= signalTime + 1 ->
-                      (throw e "Invariant violation: times did not match")
+                      throw e "Invariant violation: times did not match"
                     | mustSignalOnOrBefore window < signalTime ->
-                      (throw e "Failed to find a signal time")
+                      throw e "Failed to find a signal time"
                     | signalTime < maySignalOnOrAfter window ->
                       continue
                     | otherwise -> do
