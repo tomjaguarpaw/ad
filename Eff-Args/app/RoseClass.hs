@@ -116,7 +116,7 @@ instance {-# INCOHERENT #-} e :> (e :& es)
 throw :: err :> effs => Error e err -> e -> Eff effs a
 throw (Error throw_) e = Eff (throw_ e)
 
-has :: a :> b => a `In` b
+has :: forall a b. a :> b => a `In` b
 has = In# (##)
 
 data Dict c where
@@ -360,10 +360,7 @@ data Compound e es where
     Compound e es
 
 inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
-inComp k =
-  let d1 = has :: a `In` b
-      d2 = has :: b `In` c
-   in case have (cmp d1 d2) of Dict -> k
+inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
 
 putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
 putC = \case
