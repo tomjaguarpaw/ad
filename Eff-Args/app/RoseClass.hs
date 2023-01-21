@@ -116,7 +116,7 @@ instance {-# INCOHERENT #-} e :> (e :& es)
 throw :: err :> effs => Error e err -> e -> Eff effs a
 throw (Error throw_) e = Eff (throw_ e)
 
-has :: forall a b. a :> b => a `In` b
+has :: a :> b => a `In` b
 has = In# (##)
 
 data Dict c where
@@ -133,7 +133,6 @@ handleError f =
   Eff $ withScopedException_ (\throw_ -> unsafeUnEff (f (Error throw_)))
 
 handleErrorX ::
-  forall effs e a.
   (forall err effs'. err :> effs' => Error e err -> Eff effs' a) ->
   Eff effs (Either e a)
 handleErrorX = handleError
@@ -382,7 +381,6 @@ throwErrorC = \case
     inComp @err @ss @es (throw h)
 
 runC ::
-  forall e es r.
   Int ->
   (forall ss. Compound e ss -> Eff (ss :& es) r) ->
   Eff es (Either e r, Int)
@@ -420,7 +418,6 @@ xs !??? i = runEff $
     pure Nothing
 
 yieldToList ::
-  forall effs a r.
   (forall eff. Stream a eff -> Eff (eff :& effs) r) ->
   Eff effs ([a], r)
 yieldToList f = do
