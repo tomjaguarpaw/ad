@@ -10,6 +10,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -454,3 +455,98 @@ xs !!?? i = runEff $
           when (i == i') (earlyReturn ret (Just a))
           write s (i' + 1)
       earlyReturn ret Nothing
+
+data SignalState
+
+data Location
+
+locationCanSignal :: SignalState -> Location -> Maybe SignalState
+locationCanSignal = undefined
+
+allocateSignal :: SignalState -> Maybe (Signal, SignalState)
+allocateSignal = undefined
+
+data Insn
+
+data AwakeWindow = AwakeWindow
+  { mustSignalOnOrBefore :: Int,
+    maySignalOnOrAfter :: Int
+  }
+
+data Signal
+
+type ErrMsg = String
+
+isNop :: Insn -> Either ErrMsg (Maybe Int)
+isNop = undefined
+
+raiseSignal :: Signal -> Int -> [Insn]
+raiseSignal = undefined
+
+insertAwakeSignals ::
+  Location ->
+  SignalState ->
+  [Insn] ->
+  [AwakeWindow] ->
+  Either
+    String
+    ([Insn], [Signal], SignalState)
+insertAwakeSignals location = go [] []
+  where
+    go ::
+      -- Finished
+      [Insn] ->
+      -- Finished
+      [Signal] ->
+      SignalState ->
+      -- Input
+      [Insn] ->
+      [AwakeWindow] ->
+      Either String ([Insn], [Signal], SignalState)
+    go _ _ _ [] (_ : _) = Left "Had windows left over"
+    go _ _ _ [_] (_ : _) = Left "Had windows left over"
+    go reverseDoneInsns reverseDoneSignals st insns [] =
+      pure (reverse reverseDoneInsns ++ insns, reverse reverseDoneSignals, st)
+    go
+      reverseDoneInsns
+      reverseDoneSignals
+      st
+      (insn1 : afterInsn1@(insn2 : afterInsn2))
+      (window : windows) = do
+        insn1Nop <- isNop insn1
+        insn2Nop <- isNop insn2
+        case (insn1Nop, insn2Nop) of
+          (Just t1, Just t2) -> do
+            let signalTime = t1
+            if
+                | t2 /= signalTime + 1 ->
+                  Left "Invariant violation: times did not match"
+                | mustSignalOnOrBefore window < signalTime ->
+                  Left "Failed to find a signal time"
+                | signalTime < maySignalOnOrAfter window ->
+                  continue
+                | otherwise -> do
+                  case locationCanSignal st location of
+                    Nothing -> continue
+                    Just st' -> do
+                      (signal, st'') <- case allocateSignal st' of
+                        Nothing -> Left "Could not allocate signal"
+                        Just j -> pure j
+
+                      go
+                        ( reverse (raiseSignal signal signalTime)
+                            <> reverseDoneInsns
+                        )
+                        (signal : reverseDoneSignals)
+                        st''
+                        afterInsn2
+                        windows
+          _ -> continue
+        where
+          continue =
+            go
+              (insn1 : reverseDoneInsns)
+              reverseDoneSignals
+              st
+              afterInsn1
+              (window : windows)
