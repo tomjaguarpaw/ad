@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
@@ -19,7 +20,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE UnliftedNewtypes #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module RoseClass where
 
@@ -100,7 +100,7 @@ b = bimap (eq (##))
 
 class (a :: Rose k) :> (b :: Rose k)
 
-instance {-# incoherent #-} e :> e
+instance {-# INCOHERENT #-} e :> e
 
 instance (e :> es) => e :> (x :& es)
 
@@ -348,7 +348,7 @@ inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k =
   let d1 = has :: a `In` b
       d2 = has :: b `In` c
-  in case have (cmp d1 d2) of Dict -> k
+   in case have (cmp d1 d2) of Dict -> k
 
 putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
 putC = \case
@@ -417,16 +417,15 @@ yieldToList f = do
 exampleYield :: [Int]
 exampleYield = fst $
   runEff $
-    yieldToList $
-      \y' ->
-        forEach
-          ( \y -> do
-              yield y 10
-              yield y 20
-              yield y 30
-              yield y' 666
-          )
-          $ \n -> threeMore y' n
+    yieldToList $ \y' ->
+      forEach
+        ( \y -> do
+            yield y 10
+            yield y 20
+            yield y 30
+            yield y' 666
+        )
+        $ \n -> threeMore y' n
 
 threeMore :: eff :> effs => Yield Int () eff -> Int -> Eff effs ()
 threeMore y i = do
