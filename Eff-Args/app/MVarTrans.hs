@@ -10,6 +10,7 @@ module MVarTrans where
 
 import Data.Function
 import Data.Void
+import Data.Functor.Identity (Identity (Identity))
 import Control.Concurrent
 import Control.Exception hiding (Handler)
 import Control.Monad
@@ -307,6 +308,28 @@ failExample = do
     Free (Id () k) -> do
       let k' = do
             _ <- runFreeT (k ())
+            pure ()
+      k'
+      k'
+      putStrLn "Finished"
+
+freeT :: (Functor f, Monad m) => f a -> FreeT f m a
+freeT = FreeT . pure . fmap pure . Free
+
+failExampleM :: IO ()
+failExampleM = do
+  f <- runFreeT (evalMHandled (\op -> do
+                          putStrLn "Running"
+                          op (freeT (Identity ()))
+                          putStrLn "Middle running"
+                          op (freeT (Identity ()))
+                          putStrLn "Finished running"
+                      ))
+  case f of
+    Pure () -> pure ()
+    Free (Identity k) -> do
+      let k' = do
+            _ <- runFreeT k
             pure ()
       k'
       k'
