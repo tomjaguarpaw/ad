@@ -197,13 +197,14 @@ stateExample op = do
 
 stateExampleM :: Handler (Trans.State.StateT Int) -> IO ()
 stateExampleM op = do
-  s0 <- makeOpM0 Trans.State.get op
+  let make = flip makeOpM0 op
+  s0 <- make Trans.State.get
   putStrLn ("Initially " ++ show s0)
   makeOpM0 (Trans.State.modify' (+ 1)) op
-  s1 <- makeOpM0 Trans.State.get op
+  s1 <- make Trans.State.get
   putStrLn ("Then " ++ show s1)
   makeOpM Trans.State.modify' op (+ 1)
-  s2 <- makeOpM0 Trans.State.get op
+  s2 <- make Trans.State.get
   putStrLn ("Then again " ++ show s2)
 
 runStateExample :: IO ()
