@@ -76,6 +76,8 @@ makeOpM op send a = onlyOneCallAllowed (send . flip fmap (op a))
 makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
 makeOpM0 op send = makeOpM (const op) send ()
 
+type Handled t = forall b. t IO b -> IO b
+
 data State s r =
     Get () (s -> r)
   | Put s (() -> r)
@@ -132,6 +134,9 @@ evalM f = do
         loop
       Right r -> pure r
 
+evalMHandled :: (MonadTrans t, Monad (t IO)) => (Handled t -> IO r) -> t IO r
+evalMHandled m = evalM (\handler -> m (flip makeOpM0 handler))
+
 -- This doesn't work!
 unevalEasy :: Functor f => FreeT f IO () -> Op f -> IO ()
 unevalEasy f op = Control.Monad.Trans.Free.iterT op f
@@ -184,6 +189,12 @@ evalState sInit =
         Get () k -> fmap k Trans.State.get
         Put s k -> fmap k (Trans.State.put s)
 
+evalStateM :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
+evalStateM sInit m = Trans.State.evalStateT (evalMHandled m) sInit
+
+tryExcM :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
+tryExcM m = Trans.Except.runExceptT (evalMHandled m)
+
 stateExample :: Op (State Int) -> IO ()
 stateExample op = do
   s0 <- get op
@@ -195,20 +206,22 @@ stateExample op = do
   s2 <- get op
   putStrLn ("Then again " ++ show s2)
 
-stateExampleM :: Handler (Trans.State.StateT Int) -> IO ()
-stateExampleM op = do
-  let make = flip makeOpM0 op
-  s0 <- make Trans.State.get
+stateExampleM :: Handled (Trans.State.StateT Int) -> IO ()
+stateExampleM st = do
+  s0 <- st Trans.State.get
   putStrLn ("Initially " ++ show s0)
-  makeOpM0 (Trans.State.modify' (+ 1)) op
-  s1 <- make Trans.State.get
+  st (Trans.State.modify' (+ 1))
+  s1 <- st Trans.State.get
   putStrLn ("Then " ++ show s1)
-  makeOpM Trans.State.modify' op (+ 1)
-  s2 <- make Trans.State.get
+  st (Trans.State.modify' (+ 1))
+  s2 <- st Trans.State.get
   putStrLn ("Then again " ++ show s2)
 
 runStateExample :: IO ()
 runStateExample = evalState (0 :: Int) stateExample
+
+runStateExampleM :: IO ()
+runStateExampleM = evalStateM 0 stateExampleM
 
 data Exc e r = Throw e (Void -> r)
   deriving Functor
@@ -247,11 +260,35 @@ mixedExample opexc opst = do
 
   pure s2
 
+mixedExampleM ::
+  Handled (Trans.Except.ExceptT String) ->
+  Handled (Trans.State.StateT Int) ->
+  IO Int
+mixedExampleM opexc opst = do
+  s0 <- opst Trans.State.get
+  putStrLn ("Initially " ++ show s0)
+
+  opst (Trans.State.modify (+ 1))
+  s1 <- opst Trans.State.get
+  when (s1 > 1) (opexc (Trans.Except.throwE "s1"))
+
+  opst (Trans.State.modify (+ 1))
+  s2 <- opst Trans.State.get
+  when (s2 > 1) (opexc (Trans.Except.throwE "s2"))
+
+  pure s2
+
 runMixedExample :: IO (Either String Int)
 runMixedExample =
   tryExc $ \opexc ->
     evalState (0 :: Int) $ \opst ->
       mixedExample opexc opst
+
+runMixedExampleM :: IO (Either String Int)
+runMixedExampleM =
+  tryExcM $ \opexc ->
+    evalStateM 0 $ \opst ->
+      mixedExampleM opexc opst
 
 data Id r = Id () (() -> r)
   deriving Functor
