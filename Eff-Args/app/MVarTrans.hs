@@ -73,6 +73,9 @@ makeOpM ::
   IO b
 makeOpM op send a = onlyOneCallAllowed (send . flip fmap (op a))
 
+makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
+makeOpM0 op send = makeOpM (const op) send ()
+
 data State s r =
     Get () (s -> r)
   | Put s (() -> r)
@@ -194,13 +197,13 @@ stateExample op = do
 
 stateExampleM :: Handler (Trans.State.StateT Int) -> IO ()
 stateExampleM op = do
-  s0 <- makeOpM (const Trans.State.get) op ()
+  s0 <- makeOpM0 Trans.State.get op
   putStrLn ("Initially " ++ show s0)
-  makeOpM Trans.State.modify' op (+ 1)
-  s1 <- makeOpM (const Trans.State.get) op ()
+  makeOpM0 (Trans.State.modify' (+ 1)) op
+  s1 <- makeOpM0 Trans.State.get op
   putStrLn ("Then " ++ show s1)
   makeOpM Trans.State.modify' op (+ 1)
-  s2 <- makeOpM (const Trans.State.get) op ()
+  s2 <- makeOpM0 Trans.State.get op
   putStrLn ("Then again " ++ show s2)
 
 runStateExample :: IO ()
