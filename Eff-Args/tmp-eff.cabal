@@ -64,7 +64,7 @@ executable tmp-eff
     -- other-extensions:
 
     -- Other library packages from which modules are imported.
-    build-depends:    base, mmorph, reflection, mtl, transformers, effectful-core, ghc-prim, free
+    build-depends:    base, mmorph, reflection, mtl, transformers, effectful-core, ghc-prim, streaming
 
     -- Directories containing source files.
     hs-source-dirs:   app

@@ -18,10 +18,9 @@ import Control.Exception
 import Control.Monad (when)
 import Control.Monad.Trans (MonadTrans, lift)
 import qualified Control.Monad.Trans.Except as Trans.Except
-import Control.Monad.Trans.Free
 import qualified Control.Monad.Trans.State as Trans.State
 import Data.Function
-import Data.Functor.Identity (Identity (Identity))
+import qualified Streaming.Prelude
 import System.Mem (performGC)
 
 onlyOneCallAllowed :: ((b -> IO ()) -> IO ()) -> IO b
@@ -142,25 +141,18 @@ data Id r = Id () (() -> r)
 
 failExample :: IO ()
 failExample = do
-  f <-
-    runFreeT
-      ( eval
-          ( \op -> do
-              putStrLn "Running"
-              op (freeT (Identity ()))
-              putStrLn "Middle running"
-              op (freeT (Identity ()))
-              putStrLn "Finished running"
-          )
-      )
-  case f of
-    Pure () -> pure ()
-    Free (Identity k) -> do
-      let k' = do
-            _ <- runFreeT k
-            pure ()
-      k'
-      k'
+  let stream = eval $ \op -> do
+        op (Streaming.Prelude.yield ())
+        op (Streaming.Prelude.yield ())
+
+  putStrLn "Running to first yield"
+  Streaming.Prelude.uncons stream >>= \case
+    Nothing -> error "should have elements"
+    Just ((), rest) -> do
+      putStrLn "Running to second yield"
+      _ <- Streaming.Prelude.uncons rest
+      putStrLn "Running to second yield again"
+      _ <- Streaming.Prelude.uncons rest
       putStrLn "Finished"
 
 -- How to get nested exception propagation?
