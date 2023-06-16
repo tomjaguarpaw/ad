@@ -122,10 +122,12 @@ mixedExample opexc opst = do
 
   opst (Trans.State.modify (+ 1))
   s1 <- opst Trans.State.get
+  putStrLn ("Then " ++ show s1)
   when (s1 > 1) (opexc (Trans.Except.throwE "s1"))
 
   opst (Trans.State.modify (+ 1))
   s2 <- opst Trans.State.get
+  putStrLn ("Then " ++ show s2)
   when (s2 > 1) (opexc (Trans.Except.throwE "s2"))
 
   pure s2
