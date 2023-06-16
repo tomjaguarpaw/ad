@@ -58,23 +58,8 @@ onlyOneCallAllowed k = do
   k putIt
   getIt
 
-makeOp ::
-  (a -> (b -> IO ()) -> fio) ->
-  (fio -> IO ()) ->
-  a ->
-  IO b
-makeOp op send a = onlyOneCallAllowed (send . op a)
-
-makeOpM ::
-  Functor (t IO) =>
-  (a -> t IO b) ->
-  Handler t ->
-  a ->
-  IO b
-makeOpM op send a = onlyOneCallAllowed (send . flip fmap (op a))
-
 makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
-makeOpM0 op send = makeOpM (const op) send ()
+makeOpM0 op send = onlyOneCallAllowed (send . flip fmap op)
 
 type Handled t = forall b. t IO b -> IO b
 
