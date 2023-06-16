@@ -60,6 +60,12 @@ onlyOneCallAllowed k = do
 makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
 makeOpM0 op send = onlyOneCallAllowed (send . flip fmap op)
 
+iterTrans :: Functor (t IO) => t IO r -> Handler t -> IO r
+iterTrans t handler = do
+  mvar <- newEmptyMVar
+  handler (fmap (putMVar mvar) t)
+  takeMVar mvar
+
 type Handled t = forall b. t IO b -> IO b
 
 data State s r
@@ -91,12 +97,6 @@ evalM f = do
 
 evalMHandled :: (MonadTrans t, Monad (t IO)) => (Handled t -> IO r) -> t IO r
 evalMHandled m = evalM (\handler -> m (flip makeOpM0 handler))
-
-iterTrans :: Functor (t IO) => t IO r -> Handler t -> IO r
-iterTrans t handler = do
-  mvar <- newEmptyMVar
-  handler (fmap (putMVar mvar) t)
-  takeMVar mvar
 
 evalStateM :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
 evalStateM sInit m = Trans.State.evalStateT (evalMHandled m) sInit
