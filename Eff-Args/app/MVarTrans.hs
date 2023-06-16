@@ -53,7 +53,7 @@ multiCallsNotDetected k = do
   k putIt
   getIt
 
-type Handled t = forall b. t IO b -> IO b
+type Handle t = forall b. t IO b -> IO b
 
 data State s r
   = Get () (s -> r)
@@ -62,7 +62,7 @@ data State s r
 
 runT ::
   (Monad (t IO), MonadTrans t) =>
-  (Handled t -> IO r) ->
+  (Handle t -> IO r) ->
   t IO r
 runT m = do
   recv <- lift $ do
@@ -83,13 +83,13 @@ runT m = do
         loop
       Right r -> pure r
 
-evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
+evalState :: s -> (Handle (Trans.State.StateT s) -> IO r) -> IO r
 evalState sInit m = Trans.State.evalStateT (runT m) sInit
 
-tryExc :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
+tryExc :: (Handle (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
 tryExc m = Trans.Except.runExceptT (runT m)
 
-stateExample :: Handled (Trans.State.StateT Int) -> IO ()
+stateExample :: Handle (Trans.State.StateT Int) -> IO ()
 stateExample st = do
   s0 <- st Trans.State.get
   putStrLn ("Initially " ++ show s0)
@@ -103,7 +103,7 @@ stateExample st = do
 runStateExample :: IO ()
 runStateExample = evalState 0 stateExample
 
-excExample :: Handled (Trans.Except.ExceptT String) -> IO ()
+excExample :: Handle (Trans.Except.ExceptT String) -> IO ()
 excExample op = do
   putStrLn "Running..."
   _ <- op (Trans.Except.throwE "An exception")
@@ -113,8 +113,8 @@ runExcExample :: IO (Either String ())
 runExcExample = tryExc excExample
 
 mixedExample ::
-  Handled (Trans.Except.ExceptT String) ->
-  Handled (Trans.State.StateT Int) ->
+  Handle (Trans.Except.ExceptT String) ->
+  Handle (Trans.State.StateT Int) ->
   IO Int
 mixedExample opexc opst = do
   s0 <- opst Trans.State.get
