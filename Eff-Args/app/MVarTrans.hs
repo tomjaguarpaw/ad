@@ -73,11 +73,11 @@ data State s r
   | Put s (() -> r)
   deriving (Functor)
 
-eval ::
+evalMHandled ::
   (Monad (t IO), MonadTrans t) =>
-  (Handler t -> IO r) ->
+  (Handled t -> IO r) ->
   t IO r
-eval f = do
+evalMHandled m = do
   recv <- lift $ do
     mvar <- newEmptyMVar
     let _ = mvar
@@ -95,8 +95,7 @@ eval f = do
         loop
       Right r -> pure r
 
-evalMHandled :: (MonadTrans t, Monad (t IO)) => (Handled t -> IO r) -> t IO r
-evalMHandled m = eval (\handler -> m (flip makeOpM0 handler))
+  where f = (\handler -> m (flip makeOpM0 handler))
 
 evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
 evalState sInit m = Trans.State.evalStateT (evalMHandled m) sInit
