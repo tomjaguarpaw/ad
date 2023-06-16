@@ -138,9 +138,6 @@ runMixedExample =
     evalState 0 $ \opst ->
       mixedExample opexc opst
 
-data Id r = Id () (() -> r)
-  deriving (Functor)
-
 failExample :: IO ()
 failExample = do
   let stream = runT $ \op -> do
