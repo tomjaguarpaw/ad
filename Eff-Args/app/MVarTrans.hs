@@ -60,8 +60,12 @@ onlyOneCallAllowed k = do
 multiCallsNotDetected :: ((b -> IO ()) -> IO ()) -> IO b
 multiCallsNotDetected k = do
   mvar <- newEmptyMVar
-  k (putMVar mvar)
-  takeMVar mvar
+
+  let putIt = putMVar mvar
+      getIt = takeMVar mvar
+
+  k putIt
+  getIt
 
 type Handled t = forall b. t IO b -> IO b
 
