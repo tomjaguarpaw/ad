@@ -9,15 +9,20 @@
 module MVarTrans where
 
 import Control.Concurrent
-import Control.Exception hiding (Handler)
-import Control.Monad
+import Control.Exception
+  ( AssertionFailed (AssertionFailed),
+    SomeException,
+    throwIO,
+    try,
+  )
+import Control.Monad (when)
 import Control.Monad.Trans (MonadTrans, lift)
 import qualified Control.Monad.Trans.Except as Trans.Except
 import Control.Monad.Trans.Free
 import qualified Control.Monad.Trans.State as Trans.State
 import Data.Function
 import Data.Functor.Identity (Identity (Identity))
-import System.Mem
+import System.Mem (performGC)
 
 main :: IO ()
 main = do
@@ -34,8 +39,6 @@ main = do
   threadDelay 1
   performGC
   threadDelay 1
-
-type Handler t = t IO (IO ()) -> IO ()
 
 onlyOneCallAllowed :: ((b -> IO ()) -> IO ()) -> IO b
 onlyOneCallAllowed k = do
@@ -83,7 +86,8 @@ eval m = do
     mvar <- newEmptyMVar
     let _ = mvar
     _ <- forkIO $ do
-      r <- m (\op -> onlyOneCallAllowed (putMVar mvar . Left . flip fmap op))
+      let handled op = onlyOneCallAllowed $ \k -> putMVar mvar (Left (fmap k op))
+      r <- m handled
       putMVar mvar (Right r)
 
     pure (lift (takeMVar mvar))
