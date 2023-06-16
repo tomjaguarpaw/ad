@@ -63,12 +63,6 @@ multiCallsNotDetected k = do
   k (putMVar mvar)
   takeMVar mvar
 
-makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
-makeOpM0 op send = onlyOneCallAllowed (send . flip fmap op)
-
-iterTrans :: Functor (t IO) => t IO r -> Handler t -> IO r
-iterTrans op send = multiCallsNotDetected (send . flip fmap op)
-
 type Handled t = forall b. t IO b -> IO b
 
 data State s r
@@ -85,7 +79,7 @@ eval m = do
     mvar <- newEmptyMVar
     let _ = mvar
     _ <- forkIO $ do
-      r <- m (flip makeOpM0 (putMVar mvar . Left))
+      r <- m (\op -> onlyOneCallAllowed (putMVar mvar . Left . flip fmap op))
       putMVar mvar (Right r)
 
     pure (lift (takeMVar mvar))
