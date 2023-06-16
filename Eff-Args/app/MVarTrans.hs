@@ -36,8 +36,6 @@ main = do
   performGC
   threadDelay 1
 
-type Op f = f (IO ()) -> IO ()
-
 type Handler t = t IO (IO ()) -> IO ()
 
 onlyOneCallAllowed :: ((b -> IO ()) -> IO ()) -> IO b
@@ -84,36 +82,6 @@ data State s r =
   | Put s (() -> r)
   deriving Functor
 
-get :: Op (State s) -> IO s
-get op = makeOp Get op ()
-
-put :: Op (State s) -> s -> IO ()
-put = makeOp Put
-
-modify :: Op (State s) -> (s -> s) -> IO ()
-modify op f = do
-  s <- get op
-  put op (f s)
-
-eval :: forall f r. Functor f => (Op f -> IO r) -> FreeT f IO r
-eval f = do
-  recv <- lift $ do
-    mvar <- newEmptyMVar
-    let _ = mvar :: MVar (Either (f (IO ())) r)
-    _ <- forkIO $ do
-      r <- f (putMVar mvar . Left)
-      putMVar mvar (Right r)
-
-    pure (lift (takeMVar mvar))
-
-  fix $ \loop -> do
-    recv >>= \case
-      Left l -> do
-        io <- liftF l
-        lift io
-        loop
-      Right r -> pure r
-
 evalM ::
   (Monad (t IO), MonadTrans t) =>
   (Handler t -> IO r) -> t IO r
@@ -138,74 +106,17 @@ evalM f = do
 evalMHandled :: (MonadTrans t, Monad (t IO)) => (Handled t -> IO r) -> t IO r
 evalMHandled m = evalM (\handler -> m (flip makeOpM0 handler))
 
--- This doesn't work!
-unevalEasy :: Functor f => FreeT f IO () -> Op f -> IO ()
-unevalEasy f op = Control.Monad.Trans.Free.iterT op f
-
--- This doesn't work!
-unevalComplex :: Functor f => FreeT f IO r -> Op f -> IO r
-unevalComplex f op = do
-  mvar <- newEmptyMVar
-  flip Control.Monad.Trans.Free.iterT f $ \fio -> do
-    let fio' = flip fmap fio $ \ior -> do
-          r <- ior
-          putMVar mvar r
-
-    op fio'
-    takeMVar mvar
-
-iterT :: Functor f => FreeT f IO r -> Op f -> IO r
-iterT f op = do
-  mvar <- newEmptyMVar
-
-  -- All but the first iteration of this loop actually run in the
-  -- handler thread, not this thread!
-  flip fix f $ \again f' -> do
-    runFreeT f' >>= \case
-      Pure r -> putMVar mvar r
-      Free k -> op (fmap again k)
-
-  takeMVar mvar
-
 iterTrans :: Functor (t IO) => t IO r -> Handler t -> IO r
 iterTrans t handler = do
   mvar <- newEmptyMVar
   handler (fmap (putMVar mvar) t)
   takeMVar mvar
 
-evalFoldFree ::
-  (MonadTrans t, Monad (t IO), Functor f) =>
-  (forall n x. Monad n => f x -> t n x) ->
-  (t IO a -> ioa) ->
-  (Op f -> IO a) ->
-  ioa
-evalFoldFree d r = r . foldFreeT d . eval
-
-evalState :: s -> (Op (State s) -> IO r) -> IO r
-evalState sInit =
-  evalFoldFree d (flip Trans.State.evalStateT sInit)
-  where
-    d :: Monad m => State a b -> Trans.State.StateT a m b
-    d = \case
-        Get () k -> fmap k Trans.State.get
-        Put s k -> fmap k (Trans.State.put s)
-
 evalStateM :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
 evalStateM sInit m = Trans.State.evalStateT (evalMHandled m) sInit
 
 tryExcM :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
 tryExcM m = Trans.Except.runExceptT (evalMHandled m)
-
-stateExample :: Op (State Int) -> IO ()
-stateExample op = do
-  s0 <- get op
-  putStrLn ("Initially " ++ show s0)
-  modify op (+ 1)
-  s1 <- get op
-  putStrLn ("Then " ++ show s1)
-  modify op (+ 1)
-  s2 <- get op
-  putStrLn ("Then again " ++ show s2)
 
 stateExampleM :: Handled (Trans.State.StateT Int) -> IO ()
 stateExampleM st = do
@@ -218,48 +129,20 @@ stateExampleM st = do
   s2 <- st Trans.State.get
   putStrLn ("Then again " ++ show s2)
 
-runStateExample :: IO ()
-runStateExample = evalState (0 :: Int) stateExample
-
 runStateExampleM :: IO ()
 runStateExampleM = evalStateM 0 stateExampleM
 
 data Exc e r = Throw e (Void -> r)
   deriving Functor
 
-throwExc :: Op (Exc e) -> e -> IO a
-throwExc op e = fmap absurd (makeOp Throw op e)
-
-tryExc :: (Op (Exc e) -> IO a) -> IO (Either e a)
-tryExc = evalFoldFree d Trans.Except.runExceptT
-  where
-    d :: Monad m => Exc a b -> Trans.Except.ExceptT a m b
-    d = \case
-      Throw e k -> fmap k (Trans.Except.throwE e)
-
-excExample :: Op (Exc String) -> IO ()
-excExample op = do
+excExampleM :: Handled (Trans.Except.ExceptT String) -> IO ()
+excExampleM op = do
   putStrLn "Running..."
-  _ <- throwExc op "An exception"
+  _ <- op (Trans.Except.throwE "An exception")
   putStrLn "Still running?"
 
-runExcExample :: IO (Either String ())
-runExcExample = tryExc excExample
-
-mixedExample :: Op (Exc String) -> Op (State Int) -> IO Int
-mixedExample opexc opst = do
-  s0 <- get opst
-  putStrLn ("Initially " ++ show s0)
-
-  modify opst (+ 1)
-  s1 <- get opst
-  when (s1 > 1) (throwExc opexc "s1")
-
-  modify opst (+ 1)
-  s2 <- get opst
-  when (s2 > 1) (throwExc opexc "s2")
-
-  pure s2
+runExcExampleM :: IO (Either String ())
+runExcExampleM = tryExcM excExampleM
 
 mixedExampleM ::
   Handled (Trans.Except.ExceptT String) ->
@@ -279,12 +162,6 @@ mixedExampleM opexc opst = do
 
   pure s2
 
-runMixedExample :: IO (Either String Int)
-runMixedExample =
-  tryExc $ \opexc ->
-    evalState (0 :: Int) $ \opst ->
-      mixedExample opexc opst
-
 runMixedExampleM :: IO (Either String Int)
 runMixedExampleM =
   tryExcM $ \opexc ->
@@ -293,25 +170,6 @@ runMixedExampleM =
 
 data Id r = Id () (() -> r)
   deriving Functor
-
-failExample :: IO ()
-failExample = do
-  f <- runFreeT (eval (\op -> do
-                          putStrLn "Running"
-                          makeOp Id op ()
-                          putStrLn "Middle running"
-                          makeOp Id op ()
-                          putStrLn "Finished running"
-                      ))
-  case f of
-    Pure () -> pure ()
-    Free (Id () k) -> do
-      let k' = do
-            _ <- runFreeT (k ())
-            pure ()
-      k'
-      k'
-      putStrLn "Finished"
 
 freeT :: (Functor f, Monad m) => f a -> FreeT f m a
 freeT = FreeT . pure . fmap pure . Free
@@ -334,37 +192,6 @@ failExampleM = do
       k'
       k'
       putStrLn "Finished"
-
-evalStateFused :: s -> (Op (State s) -> IO r) -> IO r
-evalStateFused sInit f = do
-  recv <- newEmptyMVar
-
-  _ <- forkIO $ do
-    r <- f (putMVar recv . Left)
-    putMVar recv (Right r)
-
-  flip fix sInit $ \loop !s -> do
-    takeMVar recv >>= \case
-      Left l -> case l of
-        Get () k -> do
-          k s
-          loop s
-        Put s' k -> do
-          k ()
-          loop s'
-      Right r -> pure r
-
-tryExcFused :: (Op (Exc e) -> IO r) -> IO (Either e r)
-tryExcFused f = do
-  recv <- newEmptyMVar
-
-  _ <- forkIO $ do
-    r <- f (putMVar recv . Left)
-    putMVar recv (Right r)
-
-  takeMVar recv >>= \case
-    Left (Throw e _) -> pure (Left e)
-    Right r -> pure (Right r)
 
 -- How to get nested exception propagation?
 forkExcept :: IO () -> IO ThreadId
