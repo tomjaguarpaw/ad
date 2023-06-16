@@ -24,22 +24,6 @@ import Data.Function
 import Data.Functor.Identity (Identity (Identity))
 import System.Mem (performGC)
 
-main :: IO ()
-main = do
-  mvar <- newEmptyMVar
-
-  let r = putMVar mvar ()
-
-  _ <- forkIO $ do
-    try (takeMVar mvar) >>= \case
-      Left e -> print (e :: SomeException)
-      Right {} -> pure ()
-    r
-
-  threadDelay 1
-  performGC
-  threadDelay 1
-
 onlyOneCallAllowed :: ((b -> IO ()) -> IO ()) -> IO b
 onlyOneCallAllowed k = do
   mvar <- newEmptyMVar
@@ -205,3 +189,20 @@ nest2 = do
 
   threadDelay 100000
   putStrLn "Finished"
+
+-- To demonstrate what happnes when we read from an MVar that will not
+-- be written to
+blockedIndefinitely :: IO ()
+blockedIndefinitely = do
+  mvar <- newEmptyMVar
+
+  _ <- forkIO $ do
+    try (takeMVar mvar) >>= \case
+      Left e -> do
+        putStrLn ("Caught exception: " ++ show (e :: SomeException))
+      Right {} -> pure ()
+    putMVar mvar ()
+
+  threadDelay 1
+  performGC
+  threadDelay 1
