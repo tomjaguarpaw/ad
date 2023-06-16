@@ -140,9 +140,6 @@ runMixedExample =
 data Id r = Id () (() -> r)
   deriving (Functor)
 
-freeT :: (Functor f, Monad m) => f a -> FreeT f m a
-freeT = FreeT . pure . fmap pure . Free
-
 failExample :: IO ()
 failExample = do
   f <-
