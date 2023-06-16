@@ -60,11 +60,11 @@ data State s r
   | Put s (() -> r)
   deriving (Functor)
 
-eval ::
+runT ::
   (Monad (t IO), MonadTrans t) =>
   (Handled t -> IO r) ->
   t IO r
-eval m = do
+runT m = do
   recv <- lift $ do
     mvar <- newEmptyMVar
     let _ = mvar
@@ -84,10 +84,10 @@ eval m = do
       Right r -> pure r
 
 evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
-evalState sInit m = Trans.State.evalStateT (eval m) sInit
+evalState sInit m = Trans.State.evalStateT (runT m) sInit
 
 tryExc :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
-tryExc m = Trans.Except.runExceptT (eval m)
+tryExc m = Trans.Except.runExceptT (runT m)
 
 stateExample :: Handled (Trans.State.StateT Int) -> IO ()
 stateExample st = do
@@ -141,7 +141,7 @@ data Id r = Id () (() -> r)
 
 failExample :: IO ()
 failExample = do
-  let stream = eval $ \op -> do
+  let stream = runT $ \op -> do
         op (Streaming.Prelude.yield ())
         op (Streaming.Prelude.yield ())
 
