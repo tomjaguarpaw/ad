@@ -73,11 +73,11 @@ data State s r
   | Put s (() -> r)
   deriving (Functor)
 
-evalM ::
+eval ::
   (Monad (t IO), MonadTrans t) =>
   (Handler t -> IO r) ->
   t IO r
-evalM f = do
+eval f = do
   recv <- lift $ do
     mvar <- newEmptyMVar
     let _ = mvar
@@ -96,16 +96,16 @@ evalM f = do
       Right r -> pure r
 
 evalMHandled :: (MonadTrans t, Monad (t IO)) => (Handled t -> IO r) -> t IO r
-evalMHandled m = evalM (\handler -> m (flip makeOpM0 handler))
+evalMHandled m = eval (\handler -> m (flip makeOpM0 handler))
 
-evalStateM :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
-evalStateM sInit m = Trans.State.evalStateT (evalMHandled m) sInit
+evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
+evalState sInit m = Trans.State.evalStateT (evalMHandled m) sInit
 
-tryExcM :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
-tryExcM m = Trans.Except.runExceptT (evalMHandled m)
+tryExc :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
+tryExc m = Trans.Except.runExceptT (evalMHandled m)
 
-stateExampleM :: Handled (Trans.State.StateT Int) -> IO ()
-stateExampleM st = do
+stateExample :: Handled (Trans.State.StateT Int) -> IO ()
+stateExample st = do
   s0 <- st Trans.State.get
   putStrLn ("Initially " ++ show s0)
   st (Trans.State.modify' (+ 1))
@@ -115,23 +115,23 @@ stateExampleM st = do
   s2 <- st Trans.State.get
   putStrLn ("Then again " ++ show s2)
 
-runStateExampleM :: IO ()
-runStateExampleM = evalStateM 0 stateExampleM
+runStateExample :: IO ()
+runStateExample = evalState 0 stateExample
 
-excExampleM :: Handled (Trans.Except.ExceptT String) -> IO ()
-excExampleM op = do
+excExample :: Handled (Trans.Except.ExceptT String) -> IO ()
+excExample op = do
   putStrLn "Running..."
   _ <- op (Trans.Except.throwE "An exception")
   putStrLn "Still running?"
 
-runExcExampleM :: IO (Either String ())
-runExcExampleM = tryExcM excExampleM
+runExcExample :: IO (Either String ())
+runExcExample = tryExc excExample
 
-mixedExampleM ::
+mixedExample ::
   Handled (Trans.Except.ExceptT String) ->
   Handled (Trans.State.StateT Int) ->
   IO Int
-mixedExampleM opexc opst = do
+mixedExample opexc opst = do
   s0 <- opst Trans.State.get
   putStrLn ("Initially " ++ show s0)
 
@@ -145,11 +145,11 @@ mixedExampleM opexc opst = do
 
   pure s2
 
-runMixedExampleM :: IO (Either String Int)
-runMixedExampleM =
-  tryExcM $ \opexc ->
-    evalStateM 0 $ \opst ->
-      mixedExampleM opexc opst
+runMixedExample :: IO (Either String Int)
+runMixedExample =
+  tryExc $ \opexc ->
+    evalState 0 $ \opst ->
+      mixedExample opexc opst
 
 data Id r = Id () (() -> r)
   deriving (Functor)
@@ -157,8 +157,8 @@ data Id r = Id () (() -> r)
 freeT :: (Functor f, Monad m) => f a -> FreeT f m a
 freeT = FreeT . pure . fmap pure . Free
 
-failExampleM :: IO ()
-failExampleM = do
+failExample :: IO ()
+failExample = do
   f <-
     runFreeT
       ( evalMHandled
