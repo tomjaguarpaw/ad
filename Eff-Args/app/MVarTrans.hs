@@ -57,14 +57,17 @@ onlyOneCallAllowed k = do
   k putIt
   getIt
 
+multiCallsNotDetected :: ((b -> IO ()) -> IO ()) -> IO b
+multiCallsNotDetected k = do
+  mvar <- newEmptyMVar
+  k (putMVar mvar)
+  takeMVar mvar
+
 makeOpM0 :: Functor (t IO) => t IO b -> Handler t -> IO b
 makeOpM0 op send = onlyOneCallAllowed (send . flip fmap op)
 
 iterTrans :: Functor (t IO) => t IO r -> Handler t -> IO r
-iterTrans t handler = do
-  mvar <- newEmptyMVar
-  handler (fmap (putMVar mvar) t)
-  takeMVar mvar
+iterTrans op send = multiCallsNotDetected (send . flip fmap op)
 
 type Handled t = forall b. t IO b -> IO b
 
