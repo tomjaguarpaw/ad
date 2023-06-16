@@ -8,16 +8,16 @@
 
 module MVarTrans where
 
-import Data.Function
-import Data.Void
-import Data.Functor.Identity (Identity (Identity))
 import Control.Concurrent
 import Control.Exception hiding (Handler)
 import Control.Monad
-import Control.Monad.Trans (lift, MonadTrans)
+import Control.Monad.Trans (MonadTrans, lift)
+import qualified Control.Monad.Trans.Except as Trans.Except
 import Control.Monad.Trans.Free
 import qualified Control.Monad.Trans.State as Trans.State
-import qualified Control.Monad.Trans.Except as Trans.Except
+import Data.Function
+import Data.Functor.Identity (Identity (Identity))
+import Data.Void
 import System.Mem
 
 main :: IO ()
@@ -29,7 +29,7 @@ main = do
   _ <- forkIO $ do
     try (takeMVar mvar) >>= \case
       Left e -> print (e :: SomeException)
-      Right{} -> pure ()
+      Right {} -> pure ()
     r
 
   threadDelay 1
@@ -48,10 +48,11 @@ onlyOneCallAllowed k = do
 
       getIt = do
         (b, _) <- takeMVar mvar
-        _ <- forkIO $ fix $ \loop -> do
-          (_, tid) <- takeMVar mvar
-          throwTo tid (AssertionFailed "called a second time")
-          loop
+        _ <- forkIO $
+          fix $ \loop -> do
+            (_, tid) <- takeMVar mvar
+            throwTo tid (AssertionFailed "called a second time")
+            loop
         pure b
 
   k putIt
@@ -77,14 +78,15 @@ makeOpM0 op send = makeOpM (const op) send ()
 
 type Handled t = forall b. t IO b -> IO b
 
-data State s r =
-    Get () (s -> r)
+data State s r
+  = Get () (s -> r)
   | Put s (() -> r)
-  deriving Functor
+  deriving (Functor)
 
 evalM ::
   (Monad (t IO), MonadTrans t) =>
-  (Handler t -> IO r) -> t IO r
+  (Handler t -> IO r) ->
+  t IO r
 evalM f = do
   recv <- lift $ do
     mvar <- newEmptyMVar
@@ -133,7 +135,7 @@ runStateExampleM :: IO ()
 runStateExampleM = evalStateM 0 stateExampleM
 
 data Exc e r = Throw e (Void -> r)
-  deriving Functor
+  deriving (Functor)
 
 excExampleM :: Handled (Trans.Except.ExceptT String) -> IO ()
 excExampleM op = do
@@ -169,20 +171,24 @@ runMixedExampleM =
       mixedExampleM opexc opst
 
 data Id r = Id () (() -> r)
-  deriving Functor
+  deriving (Functor)
 
 freeT :: (Functor f, Monad m) => f a -> FreeT f m a
 freeT = FreeT . pure . fmap pure . Free
 
 failExampleM :: IO ()
 failExampleM = do
-  f <- runFreeT (evalMHandled (\op -> do
-                          putStrLn "Running"
-                          op (freeT (Identity ()))
-                          putStrLn "Middle running"
-                          op (freeT (Identity ()))
-                          putStrLn "Finished running"
-                      ))
+  f <-
+    runFreeT
+      ( evalMHandled
+          ( \op -> do
+              putStrLn "Running"
+              op (freeT (Identity ()))
+              putStrLn "Middle running"
+              op (freeT (Identity ()))
+              putStrLn "Finished running"
+          )
+      )
   case f of
     Pure () -> pure ()
     Free (Identity k) -> do
