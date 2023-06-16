@@ -82,7 +82,7 @@ eval m = do
     mvar <- newEmptyMVar
     let _ = mvar
     _ <- forkIO $ do
-      r <- f (putMVar mvar . Left)
+      r <- m (flip makeOpM0 (putMVar mvar . Left))
       putMVar mvar (Right r)
 
     pure (lift (takeMVar mvar))
@@ -94,8 +94,6 @@ eval m = do
         lift io
         loop
       Right r -> pure r
-
-  where f = (\handler -> m (flip makeOpM0 handler))
 
 evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
 evalState sInit m = Trans.State.evalStateT (eval m) sInit
