@@ -12,6 +12,7 @@ import Control.Monad.Trans
 import Control.Monad (join, when)
 import GHC.Exts
 import GHC.Types
+import Data.Void
 
 type Handled t = forall b. t IO b -> IO b
 
@@ -36,7 +37,13 @@ withScopedEffect ::
   (a -> (IO b -> IO r) -> IO r) -> ((a -> IO b) -> IO r) -> IO r
 withScopedEffect handler body = do
   promptTag <- newPromptTag
-  prompt promptTag (body (\e -> control0 promptTag (\k -> handler e (prompt promptTag . k))))
+  prompt
+    promptTag
+    (body (\e -> control0 promptTag (\k -> handler e (prompt promptTag . k))))
+
+withScopedException :: ((e -> IO Void) -> IO r) -> IO (Either e r)
+withScopedException body =
+  withScopedEffect (\e _ -> pure (Left e)) (fmap Right . body)
 
 evalMHandled ::
   (MonadTrans t, Monad (t IO)) =>
