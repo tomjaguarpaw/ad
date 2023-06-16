@@ -73,11 +73,11 @@ data State s r
   | Put s (() -> r)
   deriving (Functor)
 
-evalMHandled ::
+eval ::
   (Monad (t IO), MonadTrans t) =>
   (Handled t -> IO r) ->
   t IO r
-evalMHandled m = do
+eval m = do
   recv <- lift $ do
     mvar <- newEmptyMVar
     let _ = mvar
@@ -98,10 +98,10 @@ evalMHandled m = do
   where f = (\handler -> m (flip makeOpM0 handler))
 
 evalState :: s -> (Handled (Trans.State.StateT s) -> IO r) -> IO r
-evalState sInit m = Trans.State.evalStateT (evalMHandled m) sInit
+evalState sInit m = Trans.State.evalStateT (eval m) sInit
 
 tryExc :: (Handled (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
-tryExc m = Trans.Except.runExceptT (evalMHandled m)
+tryExc m = Trans.Except.runExceptT (eval m)
 
 stateExample :: Handled (Trans.State.StateT Int) -> IO ()
 stateExample st = do
@@ -160,7 +160,7 @@ failExample :: IO ()
 failExample = do
   f <-
     runFreeT
-      ( evalMHandled
+      ( eval
           ( \op -> do
               putStrLn "Running"
               op (freeT (Identity ()))
