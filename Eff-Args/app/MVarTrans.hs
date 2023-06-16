@@ -17,7 +17,6 @@ import Control.Monad.Trans.Free
 import qualified Control.Monad.Trans.State as Trans.State
 import Data.Function
 import Data.Functor.Identity (Identity (Identity))
-import Data.Void
 import System.Mem
 
 main :: IO ()
@@ -118,9 +117,6 @@ stateExampleM st = do
 
 runStateExampleM :: IO ()
 runStateExampleM = evalStateM 0 stateExampleM
-
-data Exc e r = Throw e (Void -> r)
-  deriving (Functor)
 
 excExampleM :: Handled (Trans.Except.ExceptT String) -> IO ()
 excExampleM op = do
