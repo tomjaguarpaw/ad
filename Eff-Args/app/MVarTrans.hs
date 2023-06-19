@@ -63,24 +63,31 @@ runT ::
 runT block = do
   receive <- lift $ do
     mvar <- newEmptyMVar
-    let _ = mvar :: MVar (Either (t IO (IO ())) r)
+    let _ = mvar :: MVar (Either (t IO ()) r)
     _ <- forkIO $ do
 
       let handle :: forall a. t IO a -> IO a
           handle op = onlyOneCallAllowed x
             where x :: (a -> IO ()) -> IO ()
-                  x send = putMVar mvar (Left (fmap send op))
+                  x send = putMVar mvar (Left sentOp)
+                    where sentOp :: t IO ()
+                          sentOp = do
+                            a <- op
+                            lift (send a)
 
       r <- block handle
       putMVar mvar (Right r)
 
     pure (lift (takeMVar mvar))
 
+  untilRight receive
+
+untilRight :: Monad m => m (Either (m ()) r) -> m r
+untilRight receive =
   fix $ \loop -> do
     receive >>= \case
       Left l -> do
-        io <- l
-        lift io
+        l
         loop
       Right r -> pure r
 
