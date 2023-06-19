@@ -56,22 +56,28 @@ multiCallsNotDetected k = do
 type Handle t = forall b. t IO b -> IO b
 
 runT ::
+  forall t r.
   (Monad (t IO), MonadTrans t) =>
   (Handle t -> IO r) ->
   t IO r
-runT m = do
-  recv <- lift $ do
+runT block = do
+  receive <- lift $ do
     mvar <- newEmptyMVar
-    let _ = mvar
+    let _ = mvar :: MVar (Either (t IO (IO ())) r)
     _ <- forkIO $ do
-      let handled op = onlyOneCallAllowed $ \k -> putMVar mvar (Left (fmap k op))
-      r <- m handled
+
+      let handle :: forall a. t IO a -> IO a
+          handle op = onlyOneCallAllowed x
+            where x :: (a -> IO ()) -> IO ()
+                  x send = putMVar mvar (Left (fmap send op))
+
+      r <- block handle
       putMVar mvar (Right r)
 
     pure (lift (takeMVar mvar))
 
   fix $ \loop -> do
-    recv >>= \case
+    receive >>= \case
       Left l -> do
         io <- l
         lift io
