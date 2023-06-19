@@ -55,11 +55,6 @@ multiCallsNotDetected k = do
 
 type Handle t = forall b. t IO b -> IO b
 
-data State s r
-  = Get () (s -> r)
-  | Put s (() -> r)
-  deriving (Functor)
-
 runT ::
   (Monad (t IO), MonadTrans t) =>
   (Handle t -> IO r) ->
