@@ -62,7 +62,7 @@ runT ::
   t IO r
 runT block = do
   mvar <- lift newEmptyMVar
-  let _ = mvar :: MVar (t IO (Either () r))
+  let _ = mvar :: MVar (t IO (Maybe r))
   _ <- lift $
     forkIO $ do
       let handle :: forall a. t IO a -> IO a
@@ -70,27 +70,23 @@ runT block = do
             where
               x :: (a -> IO ()) -> IO ()
               x send = putMVar mvar $ do
-                sentOp
-                pure (Left ())
-                where
-                  sentOp :: t IO ()
-                  sentOp = do
-                    a <- op
-                    lift (send a)
+                a <- op
+                lift (send a)
+                pure Nothing
 
       r <- block handle
-      putMVar mvar (pure (Right r))
+      putMVar mvar (pure (Just r))
 
-  untilRight $ do
+  untilJust $ do
     t <- lift (takeMVar mvar)
     t
 
-untilRight :: Monad m => m (Either () r) -> m r
-untilRight receive =
+untilJust :: Monad m => m (Maybe r) -> m r
+untilJust receive =
   fix $ \loop -> do
     receive >>= \case
-      Left () -> loop
-      Right r -> pure r
+      Nothing -> loop
+      Just r -> pure r
 
 evalState :: s -> (Handle (Trans.State.StateT s) -> IO r) -> IO r
 evalState sInit m = Trans.State.evalStateT (runT m) sInit
