@@ -155,6 +155,7 @@ forkExcept io = do
   tid <- myThreadId
   forkFinally io (either (throwTo tid) pure)
 
+-- The exception is propagated
 nest1 :: IO ()
 nest1 = do
   _ <- forkExcept $ do
@@ -163,14 +164,30 @@ nest1 = do
   threadDelay 1
   putStrLn "Finished"
 
+-- The exception is not propagated because the parent thread,
+-- i.e. first forked thread, dies before it can receive the exception
+-- rethrown at the termination of the second forked thread.
 nest2 :: IO ()
 nest2 = do
   _ <- forkExcept $ do
     _ <- forkExcept $ do
-      error "end thread"
+      throwIO (AssertionFailed "end thread")
     pure ()
 
-  threadDelay 100000
+  threadDelay 1
+  putStrLn "Finished"
+
+-- The exception is propagated because the parent thread is still
+-- around.
+nest3 :: IO ()
+nest3 = do
+  _ <- forkExcept $ do
+    _ <- forkExcept $ do
+      throwIO (AssertionFailed "end thread")
+
+    threadDelay 1
+
+  threadDelay 1
   putStrLn "Finished"
 
 -- To demonstrate what happnes when we read from an MVar that will not
