@@ -81,8 +81,8 @@ runT m = do
 evalState :: s -> (Handle (Trans.State.StateT s) -> IO r) -> IO r
 evalState sInit m = Trans.State.evalStateT (runT m) sInit
 
-tryExc :: (Handle (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
-tryExc m = Trans.Except.runExceptT (runT m)
+runExcept :: (Handle (Trans.Except.ExceptT e) -> IO r) -> IO (Either e r)
+runExcept m = Trans.Except.runExceptT (runT m)
 
 stateExample :: Handle (Trans.State.StateT Int) -> IO ()
 stateExample st = do
@@ -105,7 +105,7 @@ excExample op = do
   putStrLn "Still running?"
 
 runExcExample :: IO (Either String ())
-runExcExample = tryExc excExample
+runExcExample = runExcept excExample
 
 mixedExample ::
   Handle (Trans.Except.ExceptT String) ->
@@ -129,7 +129,7 @@ mixedExample opexc opst = do
 
 runMixedExample :: IO (Either String Int)
 runMixedExample =
-  tryExc $ \opexc ->
+  runExcept $ \opexc ->
     evalState 0 $ \opst ->
       mixedExample opexc opst
 
