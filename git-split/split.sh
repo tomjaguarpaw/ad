@@ -68,7 +68,7 @@ git show --no-patch --pretty=short $COMBINED
 echo
 echo -n "I'm now on $COMBINED_SHORT's parent ($COMBINED_PARENT_SHORT). "
 echo "I'm going to drop you into your chosen handler: $HANDLER"
-echo -n "Please make exactly one commit and then exit the handler with "
+echo -n "Please make any number of commits and then exit the handler with "
 echo "exit code 0."
 $HANDLER
 
