@@ -107,7 +107,12 @@ echo done
 echo
 echo "Splitting finished successfully!"
 echo
-echo "You were on $CURRENT_BRANCH_OR_SHORT.  You are now on $FINISHED_SHORT."
+if [ -n "$CURRENT_BRANCH" ]; then
+    echo -n "Your branch is $CURRENT_BRANCH.  "
+else
+    echo -n "Your HEAD is detached.  "
+fi
+echo "It was previously $CURRENT_SHORT.  It is now $FINISHED_SHORT."
 echo
 echo "You might want to do exactly one of the following"
 echo
