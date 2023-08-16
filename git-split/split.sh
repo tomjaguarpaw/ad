@@ -137,7 +137,7 @@ echo "It was previously $CURRENT_SHORT.  It is now $FINISHED_SHORT."
 echo
 echo "You might want to do exactly one of the following"
 echo
-echo "* An interactive rebase to reword the second split"
+echo "* An interactive rebase to reword the remnants of the split"
 echo
 echo "  $ git rebase --interactive $AFTER_HANDLER_SHORT $BRANCH_OR_FINISHED_SHORT"
 echo
