@@ -70,7 +70,7 @@ echo -n "I'm now on $COMBINED_SHORT's parent ($COMBINED_PARENT_SHORT). "
 echo "I'm going to drop you into your chosen handler: $HANDLER"
 echo -n "Please make any number of commits and then exit the handler with "
 echo "exit code 0."
-$HANDLER
+sh -c "$HANDLER"
 
 AFTER_HANDLER=$(git rev-parse HEAD)
 AFTER_HANDLER_SHORT=$(git rev-parse --short HEAD)
