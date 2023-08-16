@@ -62,6 +62,12 @@ echo -n reset...
 git reset --quiet $COMBINED_PARENT
 echo done
 
+echo -n "You were on "
+if [ -n "$BRANCH" ]; then
+    echo -n "branch $BRANCH ($CURRENT_SHORT). "
+else
+    echo -n "$CURRENT_SHORT. "
+fi
 echo "You wanted to split the commit"
 echo
 git show --no-patch --pretty=short $COMBINED
