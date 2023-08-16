@@ -35,11 +35,11 @@ set -e
 # *1      COMBINED^
 
 # Empty string if not a symbolic ref
-CURRENT_BRANCH=$(git symbolic-ref --quiet --short HEAD || true)
+BRANCH=$(git symbolic-ref --quiet --short HEAD || true)
 CURRENT=$(git rev-parse HEAD)
 CURRENT_SHORT=$(git rev-parse --short HEAD)
-if [ -n "$CURRENT_BRANCH" ]; then
-    BRANCH_OR_CURRENT_SHORT=$CURRENT_BRANCH
+if [ -n "$BRANCH" ]; then
+    BRANCH_OR_CURRENT_SHORT=$BRANCH
 else
     BRANCH_OR_CURRENT_SHORT=$CURRENT_SHORT
 fi
@@ -107,8 +107,8 @@ echo done
 echo
 echo "Splitting finished successfully!"
 echo
-if [ -n "$CURRENT_BRANCH" ]; then
-    echo -n "Your branch is $CURRENT_BRANCH.  "
+if [ -n "$BRANCH" ]; then
+    echo -n "Your branch is $BRANCH.  "
 else
     echo -n "Your HEAD is detached.  "
 fi
@@ -120,15 +120,15 @@ echo "* An interactive rebase to reword the second split"
 echo
 echo "  $ git rebase --interactive $AFTER_HANDLER_SHORT $FINISHED_SHORT"
 
-if [ -n "$CURRENT_BRANCH" ]; then
+if [ -n "$BRANCH" ]; then
     echo
     echo "* Reset your branch (which doesn't yet contain the split) to this one (which does)"
     echo
-    echo "  $ git checkout $CURRENT_BRANCH && git reset --hard $FINISHED_SHORT"
+    echo "  $ git checkout $BRANCH && git reset --hard $FINISHED_SHORT"
     echo
     echo "* Reset your branch and then rebase to reword"
     echo
-    echo "  $ git checkout $CURRENT_BRANCH && git reset --hard $FINISHED_SHORT && git rebase --interactive $AFTER_HANDLER_SHORT"
+    echo "  $ git checkout $BRANCH && git reset --hard $FINISHED_SHORT && git rebase --interactive $AFTER_HANDLER_SHORT"
 fi
 
 # Old bits
