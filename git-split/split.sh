@@ -100,9 +100,24 @@ git rebase --quiet --onto $REST_OF_COMBINED $COMBINED $CURRENT
 
 FINISHED=$(git rev-parse HEAD)
 FINISHED_SHORT=$(git rev-parse --short HEAD)
+if [ -n "$BRANCH" ]; then
+    BRANCH_OR_FINISHED_SHORT=$BRANCH
+else
+    BRANCH_OR_FINISHED_SHORT=$FINISHED_SHORT
+fi
 # Check 3 equality
 echo -n checking equality...
 git diff --exit-code $FINISHED $CURRENT
+
+if [ -n "$BRANCH" ]; then
+    echo -n setting branch to history with split...
+    git push --quiet --force . HEAD:$BRANCH
+    git checkout --quiet $BRANCH
+fi
+# Check 3 equality, and we have it checked out
+echo -n checking equality...
+git diff --exit-code HEAD $CURRENT
+
 echo done
 echo
 echo "Splitting finished successfully!"
@@ -118,18 +133,11 @@ echo "You might want to do exactly one of the following"
 echo
 echo "* An interactive rebase to reword the second split"
 echo
-echo "  $ git rebase --interactive $AFTER_HANDLER_SHORT $FINISHED_SHORT"
-
-if [ -n "$BRANCH" ]; then
-    echo
-    echo "* Reset your branch (which doesn't yet contain the split) to this one (which does)"
-    echo
-    echo "  $ git checkout $BRANCH && git reset --hard $FINISHED_SHORT"
-    echo
-    echo "* Reset your branch and then rebase to reword"
-    echo
-    echo "  $ git checkout $BRANCH && git reset --hard $FINISHED_SHORT && git rebase --interactive $AFTER_HANDLER_SHORT"
-fi
+echo "  $ git rebase --interactive $AFTER_HANDLER_SHORT $BRANCH_OR_FINISHED_SHORT"
+echo
+echo "* If you don't want the split after all, reset your branch to what it was before"
+echo
+echo "  $ git reset --hard $CURRENT_SHORT"
 
 # Old bits
 
