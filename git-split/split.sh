@@ -39,9 +39,9 @@ CURRENT_BRANCH=$(git symbolic-ref --quiet --short HEAD || true)
 CURRENT=$(git rev-parse HEAD)
 CURRENT_SHORT=$(git rev-parse --short HEAD)
 if [ -n "$CURRENT_BRANCH" ]; then
-    CURRENT_BRANCH_OR_SHORT=$CURRENT_BRANCH
+    BRANCH_OR_CURRENT_SHORT=$CURRENT_BRANCH
 else
-    CURRENT_BRANCH_OR_SHORT=$CURRENT_SHORT
+    BRANCH_OR_CURRENT_SHORT=$CURRENT_SHORT
 fi
 COMBINED_PROVIDED=$2
 COMBINED=$(git rev-parse $COMBINED_PROVIDED)
@@ -50,7 +50,7 @@ HANDLER=$1
 
 # This is the best way I know of to (print an error message and then
 # exit) on failure when set -e is set
-git merge-base --is-ancestor $COMBINED $CURRENT || (echo "$COMBINED_PROVIDED is not an ancestor of $CURRENT_BRANCH"; false) || exit
+git merge-base --is-ancestor $COMBINED $CURRENT || (echo "$COMBINED_PROVIDED is not an ancestor of $BRANCH_OR_CURRENT_SHORT"; false) || exit
 git diff --quiet || (echo "The repo has uncommitted changes.  Stash, commit or reset them and then try again."; false) || exit
 
 COMBINED_PARENT=$(git rev-parse $COMBINED^)
