@@ -361,31 +361,31 @@ xs !?? i = runEff $
         write s (i' + 1)
     earlyReturn ret Nothing
 
-data Compound e1 es where
+data Compound e1 e2 es where
   Compound ::
     Proxy# err ->
     Proxy# st ->
     e1 err ->
-    State Int st ->
-    Compound e1 (err :& st)
+    e2 st ->
+    Compound e1 e2 (err :& st)
 
 inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
 
-putC :: forall ss es e. ss :> es => Compound e ss -> Int -> Eff es ()
+putC :: forall ss es e. ss :> es => Compound e (State Int) ss -> Int -> Eff es ()
 putC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (write h)
 
-getC :: forall ss es e. ss :> es => Compound e ss -> Eff es Int
+getC :: forall ss es e. ss :> es => Compound e (State Int) ss -> Eff es Int
 getC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (read h)
 
-throwErrorC :: forall ss es e a. ss :> es => Compound (Error e) ss -> e -> Eff es a
+throwErrorC :: forall ss es e a s. ss :> es => Compound (Error e) s ss -> e -> Eff es a
 throwErrorC = \case
   Compound (_ :: Proxy# err) _ h _ ->
     inComp @err @ss @es (throw h)
 
 runC ::
   Int ->
-  (forall ss. Compound (Error e) ss -> Eff (ss :& es) r) ->
+  (forall ss. Compound (Error e) (State Int) ss -> Eff (ss :& es) r) ->
   Eff es (Either e r, Int)
 runC st f =
   evalState st $ \s -> do
@@ -397,7 +397,7 @@ runC st f =
 
 runC2 ::
   State Int st ->
-  (forall ss. Compound (Error e) (ss :& st) -> Eff (ss :& es) r) ->
+  (forall ss. Compound (Error e) (State Int) (ss :& st) -> Eff (ss :& es) r) ->
   Eff es (Either e r)
 runC2 s f =
   handleError $ \e ->
@@ -405,7 +405,7 @@ runC2 s f =
 
 runC' ::
   Int ->
-  (forall ss. Compound (Error r) ss -> Eff (ss :& es) r) ->
+  (forall ss. Compound (Error r) (State Int) ss -> Eff (ss :& es) r) ->
   Eff es r
 runC' st f = fmap fst $ do
   (e, s) <- runC st f
