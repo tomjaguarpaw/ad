@@ -372,16 +372,32 @@ data Compound e1 e2 es where
 inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
 
+withC1 ::
+  forall e1 e2 ss es r.
+  ss :> es =>
+  Compound e1 e2 ss ->
+  (forall st. st :> es => e1 st -> Eff es r) ->
+  Eff es r
+withC1 c f =
+  case c of Compound (_ :: Proxy# st) _ h _ -> inComp @st @ss @es (f h)
+
+withC2 ::
+  forall e1 e2 ss es r.
+  ss :> es =>
+  Compound e1 e2 ss ->
+  (forall st. st :> es => e2 st -> Eff es r) ->
+  Eff es r
+withC2 c f =
+  case c of Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (f h)
+
 putC :: forall ss es e. ss :> es => Compound e (State Int) ss -> Int -> Eff es ()
-putC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (write h)
+putC c i = withC2 c (\h -> write h i)
 
 getC :: forall ss es e. ss :> es => Compound e (State Int) ss -> Eff es Int
-getC = \case Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (read h)
+getC c = withC2 c (\h -> read h)
 
 throwErrorC :: forall ss es e a s. ss :> es => Compound (Error e) s ss -> e -> Eff es a
-throwErrorC = \case
-  Compound (_ :: Proxy# err) _ h _ ->
-    inComp @err @ss @es (throw h)
+throwErrorC c e = withC1 c (\h -> throw h e)
 
 runC ::
   Int ->
