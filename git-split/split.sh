@@ -78,7 +78,22 @@ echo -n "I'm now on $COMBINED_SHORT's parent ($COMBINED_PARENT_SHORT). "
 echo "I'm going to drop you into your chosen handler: $HANDLER"
 echo -n "Please make any number of commits and then exit the handler with "
 echo "exit code 0."
+
+set +e
 sh -c "$HANDLER"
+if [ $? -ne 0 ]; then
+    AFTER_FAILED_HANDLER=$(git rev-parse --short HEAD)
+    git reset --quiet --hard
+    echo "The handler failed at $AFTER_FAILED_HANDLER.  Returning to $BRANCH_OR_CURRENT_SHORT."
+    if [ -n "$BRANCH" ]; then
+	RETURN_TO="$BRANCH"
+    else
+	RETURN_TO="$CURRENT"
+    fi
+    git checkout --quiet "$RETURN_TO"
+    exit $?
+fi
+set -e
 
 AFTER_HANDLER=$(git rev-parse HEAD)
 AFTER_HANDLER_SHORT=$(git rev-parse --short HEAD)
