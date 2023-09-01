@@ -90,7 +90,7 @@ if [ $? -ne 0 ]; then
     else
 	RETURN_TO="$CURRENT"
     fi
-    git checkout --quiet "$RETURN_TO"
+    git checkout --force --quiet "$RETURN_TO"
     exit $?
 fi
 set -e
