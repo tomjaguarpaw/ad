@@ -122,14 +122,14 @@ traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 toListPi :: (Tag st) => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
 toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
-genericShow ::
+showField ::
   forall st (f :: FunctionSymbol st) i.
   (Tag st) =>
   (ForeachField f Show) =>
   st i ->
   Newtyped f i ->
   String
-genericShow t = provideConstraint @Show @f t show . getNewtyped
+showField t = provideConstraint @Show @f t show . getNewtyped
 
 genericShowSum ::
   forall st x (f :: FunctionSymbol st).
@@ -140,7 +140,7 @@ genericShowSum ::
   x ->
   String
 genericShowSum pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
-  conName ++ " " ++ genericShow t field
+  conName ++ " " ++ showField t field
 
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
@@ -151,7 +151,7 @@ genericShowProduct ::
   x ->
   String
 genericShowProduct conName f x =
-  conName ++ " " ++ unwords (toListPi genericShow (f x))
+  conName ++ " " ++ unwords (toListPi showField (f x))
 
 -- Generated code
 
