@@ -2,16 +2,11 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -75,7 +70,7 @@ class Tag (st :: t -> Type) where
 
 type FunctionSymbol st = Proxy st -> Type
 
-class FieldTypes (f :: FunctionSymbol st) | f -> st where
+class FieldTypes (f :: FunctionSymbol st) where
   type FieldType f (i :: t) :: Type
 
 type family ForallCTag' f c (ts :: [t]) :: Constraint where
