@@ -69,7 +69,7 @@ class Tag (st :: t -> Type) where
 
 type FunctionSymbol' t (st :: t -> Type) = Proxy st -> Type
 
-type FunctionSymbol (st :: t -> Type) = Proxy st -> Type
+type FunctionSymbol (st :: t -> Type) = FunctionSymbol' t st
 
 type family St (a :: FunctionSymbol (st :: t -> Type)) where
   St (f :: FunctionSymbol st) = st
