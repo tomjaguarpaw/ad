@@ -8,6 +8,7 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -20,6 +21,7 @@ module Main where
 
 import Data.Functor.Const (Const (Const))
 import Data.Kind (Constraint, Type)
+import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
 -- User code
@@ -55,7 +57,9 @@ class Tag (st :: t -> Type) where
 
 class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
-  type ForallTag' st (c :: Type -> Constraint) :: Constraint
+  type ForallCTag st (c :: Type -> Constraint) :: Constraint
+
+  forallCTag :: (ForallCTag st c) => Proxy c -> st i -> ((c (FieldType st i)) => r) -> r
 
 mashPiSigma ::
   (Tag st) =>
@@ -98,8 +102,11 @@ instance Tag SSumTag where
 
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
+
   -- Requires UndecidableInstances. Could probably hack around this.
-  type ForallTag' SSumTag c = ForallCSumTag' c (Tags SSumTag)
+  type ForallCTag SSumTag c = ForallCSumTag' c (Tags SSumTag)
+
+  forallCTag = \(Proxy :: Proxy c) -> forallCSumTag @c
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
@@ -113,7 +120,11 @@ type family ForallCSumTag' c (ts :: [SumTag]) :: Constraint where
 type ForallCSumTag (c :: Type -> Constraint) = ForallCSumTag' c (Tags SSumTag)
 
 forallCSumTag ::
-  (ForallCSumTag c) => SSumTag i -> ((c (SumFamily i)) => r) -> r
+  forall c i r.
+  (ForallCSumTag c) =>
+  SSumTag i ->
+  ((c (SumFamily i)) => r) ->
+  r
 forallCSumTag = \case
   SATag -> id
   SBTag -> id
