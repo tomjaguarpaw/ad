@@ -57,7 +57,10 @@ class Tag (st :: t -> Type) where
 
 class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
+  type FieldType' st :: t -> Type
   type ForallCTag st (c :: Type -> Constraint) :: Constraint
+
+  getFieldType :: FieldType' st i -> FieldType st i
 
   forallCTag'' ::
     (ForallCTag st c) =>
@@ -95,6 +98,18 @@ genericShowSum ::
 genericShowSum pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ g t field
 
+genericShowSum' ::
+  forall st x.
+  (Tag st) =>
+  FieldTypes st =>
+  ForallCTag st Show =>
+  Pi st (Const String) ->
+  (x -> Sigma st (FieldType' st)) ->
+  x ->
+  String
+genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+  conName ++ " " ++ (forallCTag @Show t show . getFieldType @_ @st) field
+
 -- Generated code
 
 -- For data Sum
@@ -116,6 +131,9 @@ instance Tag SSumTag where
 
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
+  type FieldType' SSumTag = SumFamily'
+
+  getFieldType = getSumFamily
 
   -- Requires UndecidableInstances. Could probably hack around this.
   type ForallCTag SSumTag c = ForallCSumTag' c (Tags SSumTag)
