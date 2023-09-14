@@ -246,9 +246,9 @@ instance Tag SProductTag where
 
 instance FieldTypes SProductTag where
   type FieldType SProductTag t = ProductFamily t
-  type FieldType' SProductTag = ProductFamily'
+  type FieldType' SProductTag = Family' SProductTag
 
-  getFieldType = getProductFamily
+  getFieldType = getFamily
 
   provideConstraint' = \_ -> \case
     SField1 -> id
@@ -269,10 +269,10 @@ type family ProductFamily (t :: ProductTag) :: Type where
 
 newtype ProductFamily' t = ProductFamily' {getProductFamily :: ProductFamily t}
 
-productToGeneric :: Product -> Pi SProductTag ProductFamily'
+productToGeneric :: Product -> Pi SProductTag (Family' SProductTag)
 productToGeneric (Product f1 f2 f3) =
   makePi $
-    ( ProductFamily' . \case
+    ( Family' . \case
         SField1 -> f1
         SField2 -> f2
         SField3 -> f3
