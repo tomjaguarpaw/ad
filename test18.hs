@@ -35,10 +35,7 @@ data Product = Product Int Bool Char
 newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 
 showSum :: Sum -> String
-showSum =
-  genericShowSum'
-    sumConNames
-    sumToGeneric
+showSum = genericShowSum sumConNames sumToGeneric
 
 example :: IO ()
 example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
@@ -87,17 +84,17 @@ mashPiSigma pi (Sigma s f) k =
   k s (getPi pi s) f
 
 -- `family` is a keyword?!
-genericShowSum ::
+genericShowSum'' ::
   (Tag st) =>
   Pi st (Const String) ->
   (x -> Sigma st family') ->
   (forall i. st i -> family' i -> String) ->
   x ->
   String
-genericShowSum pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+genericShowSum'' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ g t field
 
-genericShowSum' ::
+genericShowSum ::
   forall st x.
   (Tag st) =>
   FieldTypes st =>
@@ -106,8 +103,8 @@ genericShowSum' ::
   (x -> Sigma st (FieldType' st)) ->
   x ->
   String
-genericShowSum' pi f =
-  genericShowSum pi f (\t' -> forallCTag @Show t' show . getFieldType @_ @st)
+genericShowSum pi f =
+  genericShowSum'' pi f (\t' -> forallCTag @Show t' show . getFieldType @_ @st)
 
 -- Generated code
 
