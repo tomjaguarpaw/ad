@@ -101,7 +101,7 @@ provideConstraint ::
   r
 provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 
-newtype Newtyped (f :: FunctionSymbol' t st) i = Newtyped {getNewtyped :: FieldType' t st f i}
+newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 
 mashPiSigma ::
   (Tag st) =>
