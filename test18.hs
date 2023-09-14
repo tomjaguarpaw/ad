@@ -39,7 +39,7 @@ showSum =
   genericShowSum
     sumConNames
     sumToGeneric
-    (\t -> forallCTag' @Show t show . getSumFamily)
+    (\t -> forallCTag @Show t show . getSumFamily)
 
 example :: IO ()
 example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
@@ -59,16 +59,16 @@ class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
   type ForallCTag st (c :: Type -> Constraint) :: Constraint
 
-  forallCTag :: (ForallCTag st c) => Proxy c -> st i -> ((c (FieldType st i)) => r) -> r
+  forallCTag'' :: (ForallCTag st c) => Proxy c -> st i -> ((c (FieldType st i)) => r) -> r
 
-forallCTag' ::
+forallCTag ::
   forall c st r i.
   (FieldTypes st) =>
   (ForallCTag st c) =>
   st i ->
   ((c (FieldType st i)) => r) ->
   r
-forallCTag' = forallCTag (Proxy @c)
+forallCTag = forallCTag'' (Proxy @c)
 
 mashPiSigma ::
   (Tag st) =>
@@ -115,7 +115,7 @@ instance FieldTypes SSumTag where
   -- Requires UndecidableInstances. Could probably hack around this.
   type ForallCTag SSumTag c = ForallCSumTag' c (Tags SSumTag)
 
-  forallCTag = \(Proxy :: Proxy c) -> forallCSumTag @c
+  forallCTag'' = \(Proxy :: Proxy c) -> forallCSumTag @c
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
