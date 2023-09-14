@@ -180,7 +180,7 @@ instance FieldTypes SSumTag where
 
   getFieldType = getSumFamily
 
-  provideConstraint' = \(Proxy :: Proxy c) -> \case
+  provideConstraint' = \_ -> \case
     SATag -> id
     SBTag -> id
     SCTag -> id
@@ -238,7 +238,7 @@ instance FieldTypes SProductTag where
 
   getFieldType = getProductFamily
 
-  provideConstraint' = \(_) -> \case
+  provideConstraint' = \_ -> \case
     SField1 -> id
     SField2 -> id
     SField3 -> id
