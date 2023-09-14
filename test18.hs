@@ -170,7 +170,7 @@ instance FieldTypes SSumTag where
   getFieldType = getSumFamily
 
   -- Requires UndecidableInstances. Could probably hack around this.
-  type ForallCTag SSumTag c = ForallCSumTag' c (Tags SSumTag)
+  type ForallCTag SSumTag c = ForallCTag' SSumTag c (Tags SSumTag)
 
   forallCTag'' = \(Proxy :: Proxy c) -> forallCSumTag @c
 
