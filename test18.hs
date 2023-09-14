@@ -124,6 +124,18 @@ genericShowSum ::
 genericShowSum pi f =
   genericShowSum' pi f (\t -> forallCTag @Show t show . getFieldType @_ @st)
 
+genericShowProduct ::
+  forall st x.
+  (FieldTypes st) =>
+  (ForallCTag st Show) =>
+  (Tag st) =>
+  String ->
+  (x -> Pi st (FieldType' st)) ->
+  x ->
+  String
+genericShowProduct conName f x =
+  conName ++ " " ++ intercalate " " (toListPi (\st -> forallCTag @Show st show . getFieldType @_ @st) (f x))
+
 -- Generated code
 
 -- For data Sum
@@ -243,3 +255,6 @@ genericToProduct pi =
   where
     getField :: forall i. SProductTag i -> ProductFamily i
     getField = getProductFamily . getPi pi
+
+productConName :: String
+productConName = "Product"
