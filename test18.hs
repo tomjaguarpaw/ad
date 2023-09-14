@@ -14,6 +14,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE ViewPatterns #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
@@ -201,8 +202,6 @@ type family SumFamily (t :: SumTag) :: Type where
   SumFamily BTag = Bool
   SumFamily CTag = Char
 
-newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
-
 sumConNames :: Pi SSumTag (Const String)
 sumConNames =
   makePi $
@@ -217,9 +216,9 @@ sumToGeneric = \case
   B p -> Sigma SBTag (Family' p)
   C p -> Sigma SCTag (Family' p)
 
-genericToSum :: Sigma SSumTag SumFamily' -> Sum
+genericToSum :: Sigma SSumTag (Family' SSumTag) -> Sum
 genericToSum = \case
-  Sigma t (SumFamily' p) -> case t of
+  Sigma t (getFieldType' @SSumTag -> p) -> case t of
     SATag -> A p
     SBTag -> B p
     SCTag -> C p
@@ -255,6 +254,13 @@ instance FieldTypes SProductTag where
     SField1 -> id
     SField2 -> id
     SField3 -> id
+
+getFieldType' ::
+  forall st i.
+  (FieldTypes st) =>
+  FieldType' st i ->
+  FieldType st i
+getFieldType' = getFieldType @_ @st
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
