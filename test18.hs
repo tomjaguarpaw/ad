@@ -70,7 +70,7 @@ class FieldTypes (st :: t -> Type) where
 
   getFieldType :: FieldType' st i -> FieldType st i
 
-  forallCTag' ::
+  provideConstraint' ::
     (ForallCTag st c) =>
     Proxy c ->
     st i ->
@@ -91,7 +91,7 @@ provideConstraint ::
   st i ->
   ((c (FieldType st i)) => r) ->
   r
-provideConstraint = forallCTag' (Proxy @c)
+provideConstraint = provideConstraint' (Proxy @c)
 
 mashPiSigma ::
   (Tag st) =>
@@ -180,23 +180,15 @@ instance FieldTypes SSumTag where
 
   getFieldType = getSumFamily
 
-  forallCTag' = \(Proxy :: Proxy c) -> forallCSumTag @c
+  provideConstraint' = \(Proxy :: Proxy c) -> \case
+    SATag -> id
+    SBTag -> id
+    SCTag -> id
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
   SumFamily BTag = Bool
   SumFamily CTag = Char
-
-forallCSumTag ::
-  forall c i r.
-  (ForallCTag SSumTag c) =>
-  SSumTag i ->
-  ((c (SumFamily i)) => r) ->
-  r
-forallCSumTag = \case
-  SATag -> id
-  SBTag -> id
-  SCTag -> id
 
 sumConNames :: Pi SSumTag (Const String)
 sumConNames =
@@ -246,7 +238,10 @@ instance FieldTypes SProductTag where
 
   getFieldType = getProductFamily
 
-  forallCTag' = \(Proxy :: Proxy c) -> forallCProductTag @c
+  provideConstraint' = \(_) -> \case
+    SField1 -> id
+    SField2 -> id
+    SField3 -> id
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
@@ -263,17 +258,6 @@ productToGeneric (Product f1 f2 f3) =
         SField2 -> f2
         SField3 -> f3
     )
-
-forallCProductTag ::
-  forall c i r.
-  (ForallCTag SProductTag c) =>
-  SProductTag i ->
-  ((c (ProductFamily i)) => r) ->
-  r
-forallCProductTag = \case
-  SField1 -> id
-  SField2 -> id
-  SField3 -> id
 
 genericToProduct :: Pi SProductTag ProductFamily' -> Product
 genericToProduct pi =
