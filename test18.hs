@@ -21,6 +21,7 @@ module Main where
 
 import Data.Functor.Const (Const (Const, getConst))
 import Data.Kind (Constraint, Type)
+import Data.List (intercalate)
 import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
@@ -89,12 +90,15 @@ mashPiSigma ::
   r
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
 
-traversePi_ :: (Applicative m, Tag st)
-            => (forall (i :: t). st i -> f i -> m ()) -> Pi st f -> m ()
+traversePi_ ::
+  (Applicative m, Tag st) =>
+  (forall (i :: t). st i -> f i -> m ()) ->
+  Pi st f ->
+  m ()
 -- This implementation could be better
 traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 
-toListPi :: Tag st => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
+toListPi :: (Tag st) => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
 toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
 -- `family` is a keyword?!
