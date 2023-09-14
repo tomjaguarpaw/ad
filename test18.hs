@@ -51,6 +51,13 @@ class Tag (st :: t -> Type) where
   getPi :: forall (i :: t) (f :: t -> Type). Pi st f -> st i -> f i
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
+  traversePi ::
+    forall (f :: t -> Type) (g :: t -> Type) m.
+    (Applicative m) =>
+    (forall (i :: t). f i -> m (g i)) ->
+    Pi st f ->
+    m (Pi st g)
+
 class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
   type FieldType' st :: t -> Type
@@ -124,6 +131,9 @@ instance Tag SSumTag where
     SCTag -> f3
   makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag)
 
+  traversePi f (PiSSumTag a b c) =
+    PiSSumTag <$> f a <*> f b <*> f c
+
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
   type FieldType' SSumTag = SumFamily'
@@ -195,6 +205,9 @@ instance Tag SProductTag where
     SField2 -> f2
     SField3 -> f3
   makePi f = PiSProductTag (f SField1) (f SField2) (f SField3)
+
+  traversePi f (PiSProductTag f1 f2 f3) =
+    PiSProductTag <$> f f1 <*> f f2 <*> f f3
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
