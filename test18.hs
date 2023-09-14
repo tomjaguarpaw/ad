@@ -84,14 +84,14 @@ type family ForallCTag' st c (ts :: [t]) :: Constraint where
 
 type ForallCTag st c = ForallCTag' st c (Tags st)
 
-forallCTag ::
+provideConstraint ::
   forall c st r i.
   (FieldTypes st) =>
   (ForallCTag st c) =>
   st i ->
   ((c (FieldType st i)) => r) ->
   r
-forallCTag = forallCTag' (Proxy @c)
+provideConstraint = forallCTag' (Proxy @c)
 
 mashPiSigma ::
   (Tag st) =>
@@ -133,7 +133,10 @@ genericShowSum ::
   x ->
   String
 genericShowSum pi f =
-  genericShowSum' pi f (\t -> forallCTag @Show t show . getFieldType @_ @st)
+  genericShowSum'
+    pi
+    f
+    (\t -> provideConstraint @Show t show . getFieldType @_ @st)
 
 genericShowProduct ::
   forall st x.
@@ -145,7 +148,9 @@ genericShowProduct ::
   x ->
   String
 genericShowProduct conName f x =
-  conName ++ " " ++ intercalate " " (toListPi (\st -> forallCTag @Show st show . getFieldType @_ @st) (f x))
+  conName
+    ++ " "
+    ++ intercalate " " (toListPi (\st -> provideConstraint @Show st show . getFieldType @_ @st) (f x))
 
 -- Generated code
 
