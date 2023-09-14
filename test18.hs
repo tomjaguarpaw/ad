@@ -96,8 +96,8 @@ genericShowSum' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
 genericShowSum ::
   forall st x.
   (Tag st) =>
-  FieldTypes st =>
-  ForallCTag st Show =>
+  (FieldTypes st) =>
+  (ForallCTag st Show) =>
   Pi st (Const String) ->
   (x -> Sigma st (FieldType' st)) ->
   x ->
