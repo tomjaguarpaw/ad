@@ -127,6 +127,16 @@ genericShowSum' ::
 genericShowSum' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ g t field
 
+genericShow ::
+  forall st (f :: FunctionSymbol st) i.
+  (FieldTypes f) =>
+  (Tag st) =>
+  (ForallCTag f Show) =>
+  st i ->
+  Family' f i ->
+  String
+genericShow t = provideConstraint @Show @_ @f t show . getFieldType @f
+
 genericShowSum ::
   forall st x (f :: FunctionSymbol st).
   (Tag st) =>
@@ -140,7 +150,7 @@ genericShowSum pi f =
   genericShowSum'
     pi
     f
-    (\t -> provideConstraint @Show @_ @f t show . getFieldType @f)
+    (\t -> genericShow @_ @f t)
 
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
