@@ -84,14 +84,14 @@ mashPiSigma pi (Sigma s f) k =
   k s (getPi pi s) f
 
 -- `family` is a keyword?!
-genericShowSum'' ::
+genericShowSum' ::
   (Tag st) =>
   Pi st (Const String) ->
   (x -> Sigma st family') ->
   (forall i. st i -> family' i -> String) ->
   x ->
   String
-genericShowSum'' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+genericShowSum' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ g t field
 
 genericShowSum ::
@@ -104,7 +104,7 @@ genericShowSum ::
   x ->
   String
 genericShowSum pi f =
-  genericShowSum'' pi f (\t' -> forallCTag @Show t' show . getFieldType @_ @st)
+  genericShowSum' pi f (\t -> forallCTag @Show t show . getFieldType @_ @st)
 
 -- Generated code
 
