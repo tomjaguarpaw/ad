@@ -107,8 +107,8 @@ genericShowSum' ::
   (x -> Sigma st (FieldType' st)) ->
   x ->
   String
-genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
-  conName ++ " " ++ (forallCTag @Show t show . getFieldType @_ @st) field
+genericShowSum' pi f =
+  genericShowSum pi f (\t' -> forallCTag @Show t' show . getFieldType @_ @st)
 
 -- Generated code
 
