@@ -54,7 +54,7 @@ class Tag (st :: t -> Type) where
   traversePi ::
     forall (f :: t -> Type) (g :: t -> Type) m.
     (Applicative m) =>
-    (forall (i :: t). f i -> m (g i)) ->
+    (forall (i :: t). st i -> f i -> m (g i)) ->
     Pi st f ->
     m (Pi st g)
 
@@ -90,12 +90,12 @@ mashPiSigma ::
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
 
 traversePi_ :: (Applicative m, Tag st)
-            => (forall (i :: t). f i -> m ()) -> Pi st f -> m ()
+            => (forall (i :: t). st i -> f i -> m ()) -> Pi st f -> m ()
 -- This implementation could be better
-traversePi_ f = fmap (const ()) . traversePi (fmap Const . f)
+traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 
-toListPi :: Tag st => (forall (i :: t). f i -> a) -> Pi st f -> [a]
-toListPi f = getConst . traversePi_ (\x -> Const [f x])
+toListPi :: Tag st => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
+toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
 -- `family` is a keyword?!
 genericShowSum' ::
@@ -140,7 +140,7 @@ instance Tag SSumTag where
   makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag)
 
   traversePi f (PiSSumTag a b c) =
-    PiSSumTag <$> f a <*> f b <*> f c
+    PiSSumTag <$> f SATag a <*> f SBTag b <*> f SCTag c
 
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
@@ -215,7 +215,7 @@ instance Tag SProductTag where
   makePi f = PiSProductTag (f SField1) (f SField2) (f SField3)
 
   traversePi f (PiSProductTag f1 f2 f3) =
-    PiSProductTag <$> f f1 <*> f f2 <*> f f3
+    PiSProductTag <$> f SField1 f1 <*> f SField2 f2 <*> f SField3 f3
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
