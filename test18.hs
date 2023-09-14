@@ -55,17 +55,17 @@ class Tag (st :: t -> Type) where
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
 mashPiSigma ::
-  Tag s =>
-  Pi s t2 ->
-  Sigma s t1 ->
-  (forall i. s i -> t1 i -> t2 i -> r) ->
+  Tag st =>
+  Pi st f1 ->
+  Sigma st f2 ->
+  (forall i. st i -> f1 i -> f2 i -> r) ->
   r
 mashPiSigma pi (Sigma s f) k =
-  k s f (getPi pi s)
+  k s (getPi pi s) f
 
 instance Tag SProductTag where
-  data Pi SProductTag t = PiSProductTag (t Field1) (t Field2) (t Field3)
-  type ForallC SProductTag c t = (c (t Field1), c (t Field2), c (t Field3))
+  data Pi SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
+  type ForallC SProductTag c f = (c (f Field1), c (f Field2), c (f Field3))
 
   getPi (PiSProductTag f1 f2 f3) = \case
     SField1 -> f1
@@ -95,8 +95,8 @@ genericToProduct pi =
         getField = getProductFamily . getPi pi
 
 instance Tag SSumTag where
-  data Pi SSumTag t = PiSSumTag (t ATag) (t BTag) (t CTag)
-  type ForallC SSumTag c t = (c (t ATag), c (t BTag), c (t CTag))
+  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
+  type ForallC SSumTag c f = (c (f ATag), c (f BTag), c (f CTag))
   getPi (PiSSumTag f1 f2 f3) = \case
     SATag -> f1
     SBTag -> f2
@@ -146,13 +146,13 @@ genericToSum =
 
   -- `family` is a keyword?!
 genericShowSum ::
-  Tag t =>
-  Pi t (Const String) ->
-  (x -> Sigma t family') ->
-  (forall i. t i -> family' i -> String) ->
+  Tag st =>
+  Pi st (Const String) ->
+  (x -> Sigma st family') ->
+  (forall i. st i -> family' i -> String) ->
   x ->
   String
-genericShowSum pi f g x = mashPiSigma pi (f x) $ \t field (Const conName) ->
+genericShowSum pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ g t field
 
 showSum :: Sum -> String
