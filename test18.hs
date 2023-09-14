@@ -47,12 +47,12 @@ data SProductTag t where
 data Sigma s f where
   Sigma :: s i -> f i -> Sigma s f
 
-class Tag (st :: i -> Type) where
-  data Pi st :: (i -> Type) -> Type
-  type ForallC st (c :: z -> Constraint) (f :: i -> z) :: Constraint
+class Tag (st :: t -> Type) where
+  data Pi st :: (t -> Type) -> Type
+  type ForallC st (c :: z -> Constraint) (f :: t -> z) :: Constraint
 
-  getPi :: Pi st f -> st i' -> f i'
-  makePi :: (forall i'. st i' -> f i') -> Pi st f
+  getPi :: forall (i :: t) (f :: t -> *). Pi st f -> st i -> f i
+  makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
 mashPiSigma ::
   Tag s =>
