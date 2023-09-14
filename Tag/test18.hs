@@ -138,7 +138,7 @@ genericShowSum pi f =
   genericShowSum'
     pi
     f
-    (\t -> provideConstraint @Show @_ @f t show . getFieldType @_ @f)
+    (\t -> provideConstraint @Show @_ @f t show . getFieldType @f)
 
 genericShowProduct ::
   forall st x (f :: Proxy st -> Type).
@@ -162,13 +162,13 @@ genericShowProduct conName f x =
                 @f
                 st
                 show
-                . getFieldType @_ @f
+                . getFieldType @f
           )
           (f x)
       )
 
 getFieldType ::
-  forall i f.
+  forall f i.
   (FieldTypes f) =>
   Family' f i ->
   FieldType f i
@@ -227,7 +227,7 @@ sumToGeneric = \case
 
 genericToSum :: Sigma SSumTag (Family' SumF) -> Sum
 genericToSum = \case
-  Sigma t (getFieldType @_ @SumF -> p) -> case t of
+  Sigma t (getFieldType @SumF -> p) -> case t of
     SATag -> A p
     SBTag -> B p
     SCTag -> C p
