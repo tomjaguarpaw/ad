@@ -65,9 +65,6 @@ class Tag (st :: t -> Type) where
 
 class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
-  type FieldType' st :: t -> Type
-
-  getFieldType :: FieldType' st i -> FieldType st i
 
   provideConstraint' ::
     (ForallCTag st c) =>
@@ -130,14 +127,14 @@ genericShowSum ::
   (FieldTypes st) =>
   (ForallCTag st Show) =>
   Pi st (Const String) ->
-  (x -> Sigma st (FieldType' st)) ->
+  (x -> Sigma st (Family' st)) ->
   x ->
   String
 genericShowSum pi f =
   genericShowSum'
     pi
     f
-    (\t -> provideConstraint @Show t show . getFieldType @_ @st)
+    (\t -> provideConstraint @Show t show . getFieldType' @st)
 
 genericShowProduct ::
   forall st x.
@@ -145,7 +142,7 @@ genericShowProduct ::
   (ForallCTag st Show) =>
   (Tag st) =>
   String ->
-  (x -> Pi st (FieldType' st)) ->
+  (x -> Pi st (Family' st)) ->
   x ->
   String
 genericShowProduct conName f x =
@@ -159,7 +156,7 @@ genericShowProduct conName f x =
                 @Show
                 st
                 show
-                . getFieldType @_ @st
+                . getFieldType' @st
           )
           (f x)
       )
@@ -188,9 +185,6 @@ instance Tag SSumTag where
 
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
-  type FieldType' SSumTag = Family' SSumTag
-
-  getFieldType = getFamily
 
   provideConstraint' = \_ -> \case
     SATag -> id
@@ -210,7 +204,7 @@ sumConNames =
       SBTag -> "B"
       SCTag -> "C"
 
-sumToGeneric :: Sum -> Sigma SSumTag (FieldType' SSumTag)
+sumToGeneric :: Sum -> Sigma SSumTag (Family' SSumTag)
 sumToGeneric = \case
   A p -> Sigma SATag (Family' p)
   B p -> Sigma SBTag (Family' p)
@@ -246,9 +240,6 @@ instance Tag SProductTag where
 
 instance FieldTypes SProductTag where
   type FieldType SProductTag t = ProductFamily t
-  type FieldType' SProductTag = Family' SProductTag
-
-  getFieldType = getFamily
 
   provideConstraint' = \_ -> \case
     SField1 -> id
@@ -258,9 +249,9 @@ instance FieldTypes SProductTag where
 getFieldType' ::
   forall st i.
   (FieldTypes st) =>
-  FieldType' st i ->
+  Family' st i ->
   FieldType st i
-getFieldType' = getFieldType @_ @st
+getFieldType' = getFamily
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
