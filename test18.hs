@@ -70,7 +70,7 @@ class FieldTypes (st :: t -> Type) where
 
   getFieldType :: FieldType' st i -> FieldType st i
 
-  forallCTag'' ::
+  forallCTag' ::
     (ForallCTag st c) =>
     Proxy c ->
     st i ->
@@ -91,7 +91,7 @@ forallCTag ::
   st i ->
   ((c (FieldType st i)) => r) ->
   r
-forallCTag = forallCTag'' (Proxy @c)
+forallCTag = forallCTag' (Proxy @c)
 
 mashPiSigma ::
   (Tag st) =>
@@ -175,7 +175,7 @@ instance FieldTypes SSumTag where
 
   getFieldType = getSumFamily
 
-  forallCTag'' = \(Proxy :: Proxy c) -> forallCSumTag @c
+  forallCTag' = \(Proxy :: Proxy c) -> forallCSumTag @c
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
@@ -241,7 +241,7 @@ instance FieldTypes SProductTag where
 
   getFieldType = getProductFamily
 
-  forallCTag'' = \(Proxy :: Proxy c) -> forallCProductTag @c
+  forallCTag' = \(Proxy :: Proxy c) -> forallCProductTag @c
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
