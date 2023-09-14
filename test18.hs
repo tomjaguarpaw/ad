@@ -19,7 +19,7 @@
 
 module Main where
 
-import Data.Functor.Const (Const (Const))
+import Data.Functor.Const (Const (Const, getConst))
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
@@ -93,6 +93,9 @@ traversePi_ :: (Applicative m, Tag st)
             => (forall (i :: t). f i -> m ()) -> Pi st f -> m ()
 -- This implementation could be better
 traversePi_ f = fmap (const ()) . traversePi (fmap Const . f)
+
+toListPi :: Tag st => (forall (i :: t). f i -> a) -> Pi st f -> [a]
+toListPi f = getConst . traversePi_ (\x -> Const [f x])
 
 -- `family` is a keyword?!
 genericShowSum' ::
