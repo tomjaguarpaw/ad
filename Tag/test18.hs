@@ -73,7 +73,7 @@ class Tag (st :: t -> Type) where
     ((c (FieldType f st i)) => r) ->
     r
 
-class FieldTypes f (st :: t -> Type) | f -> st where
+class FieldTypes (st :: t -> Type) f | f -> st where
   type FieldType f st (i :: t) :: Type
 
 type family ForallCTag' f st c (ts :: [t]) :: Constraint where
@@ -86,7 +86,7 @@ type ForallCTag f st c = ForallCTag' f st c (Tags st)
 provideConstraint ::
   forall c f st r i.
   (Tag st) =>
-  (FieldTypes f st) =>
+  (FieldTypes st f) =>
   (ForallCTag f st c) =>
   st i ->
   ((c (FieldType f st i)) => r) ->
@@ -128,7 +128,7 @@ genericShowSum' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
 genericShowSum ::
   forall st x f.
   (Tag st) =>
-  (FieldTypes f st) =>
+  (FieldTypes st f) =>
   (ForallCTag f st Show) =>
   Pi st (Const String) ->
   (x -> Sigma st (Family' f st)) ->
@@ -142,7 +142,7 @@ genericShowSum pi f =
 
 genericShowProduct ::
   forall st x f.
-  (FieldTypes f st) =>
+  (FieldTypes st f) =>
   (ForallCTag f st Show) =>
   (Tag st) =>
   String ->
@@ -168,7 +168,7 @@ genericShowProduct conName f x =
 
 getFieldType ::
   forall st i f.
-  (FieldTypes f st) =>
+  (FieldTypes st f) =>
   Family' f st i ->
   FieldType f st i
 getFieldType = getFamily
@@ -202,7 +202,7 @@ instance Tag SSumTag where
 
 data SumF
 
-instance FieldTypes SumF SSumTag where
+instance FieldTypes SSumTag SumF where
   type FieldType SumF SSumTag t = SumFamily t
 
 type family SumFamily (t :: SumTag) :: Type where
@@ -259,7 +259,7 @@ instance Tag SProductTag where
 
 data ProductF
 
-instance FieldTypes ProductF SProductTag where
+instance FieldTypes SProductTag ProductF where
   type FieldType ProductF SProductTag t = ProductFamily t
 
 type family ProductFamily (t :: ProductTag) :: Type where
