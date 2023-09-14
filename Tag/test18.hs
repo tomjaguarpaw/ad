@@ -68,18 +68,17 @@ class Tag (st :: t -> Type) where
     ((c (FieldType f i)) => r) ->
     r
 
+type FunctionSymbol' t (st :: t -> Type) = Proxy st -> Type
+
 type FunctionSymbol (st :: t -> Type) = Proxy st -> Type
 
-type family F (a :: FunctionSymbol st) where
-  F (f :: FunctionSymbol st) = st
+type family St (a :: FunctionSymbol (st :: t -> Type)) where
+  St (f :: FunctionSymbol st) = st
 
-type family G (a :: FunctionSymbol st) where
-  G (f :: FunctionSymbol (st :: t -> Type)) = t
-
-class FieldTypes (f :: FunctionSymbol (st :: t -> Type)) where
+class FieldTypes (f :: FunctionSymbol' t st) where
   type FieldType' t st f (i :: t) :: Type
 
-type FieldType f i = FieldType' (G f) (F f) f i
+type FieldType (f :: FunctionSymbol' t st) i = FieldType' t st f i
 
 type family ForeachField' (f :: FunctionSymbol st) c (ts :: [t]) :: Constraint where
   ForeachField' _ _ '[] = ()
@@ -89,16 +88,16 @@ type family ForeachField' (f :: FunctionSymbol st) c (ts :: [t]) :: Constraint w
 type ForeachField (f :: FunctionSymbol st) c = ForeachField' f c (Tags st)
 
 provideConstraint ::
-  forall c st (f :: FunctionSymbol st) r i.
+  forall c f r i st.
+  (st ~ St f) =>
   (Tag st) =>
-  (FieldTypes f) =>
   (ForeachField f c) =>
   st i ->
   ((c (FieldType f i)) => r) ->
   r
 provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 
-newtype Family' f t = Family' {getFamily :: FieldType' (G f) (F f) f t}
+newtype Family' (f :: FunctionSymbol' t st) i = Family' {getFamily :: FieldType' t st f i}
 
 mashPiSigma ::
   (Tag st) =>
@@ -119,41 +118,28 @@ traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 toListPi :: (Tag st) => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
 toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
--- `family` is a keyword?!
-genericShowSum' ::
-  (Tag st) =>
-  Pi st (Const String) ->
-  (x -> Sigma st family') ->
-  (forall i. st i -> family' i -> String) ->
-  x ->
-  String
-genericShowSum' pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
-  conName ++ " " ++ g t field
-
 genericShow ::
   forall st (f :: FunctionSymbol st) i.
-  (FieldTypes f) =>
   (Tag st) =>
   (ForeachField f Show) =>
   st i ->
   Family' f i ->
   String
-genericShow t = provideConstraint @Show @_ @f t show . getFieldType @f
+genericShow t = provideConstraint @Show @f t show . getFamily
 
 genericShowSum ::
   forall st x (f :: FunctionSymbol st).
   (Tag st) =>
-  (FieldTypes f) =>
   (ForeachField f Show) =>
   Pi st (Const String) ->
   (x -> Sigma st (Family' f)) ->
   x ->
   String
-genericShowSum pi f = genericShowSum' pi f (genericShow @_ @f)
+genericShowSum pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+  conName ++ " " ++ genericShow t field
 
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
-  (FieldTypes f) =>
   (ForeachField f Show) =>
   (Tag st) =>
   String ->
@@ -162,13 +148,6 @@ genericShowProduct ::
   String
 genericShowProduct conName f x =
   conName ++ " " ++ intercalate " " (toListPi genericShow (f x))
-
-getFieldType ::
-  forall f i.
-  (FieldTypes f) =>
-  Family' f i ->
-  FieldType f i
-getFieldType = getFamily
 
 -- Generated code
 
@@ -223,7 +202,7 @@ sumToGeneric = \case
 
 genericToSum :: Sigma SSumTag (Family' SumF) -> Sum
 genericToSum = \case
-  Sigma t (getFieldType @SumF -> p) -> case t of
+  Sigma t (getFamily -> p) -> case t of
     SATag -> A p
     SBTag -> B p
     SCTag -> C p
