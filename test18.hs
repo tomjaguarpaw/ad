@@ -80,8 +80,7 @@ mashPiSigma ::
   Sigma st f2 ->
   (forall i. st i -> f1 i -> f2 i -> r) ->
   r
-mashPiSigma pi (Sigma s f) k =
-  k s (getPi pi s) f
+mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
 
 -- `family` is a keyword?!
 genericShowSum' ::
