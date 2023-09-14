@@ -146,11 +146,7 @@ genericShowSum ::
   (x -> Sigma st (Family' f)) ->
   x ->
   String
-genericShowSum pi f =
-  genericShowSum'
-    pi
-    f
-    (\t -> genericShow @_ @f t)
+genericShowSum pi f = genericShowSum' pi f (genericShow @_ @f)
 
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
@@ -162,22 +158,7 @@ genericShowProduct ::
   x ->
   String
 genericShowProduct conName f x =
-  conName
-    ++ " "
-    ++ intercalate
-      " "
-      ( toListPi
-          ( \st ->
-              provideConstraint
-                @Show
-                @_
-                @f
-                st
-                show
-                . getFieldType @f
-          )
-          (f x)
-      )
+  conName ++ " " ++ intercalate " " (toListPi genericShow (f x))
 
 getFieldType ::
   forall f i.
