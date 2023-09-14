@@ -265,7 +265,7 @@ productToGeneric (Product f1 f2 f3) =
         SField3 -> f3
     )
 
-type family ForallCTag' st c (ts :: [ProductTag]) :: Constraint where
+type family ForallCTag' st c (ts :: [t]) :: Constraint where
   ForallCTag' _ _ '[] = ()
   ForallCTag' st c (t : ts) =
     (c (FieldType st t), ForallCTag' st c ts)
