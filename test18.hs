@@ -182,15 +182,9 @@ type family SumFamily (t :: SumTag) :: Type where
   SumFamily BTag = Bool
   SumFamily CTag = Char
 
-type family ForallCSumTag' c (ts :: [SumTag]) :: Constraint where
-  ForallCSumTag' _ '[] = ()
-  ForallCSumTag' c (t : ts) = (c (SumFamily t), ForallCSumTag' c ts)
-
-type ForallCSumTag (c :: Type -> Constraint) = ForallCSumTag' c (Tags SSumTag)
-
 forallCSumTag ::
   forall c i r.
-  (ForallCSumTag c) =>
+  (ForallCTag SSumTag c) =>
   SSumTag i ->
   ((c (SumFamily i)) => r) ->
   r
