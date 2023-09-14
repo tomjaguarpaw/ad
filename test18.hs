@@ -77,6 +77,13 @@ class FieldTypes (st :: t -> Type) where
     ((c (FieldType st i)) => r) ->
     r
 
+type family ForallCTag' st c (ts :: [t]) :: Constraint where
+  ForallCTag' _ _ '[] = ()
+  ForallCTag' st c (t : ts) =
+    (c (FieldType st t), ForallCTag' st c ts)
+
+type ForallCTag st c = ForallCTag' st c (Tags st)
+
 forallCTag ::
   forall c st r i.
   (FieldTypes st) =>
@@ -170,8 +177,6 @@ instance FieldTypes SSumTag where
 
   forallCTag'' = \(Proxy :: Proxy c) -> forallCSumTag @c
 
-type ForallCTag st c = ForallCTag' st c (Tags st)
-
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
   SumFamily BTag = Bool
@@ -259,11 +264,6 @@ productToGeneric (Product f1 f2 f3) =
         SField2 -> f2
         SField3 -> f3
     )
-
-type family ForallCTag' st c (ts :: [t]) :: Constraint where
-  ForallCTag' _ _ '[] = ()
-  ForallCTag' st c (t : ts) =
-    (c (FieldType st t), ForallCTag' st c ts)
 
 forallCProductTag ::
   forall c i r.
