@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
@@ -21,6 +22,7 @@ import Data.Functor.Const (Const (Const))
 import Data.Kind (Constraint, Type)
 import Prelude hiding (pi)
 
+-- User code
 data Sum
   = A Int
   | B Bool
@@ -28,20 +30,19 @@ data Sum
 
 data Product = Product Int Bool Char
 
-data SumTag = ATag | BTag | CTag
+newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 
-data SSumTag t where
-  SATag :: SSumTag ATag
-  SBTag :: SSumTag BTag
-  SCTag :: SSumTag CTag
+showSum :: Sum -> String
+showSum =
+  genericShowSum
+    sumConNames
+    sumToGeneric
+    (\t -> forallCSumTag @Show t show . getSumFamily)
 
-data ProductTag = Field1 | Field2 | Field3
+example :: IO ()
+example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
 
-data SProductTag t where
-  SField1 :: SProductTag Field1
-  SField2 :: SProductTag Field2
-  SField3 :: SProductTag Field3
-
+-- Generics library
 data Sigma s f where
   Sigma :: s i -> f i -> Sigma s f
 
@@ -52,6 +53,10 @@ class Tag (st :: t -> Type) where
   getPi :: forall (i :: t) (f :: t -> *). Pi st f -> st i -> f i
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
+class FieldTypes (st :: t -> Type) where
+  type FieldType st (i :: t) :: Type
+  type ForallTag' st (c :: Type -> Constraint) :: Constraint
+
 mashPiSigma ::
   (Tag st) =>
   Pi st f1 ->
@@ -60,6 +65,88 @@ mashPiSigma ::
   r
 mashPiSigma pi (Sigma s f) k =
   k s (getPi pi s) f
+
+-- `family` is a keyword?!
+genericShowSum ::
+  (Tag st) =>
+  Pi st (Const String) ->
+  (x -> Sigma st family') ->
+  (forall i. st i -> family' i -> String) ->
+  x ->
+  String
+genericShowSum pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+  conName ++ " " ++ g t field
+
+-- Generated code
+
+-- For data Sum
+data SumTag = ATag | BTag | CTag
+
+data SSumTag t where
+  SATag :: SSumTag ATag
+  SBTag :: SSumTag BTag
+  SCTag :: SSumTag CTag
+
+instance Tag SSumTag where
+  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
+  type Tags SSumTag = [ATag, BTag, CTag]
+  getPi (PiSSumTag f1 f2 f3) = \case
+    SATag -> f1
+    SBTag -> f2
+    SCTag -> f3
+  makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag)
+
+instance FieldTypes SSumTag where
+  type FieldType SSumTag t = SumFamily t
+  -- Requires UndecidableInstances. Could probably hack around this.
+  type ForallTag' SSumTag c = ForallCSumTag' c (Tags SSumTag)
+
+type family SumFamily (t :: SumTag) :: Type where
+  SumFamily ATag = Int
+  SumFamily BTag = Bool
+  SumFamily CTag = Char
+
+type family ForallCSumTag' c (ts :: [SumTag]) :: Constraint where
+  ForallCSumTag' _ '[] = ()
+  ForallCSumTag' c (t : ts) = (c (SumFamily t), ForallCSumTag' c ts)
+
+type ForallCSumTag (c :: Type -> Constraint) = ForallCSumTag' c (Tags SSumTag)
+
+forallCSumTag ::
+  (ForallCSumTag c) => SSumTag i -> ((c (SumFamily i)) => r) -> r
+forallCSumTag = \case
+  SATag -> id
+  SBTag -> id
+  SCTag -> id
+
+sumConNames :: Pi SSumTag (Const String)
+sumConNames =
+  makePi $
+    Const . \case
+      SATag -> "A"
+      SBTag -> "B"
+      SCTag -> "C"
+
+sumToGeneric :: Sum -> Sigma SSumTag SumFamily'
+sumToGeneric = \case
+  A p -> Sigma SATag (SumFamily' p)
+  B p -> Sigma SBTag (SumFamily' p)
+  C p -> Sigma SCTag (SumFamily' p)
+
+genericToSum :: Sigma SSumTag SumFamily' -> Sum
+genericToSum = \case
+  Sigma t (SumFamily' p) -> case t of
+    SATag -> A p
+    SBTag -> B p
+    SCTag -> C p
+
+-- For data Product
+data ProductTag = Field1 | Field2 | Field3
+
+data SProductTag t where
+  SField1 :: SProductTag Field1
+  SField2 :: SProductTag Field2
+  SField3 :: SProductTag Field3
 
 instance Tag SProductTag where
   data Pi SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
@@ -93,73 +180,3 @@ genericToProduct pi =
   where
     getField :: forall i. SProductTag i -> ProductFamily i
     getField = getProductFamily . getPi pi
-
-instance Tag SSumTag where
-  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
-  type Tags SSumTag = [ATag, BTag, CTag]
-  getPi (PiSSumTag f1 f2 f3) = \case
-    SATag -> f1
-    SBTag -> f2
-    SCTag -> f3
-  makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag)
-
-type family SumFamily (t :: SumTag) :: Type where
-  SumFamily ATag = Int
-  SumFamily BTag = Bool
-  SumFamily CTag = Char
-
-type family ForallCSumTag' c (ts :: [SumTag]) :: Constraint where
-  ForallCSumTag' _ '[] = ()
-  ForallCSumTag' c (t : ts) = (c (SumFamily t), ForallCSumTag' c ts)
-
-type ForallCSumTag (c :: Type -> Constraint) = ForallCSumTag' c (Tags SSumTag)
-
-forallCSumTag ::
-  (ForallCSumTag c) =>
-  SSumTag i ->
-  ((c (SumFamily i)) => r) ->
-  r
-forallCSumTag = \case
-  SATag -> id
-  SBTag -> id
-  SCTag -> id
-
-newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
-
-sumConNames :: Pi SSumTag (Const String)
-sumConNames =
-  makePi $
-    Const . \case
-      SATag -> "A"
-      SBTag -> "B"
-      SCTag -> "C"
-
-sumToGeneric :: Sum -> Sigma SSumTag SumFamily'
-sumToGeneric = \case
-  A p -> Sigma SATag (SumFamily' p)
-  B p -> Sigma SBTag (SumFamily' p)
-  C p -> Sigma SCTag (SumFamily' p)
-
-genericToSum :: Sigma SSumTag SumFamily' -> Sum
-genericToSum = \case
-  Sigma t (SumFamily' p) -> case t of
-    SATag -> A p
-    SBTag -> B p
-    SCTag -> C p
-
--- `family` is a keyword?!
-genericShowSum ::
-  (Tag st) =>
-  Pi st (Const String) ->
-  (x -> Sigma st family') ->
-  (forall i. st i -> family' i -> String) ->
-  x ->
-  String
-genericShowSum pi f g x = mashPiSigma pi (f x) $ \t (Const conName) field ->
-  conName ++ " " ++ g t field
-
-showSum :: Sum -> String
-showSum = genericShowSum sumConNames sumToGeneric (\t -> forallCSumTag @Show t show . getSumFamily)
-
-example :: IO ()
-example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
