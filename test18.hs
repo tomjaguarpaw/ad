@@ -161,6 +161,13 @@ genericShowProduct conName f x =
           (f x)
       )
 
+getFieldType ::
+  forall st i.
+  (FieldTypes st) =>
+  Family' st i ->
+  FieldType st i
+getFieldType = getFamily
+
 -- Generated code
 
 -- For data Sum
@@ -245,13 +252,6 @@ instance FieldTypes SProductTag where
     SField1 -> id
     SField2 -> id
     SField3 -> id
-
-getFieldType ::
-  forall st i.
-  (FieldTypes st) =>
-  Family' st i ->
-  FieldType st i
-getFieldType = getFamily
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
