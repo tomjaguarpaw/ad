@@ -33,8 +33,6 @@ data Sum
 
 data Product = Product Int Bool Char
 
-newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
-
 showSum :: Sum -> String
 showSum = genericShowSum sumConNames sumToGeneric
 
@@ -200,6 +198,8 @@ type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
   SumFamily BTag = Bool
   SumFamily CTag = Char
+
+newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 
 sumConNames :: Pi SSumTag (Const String)
 sumConNames =
