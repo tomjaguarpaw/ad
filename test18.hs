@@ -67,7 +67,6 @@ class Tag (st :: t -> Type) where
 class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
   type FieldType' st :: t -> Type
-  type ForallCTag st (c :: Type -> Constraint) :: Constraint
 
   getFieldType :: FieldType' st i -> FieldType st i
 
@@ -169,10 +168,9 @@ instance FieldTypes SSumTag where
 
   getFieldType = getSumFamily
 
-  -- Requires UndecidableInstances. Could probably hack around this.
-  type ForallCTag SSumTag c = ForallCTag' SSumTag c (Tags SSumTag)
-
   forallCTag'' = \(Proxy :: Proxy c) -> forallCSumTag @c
+
+type ForallCTag st c = ForallCTag' st c (Tags st)
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
@@ -243,9 +241,6 @@ instance FieldTypes SProductTag where
   type FieldType' SProductTag = ProductFamily'
 
   getFieldType = getProductFamily
-
-  -- Requires UndecidableInstances. Could probably hack around this.
-  type ForallCTag SProductTag c = ForallCTag' SProductTag c (Tags SProductTag)
 
   forallCTag'' = \(Proxy :: Proxy c) -> forallCProductTag @c
 
