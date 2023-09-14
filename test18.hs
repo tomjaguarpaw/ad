@@ -2,26 +2,23 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE KindSignatures #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
-
-{-# OPTIONS_GHC -Wall #-} 
-
+{-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 module Main where
 
-import Prelude hiding (pi)
-
 import Data.Functor.Const (Const (Const))
 import Data.Kind (Constraint, Type)
+import Prelude hiding (pi)
 
 data Sum
   = A Int
@@ -55,7 +52,7 @@ class Tag (st :: t -> Type) where
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
 mashPiSigma ::
-  Tag st =>
+  (Tag st) =>
   Pi st f1 ->
   Sigma st f2 ->
   (forall i. st i -> f1 i -> f2 i -> r) ->
@@ -73,26 +70,28 @@ instance Tag SProductTag where
     SField3 -> f3
   makePi f = PiSProductTag (f SField1) (f SField2) (f SField3)
 
-
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
   ProductFamily Field2 = Bool
   ProductFamily Field3 = Char
 
-newtype ProductFamily' t =
-  ProductFamily' { getProductFamily :: ProductFamily t }
+newtype ProductFamily' t = ProductFamily' {getProductFamily :: ProductFamily t}
 
 productToGeneric :: Product -> Pi SProductTag ProductFamily'
-productToGeneric (Product f1 f2 f3) = makePi $ (ProductFamily' . \case
-  SField1 -> f1
-  SField2 -> f2
-  SField3 -> f3)
+productToGeneric (Product f1 f2 f3) =
+  makePi $
+    ( ProductFamily' . \case
+        SField1 -> f1
+        SField2 -> f2
+        SField3 -> f3
+    )
 
 genericToProduct :: Pi SProductTag ProductFamily' -> Product
 genericToProduct pi =
   Product (getField SField1) (getField SField2) (getField SField3)
-  where getField :: forall i. SProductTag i -> ProductFamily i
-        getField = getProductFamily . getPi pi
+  where
+    getField :: forall i. SProductTag i -> ProductFamily i
+    getField = getProductFamily . getPi pi
 
 instance Tag SSumTag where
   data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
@@ -109,27 +108,30 @@ type family SumFamily (t :: SumTag) :: Type where
   SumFamily CTag = Char
 
 type ForallCSumTag (c :: Type -> Constraint) =
-  (c (SumFamily ATag),
-   c (SumFamily BTag),
-   c (SumFamily CTag))
+  ( c (SumFamily ATag),
+    c (SumFamily BTag),
+    c (SumFamily CTag)
+  )
 
 forallCSumTag ::
-  ForallCSumTag c =>
+  (ForallCSumTag c) =>
   SSumTag i ->
-  (c (SumFamily i) => r)
-  -> r
+  ((c (SumFamily i)) => r) ->
+  r
 forallCSumTag = \case
   SATag -> id
   SBTag -> id
   SCTag -> id
 
-newtype SumFamily' t = SumFamily' { getSumFamily :: SumFamily t }
+newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 
 sumConNames :: Pi SSumTag (Const String)
-sumConNames = makePi $ Const . \case
-  SATag -> "A"
-  SBTag -> "B"
-  SCTag -> "C"
+sumConNames =
+  makePi $
+    Const . \case
+      SATag -> "A"
+      SBTag -> "B"
+      SCTag -> "C"
 
 sumToGeneric :: Sum -> Sigma SSumTag SumFamily'
 sumToGeneric = \case
@@ -138,15 +140,15 @@ sumToGeneric = \case
   C p -> Sigma SCTag (SumFamily' p)
 
 genericToSum :: Sigma SSumTag SumFamily' -> Sum
-genericToSum =
-  \case Sigma t (SumFamily' p) -> case t of
-          SATag -> A p
-          SBTag -> B p
-          SCTag -> C p
+genericToSum = \case
+  Sigma t (SumFamily' p) -> case t of
+    SATag -> A p
+    SBTag -> B p
+    SCTag -> C p
 
-  -- `family` is a keyword?!
+-- `family` is a keyword?!
 genericShowSum ::
-  Tag st =>
+  (Tag st) =>
   Pi st (Const String) ->
   (x -> Sigma st family') ->
   (forall i. st i -> family' i -> String) ->
