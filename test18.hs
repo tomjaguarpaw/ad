@@ -233,6 +233,17 @@ instance Tag SProductTag where
   traversePi f (PiSProductTag f1 f2 f3) =
     PiSProductTag <$> f SField1 f1 <*> f SField2 f2 <*> f SField3 f3
 
+instance FieldTypes SProductTag where
+  type FieldType SProductTag t = ProductFamily t
+  type FieldType' SProductTag = ProductFamily'
+
+  getFieldType = getProductFamily
+
+  -- Requires UndecidableInstances. Could probably hack around this.
+  type ForallCTag SProductTag c = ForallCProductTag' c (Tags SProductTag)
+
+  forallCTag'' = \(Proxy :: Proxy c) -> forallCProductTag @c
+
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
   ProductFamily Field2 = Bool
@@ -248,6 +259,23 @@ productToGeneric (Product f1 f2 f3) =
         SField2 -> f2
         SField3 -> f3
     )
+
+type family ForallCProductTag' c (ts :: [ProductTag]) :: Constraint where
+  ForallCProductTag' _ '[] = ()
+  ForallCProductTag' c (t : ts) = (c (ProductFamily t), ForallCProductTag' c ts)
+
+type ForallCProductTag (c :: Type -> Constraint) = ForallCProductTag' c (Tags SProductTag)
+
+forallCProductTag ::
+  forall c i r.
+  (ForallCProductTag c) =>
+  SProductTag i ->
+  ((c (ProductFamily i)) => r) ->
+  r
+forallCProductTag = \case
+  SField1 -> id
+  SField2 -> id
+  SField3 -> id
 
 genericToProduct :: Pi SProductTag ProductFamily' -> Product
 genericToProduct pi =
