@@ -48,7 +48,7 @@ class Tag (st :: t -> Type) where
   data Pi st :: (t -> Type) -> Type
   type Tags st :: [t]
 
-  getPi :: forall (i :: t) (f :: t -> *). Pi st f -> st i -> f i
+  getPi :: forall (i :: t) (f :: t -> Type). Pi st f -> st i -> f i
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
 
 class FieldTypes (st :: t -> Type) where
