@@ -11,6 +11,7 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
@@ -46,7 +47,7 @@ data Sigma s f where
 
 class Tag (st :: t -> Type) where
   data Pi st :: (t -> Type) -> Type
-  type ForallC st (c :: z -> Constraint) (f :: t -> z) :: Constraint
+  type Tags st :: [t]
 
   getPi :: forall (i :: t) (f :: t -> *). Pi st f -> st i -> f i
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
@@ -62,7 +63,7 @@ mashPiSigma pi (Sigma s f) k =
 
 instance Tag SProductTag where
   data Pi SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
-  type ForallC SProductTag c f = (c (f Field1), c (f Field2), c (f Field3))
+  type Tags SProductTag = [Field1, Field2, Field3]
 
   getPi (PiSProductTag f1 f2 f3) = \case
     SField1 -> f1
@@ -95,7 +96,7 @@ genericToProduct pi =
 
 instance Tag SSumTag where
   data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
-  type ForallC SSumTag c f = (c (f ATag), c (f BTag), c (f CTag))
+  type Tags SSumTag = [ATag, BTag, CTag]
   getPi (PiSSumTag f1 f2 f3) = \case
     SATag -> f1
     SBTag -> f2
@@ -107,11 +108,11 @@ type family SumFamily (t :: SumTag) :: Type where
   SumFamily BTag = Bool
   SumFamily CTag = Char
 
-type ForallCSumTag (c :: Type -> Constraint) =
-  ( c (SumFamily ATag),
-    c (SumFamily BTag),
-    c (SumFamily CTag)
-  )
+type family ForallCSumTag' c (ts :: [SumTag]) :: Constraint where
+  ForallCSumTag' _ '[] = ()
+  ForallCSumTag' c (t : ts) = (c (SumFamily t), ForallCSumTag' c ts)
+
+type ForallCSumTag (c :: Type -> Constraint) = ForallCSumTag' c (Tags SSumTag)
 
 forallCSumTag ::
   (ForallCSumTag c) =>
