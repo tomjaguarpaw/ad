@@ -59,7 +59,12 @@ class FieldTypes (st :: t -> Type) where
   type FieldType st (i :: t) :: Type
   type ForallCTag st (c :: Type -> Constraint) :: Constraint
 
-  forallCTag'' :: (ForallCTag st c) => Proxy c -> st i -> ((c (FieldType st i)) => r) -> r
+  forallCTag'' ::
+    (ForallCTag st c) =>
+    Proxy c ->
+    st i ->
+    ((c (FieldType st i)) => r) ->
+    r
 
 forallCTag ::
   forall c st r i.
