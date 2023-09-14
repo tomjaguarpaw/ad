@@ -65,9 +65,6 @@ class Tag (st :: t -> Type) where
     Pi st f ->
     m (Pi st g)
 
-class FieldTypes f (st :: t -> Type) | f -> st where
-  type FieldType f st (i :: t) :: Type
-
   provideConstraint' ::
     (ForallCTag f st c) =>
     Proxy c ->
@@ -75,6 +72,9 @@ class FieldTypes f (st :: t -> Type) | f -> st where
     st i ->
     ((c (FieldType f st i)) => r) ->
     r
+
+class FieldTypes f (st :: t -> Type) | f -> st where
+  type FieldType f st (i :: t) :: Type
 
 type family ForallCTag' f st c (ts :: [t]) :: Constraint where
   ForallCTag' _ _ _ '[] = ()
@@ -85,6 +85,7 @@ type ForallCTag f st c = ForallCTag' f st c (Tags st)
 
 provideConstraint ::
   forall c f st r i.
+  (Tag st) =>
   (FieldTypes f st) =>
   (ForallCTag f st c) =>
   st i ->
@@ -194,15 +195,15 @@ instance Tag SSumTag where
   traversePi f (PiSSumTag a b c) =
     PiSSumTag <$> f SATag a <*> f SBTag b <*> f SCTag c
 
-data SumF
-
-instance FieldTypes SumF SSumTag where
-  type FieldType SumF SSumTag t = SumFamily t
-
   provideConstraint' = \_ _ -> \case
     SATag -> id
     SBTag -> id
     SCTag -> id
+
+data SumF
+
+instance FieldTypes SumF SSumTag where
+  type FieldType SumF SSumTag t = SumFamily t
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
@@ -251,15 +252,15 @@ instance Tag SProductTag where
   traversePi f (PiSProductTag f1 f2 f3) =
     PiSProductTag <$> f SField1 f1 <*> f SField2 f2 <*> f SField3 f3
 
-data ProductF
-
-instance FieldTypes ProductF SProductTag where
-  type FieldType ProductF SProductTag t = ProductFamily t
-
   provideConstraint' = \_ _ -> \case
     SField1 -> id
     SField2 -> id
     SField3 -> id
+
+data ProductF
+
+instance FieldTypes ProductF SProductTag where
+  type FieldType ProductF SProductTag t = ProductFamily t
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
