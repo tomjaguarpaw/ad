@@ -61,7 +61,7 @@ class Tag (st :: t -> Type) where
     m (Pi st g)
 
   provideConstraint' ::
-    (ForallCTag (f :: FunctionSymbol st) c) =>
+    (ForeachField (f :: FunctionSymbol st) c) =>
     Proxy c ->
     Proxy f ->
     st i ->
@@ -73,18 +73,18 @@ type FunctionSymbol st = Proxy st -> Type
 class FieldTypes (f :: FunctionSymbol st) where
   type FieldType f (i :: t) :: Type
 
-type family ForallCTag' f c (ts :: [t]) :: Constraint where
-  ForallCTag' _ _ '[] = ()
-  ForallCTag' f c (t : ts) =
-    (c (FieldType f t), ForallCTag' f c ts)
+type family ForeachField' f c (ts :: [t]) :: Constraint where
+  ForeachField' _ _ '[] = ()
+  ForeachField' f c (t : ts) =
+    (c (FieldType f t), ForeachField' f c ts)
 
-type ForallCTag (f :: FunctionSymbol st) c = ForallCTag' f c (Tags st)
+type ForeachField (f :: FunctionSymbol st) c = ForeachField' f c (Tags st)
 
 provideConstraint ::
   forall c st (f :: FunctionSymbol st) r i.
   (Tag st) =>
   (FieldTypes f) =>
-  (ForallCTag f c) =>
+  (ForeachField f c) =>
   st i ->
   ((c (FieldType f i)) => r) ->
   r
@@ -126,7 +126,7 @@ genericShow ::
   forall st (f :: FunctionSymbol st) i.
   (FieldTypes f) =>
   (Tag st) =>
-  (ForallCTag f Show) =>
+  (ForeachField f Show) =>
   st i ->
   Family' f i ->
   String
@@ -136,7 +136,7 @@ genericShowSum ::
   forall st x (f :: FunctionSymbol st).
   (Tag st) =>
   (FieldTypes f) =>
-  (ForallCTag f Show) =>
+  (ForeachField f Show) =>
   Pi st (Const String) ->
   (x -> Sigma st (Family' f)) ->
   x ->
@@ -146,7 +146,7 @@ genericShowSum pi f = genericShowSum' pi f (genericShow @_ @f)
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
   (FieldTypes f) =>
-  (ForallCTag f Show) =>
+  (ForeachField f Show) =>
   (Tag st) =>
   String ->
   (x -> Pi st (Family' f)) ->
