@@ -36,10 +36,9 @@ newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 
 showSum :: Sum -> String
 showSum =
-  genericShowSum
+  genericShowSum'
     sumConNames
     sumToGeneric
-    (\t -> forallCTag @Show t show . getSumFamily)
 
 example :: IO ()
 example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
