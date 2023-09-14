@@ -39,7 +39,7 @@ showSum =
   genericShowSum
     sumConNames
     sumToGeneric
-    (\t -> forallCSumTag @Show t show . getSumFamily)
+    (\t -> forallCTag' @Show t show . getSumFamily)
 
 example :: IO ()
 example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
@@ -60,6 +60,15 @@ class FieldTypes (st :: t -> Type) where
   type ForallCTag st (c :: Type -> Constraint) :: Constraint
 
   forallCTag :: (ForallCTag st c) => Proxy c -> st i -> ((c (FieldType st i)) => r) -> r
+
+forallCTag' ::
+  forall c st r i.
+  (FieldTypes st) =>
+  (ForallCTag st c) =>
+  st i ->
+  ((c (FieldType st i)) => r) ->
+  r
+forallCTag' = forallCTag (Proxy @c)
 
 mashPiSigma ::
   (Tag st) =>
