@@ -38,8 +38,13 @@ newtype SumFamily' t = SumFamily' {getSumFamily :: SumFamily t}
 showSum :: Sum -> String
 showSum = genericShowSum sumConNames sumToGeneric
 
+showProduct :: Product -> String
+showProduct = genericShowProduct productConName productToGeneric
+
 example :: IO ()
-example = mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
+example = do
+  mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
+  putStrLn (showProduct (Product 1 True 'x'))
 
 -- Generics library
 data Sigma s f where
@@ -240,7 +245,7 @@ instance FieldTypes SProductTag where
   getFieldType = getProductFamily
 
   -- Requires UndecidableInstances. Could probably hack around this.
-  type ForallCTag SProductTag c = ForallCProductTag' c (Tags SProductTag)
+  type ForallCTag SProductTag c = ForallCTag' SProductTag c (Tags SProductTag)
 
   forallCTag'' = \(Proxy :: Proxy c) -> forallCProductTag @c
 
@@ -260,15 +265,14 @@ productToGeneric (Product f1 f2 f3) =
         SField3 -> f3
     )
 
-type family ForallCProductTag' c (ts :: [ProductTag]) :: Constraint where
-  ForallCProductTag' _ '[] = ()
-  ForallCProductTag' c (t : ts) = (c (ProductFamily t), ForallCProductTag' c ts)
-
-type ForallCProductTag (c :: Type -> Constraint) = ForallCProductTag' c (Tags SProductTag)
+type family ForallCTag' st c (ts :: [ProductTag]) :: Constraint where
+  ForallCTag' _ _ '[] = ()
+  ForallCTag' st c (t : ts) =
+    (c (FieldType st t), ForallCTag' st c ts)
 
 forallCProductTag ::
   forall c i r.
-  (ForallCProductTag c) =>
+  (ForallCTag SProductTag c) =>
   SProductTag i ->
   ((c (ProductFamily i)) => r) ->
   r
