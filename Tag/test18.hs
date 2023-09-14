@@ -37,8 +37,8 @@ showSum = genericShowSum sumConNames sumToGeneric
 showProduct :: Product -> String
 showProduct = genericShowProduct productConName productToGeneric
 
-example :: IO ()
-example = do
+main :: IO ()
+main = do
   mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
   putStrLn (showProduct (Product 1 True 'x'))
 
@@ -65,18 +65,26 @@ class Tag (st :: t -> Type) where
     Proxy c ->
     Proxy f ->
     st i ->
-    ((c (FieldType f i)) => r) ->
+    ((c (FieldType' f i)) => r) ->
     r
 
-type FunctionSymbol st = Proxy st -> Type
+type FunctionSymbol (st :: t -> Type) = Proxy st -> Type
 
-class FieldTypes (f :: FunctionSymbol st) where
-  type FieldType f (i :: t) :: Type
+type family F (a :: FunctionSymbol st) where
+  F (f :: FunctionSymbol st) = st
 
-type family ForeachField' f c (ts :: [t]) :: Constraint where
+type family G (a :: FunctionSymbol st) where
+  G (f :: FunctionSymbol (st :: t -> Type)) = t
+
+class FieldTypes (f :: FunctionSymbol (st :: t -> Type)) where
+  type FieldType t st f (i :: t) :: Type
+
+type FieldType' f i = FieldType (G f) (F f) f i
+
+type family ForeachField' (f :: FunctionSymbol st) c (ts :: [t]) :: Constraint where
   ForeachField' _ _ '[] = ()
-  ForeachField' f c (t : ts) =
-    (c (FieldType f t), ForeachField' f c ts)
+  ForeachField' f c (i : is) =
+    (c (FieldType' f i), ForeachField' f c is)
 
 type ForeachField (f :: FunctionSymbol st) c = ForeachField' f c (Tags st)
 
@@ -86,11 +94,11 @@ provideConstraint ::
   (FieldTypes f) =>
   (ForeachField f c) =>
   st i ->
-  ((c (FieldType f i)) => r) ->
+  ((c (FieldType' f i)) => r) ->
   r
 provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 
-newtype Family' f t = Family' {getFamily :: FieldType f t}
+newtype Family' f t = Family' {getFamily :: FieldType (G f) (F f) f t}
 
 mashPiSigma ::
   (Tag st) =>
@@ -159,7 +167,7 @@ getFieldType ::
   forall f i.
   (FieldTypes f) =>
   Family' f i ->
-  FieldType f i
+  FieldType' f i
 getFieldType = getFamily
 
 -- Generated code
@@ -192,7 +200,7 @@ instance Tag SSumTag where
 data SumF (a :: Proxy SSumTag)
 
 instance FieldTypes SumF where
-  type FieldType SumF t = SumFamily t
+  type FieldType _ _ SumF t = SumFamily t
 
 type family SumFamily (t :: SumTag) :: Type where
   SumFamily ATag = Int
@@ -249,7 +257,7 @@ instance Tag SProductTag where
 data ProductF (a :: Proxy SProductTag)
 
 instance FieldTypes ProductF where
-  type FieldType ProductF t = ProductFamily t
+  type FieldType _ _ ProductF t = ProductFamily t
 
 type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field1 = Int
