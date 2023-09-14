@@ -89,6 +89,11 @@ mashPiSigma ::
   r
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
 
+traversePi_ :: (Applicative m, Tag st)
+            => (forall (i :: t). f i -> m ()) -> Pi st f -> m ()
+-- This implementation could be better
+traversePi_ f = fmap (const ()) . traversePi (fmap Const . f)
+
 -- `family` is a keyword?!
 genericShowSum' ::
   (Tag st) =>
