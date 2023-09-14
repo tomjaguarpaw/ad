@@ -91,6 +91,8 @@ provideConstraint ::
   r
 provideConstraint = provideConstraint' (Proxy @c)
 
+newtype Family' st t = Family' {getFamily :: FieldType st t}
+
 mashPiSigma ::
   (Tag st) =>
   Pi st f1 ->
@@ -185,9 +187,9 @@ instance Tag SSumTag where
 
 instance FieldTypes SSumTag where
   type FieldType SSumTag t = SumFamily t
-  type FieldType' SSumTag = SumFamily'
+  type FieldType' SSumTag = Family' SSumTag
 
-  getFieldType = getSumFamily
+  getFieldType = getFamily
 
   provideConstraint' = \_ -> \case
     SATag -> id
@@ -209,11 +211,11 @@ sumConNames =
       SBTag -> "B"
       SCTag -> "C"
 
-sumToGeneric :: Sum -> Sigma SSumTag SumFamily'
+sumToGeneric :: Sum -> Sigma SSumTag (FieldType' SSumTag)
 sumToGeneric = \case
-  A p -> Sigma SATag (SumFamily' p)
-  B p -> Sigma SBTag (SumFamily' p)
-  C p -> Sigma SCTag (SumFamily' p)
+  A p -> Sigma SATag (Family' p)
+  B p -> Sigma SBTag (Family' p)
+  C p -> Sigma SCTag (Family' p)
 
 genericToSum :: Sigma SSumTag SumFamily' -> Sum
 genericToSum = \case
