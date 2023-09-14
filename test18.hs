@@ -150,7 +150,18 @@ genericShowProduct ::
 genericShowProduct conName f x =
   conName
     ++ " "
-    ++ intercalate " " (toListPi (\st -> provideConstraint @Show st show . getFieldType @_ @st) (f x))
+    ++ intercalate
+      " "
+      ( toListPi
+          ( \st ->
+              provideConstraint
+                @Show
+                st
+                show
+                . getFieldType @_ @st
+          )
+          (f x)
+      )
 
 -- Generated code
 
