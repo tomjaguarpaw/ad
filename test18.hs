@@ -267,8 +267,6 @@ type family ProductFamily (t :: ProductTag) :: Type where
   ProductFamily Field2 = Bool
   ProductFamily Field3 = Char
 
-newtype ProductFamily' t = ProductFamily' {getProductFamily :: ProductFamily t}
-
 productToGeneric :: Product -> Pi SProductTag (Family' SProductTag)
 productToGeneric (Product f1 f2 f3) =
   makePi $
@@ -278,12 +276,12 @@ productToGeneric (Product f1 f2 f3) =
         SField3 -> f3
     )
 
-genericToProduct :: Pi SProductTag ProductFamily' -> Product
+genericToProduct :: Pi SProductTag (Family' SProductTag) -> Product
 genericToProduct pi =
   Product (getField SField1) (getField SField2) (getField SField3)
   where
     getField :: forall i. SProductTag i -> ProductFamily i
-    getField = getProductFamily . getPi pi
+    getField = getFamily . getPi pi
 
 productConName :: String
 productConName = "Product"
