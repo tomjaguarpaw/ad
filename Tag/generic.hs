@@ -430,7 +430,7 @@ instance IsProduct (Product a) (ProductF a) where
 
 -- Attempt at a nested version
 
-data NestedProductATag = NA1
+data NestedProductATag = NA1 | NA2
 
 data NestedProductBTag = NB1
 
@@ -454,6 +454,7 @@ newtype NestedProductTag (a :: SumTag)
 type SNestedProductATag :: NestedProductTag ATag -> Type
 data SNestedProductATag a where
   SNA1 :: SNestedProductATag ('NestedProductTag NA1)
+  SNA2 :: SNestedProductATag ('NestedProductTag NA2)
 
 type SNestedProductBTag :: NestedProductTag BTag -> Type
 data SNestedProductBTag a where
@@ -482,6 +483,9 @@ type family SNestedProductTagF a where
 instance Known (NestedProductTag ATag) ('NestedProductTag NA1) where
   know = SNestedProductTag SNA1
 
+instance Known (NestedProductTag ATag) ('NestedProductTag NA2) where
+  know = SNestedProductTag SNA2
+
 instance Known (NestedProductTag BTag) ('NestedProductTag NB1) where
   know = SNestedProductTag SNB1
 
@@ -496,7 +500,7 @@ instance Known (NestedProductTag ETag) ('NestedProductTag NE1) where
 
 type TheTags :: forall (a :: SumTag) -> [NestedProductTag a]
 type family TheTags a where
-  TheTags ATag = '[ 'NestedProductTag NA1]
+  TheTags ATag = '[ 'NestedProductTag NA1, 'NestedProductTag NA2]
   TheTags BTag = '[ 'NestedProductTag NB1]
   TheTags CTag = '[ 'NestedProductTag NC1]
   TheTags DTag = '[ 'NestedProductTag ND1]
@@ -504,7 +508,7 @@ type family TheTags a where
 
 type ThePi :: forall (a :: SumTag) -> (NestedProductTag a -> Type) -> Type
 type family ThePi a b where
-  ThePi ATag f = f ('NestedProductTag NA1)
+  ThePi ATag f = (f ('NestedProductTag NA1), f ('NestedProductTag NA2))
   ThePi BTag f = f ('NestedProductTag NB1)
   ThePi CTag f = f ('NestedProductTag NC1)
   ThePi DTag f = f ('NestedProductTag ND1)
@@ -519,35 +523,45 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
   data Pi (NestedProductTag a) f = NestedPi (ThePi a f)
 
   getPi' (NestedPi thePi) = case know @_ @a of
-    SATag -> \case SNestedProductTag SNA1 -> thePi
+    SATag ->
+      let (thePi1, thePi2) = thePi
+       in \case
+            SNestedProductTag SNA1 -> thePi1
+            SNestedProductTag SNA2 -> thePi2
     SBTag -> \case SNestedProductTag SNB1 -> thePi
     SCTag -> \case SNestedProductTag SNC1 -> thePi
     SDTag -> \case SNestedProductTag SND1 -> thePi
     SETag -> \case SNestedProductTag SNE1 -> thePi
 
   knowns = case know @_ @a of
-    SATag -> \case SNestedProductTag SNA1 -> Dict
+    SATag -> \case
+      SNestedProductTag SNA1 -> Dict
+      SNestedProductTag SNA2 -> Dict
     SBTag -> \case SNestedProductTag SNB1 -> Dict
     SCTag -> \case SNestedProductTag SNC1 -> Dict
     SDTag -> \case SNestedProductTag SND1 -> Dict
     SETag -> \case SNestedProductTag SNE1 -> Dict
 
   makePi thePi = case know @_ @a of
-    SATag -> NestedPi thePi
+    SATag -> NestedPi (thePi, thePi)
     SBTag -> NestedPi thePi
     SCTag -> NestedPi thePi
     SDTag -> NestedPi thePi
     SETag -> NestedPi thePi
 
   traversePi f (NestedPi thePi) = case know @_ @a of
-    SATag -> NestedPi <$> f know thePi
+    SATag ->
+      let (thePi1, thePi2) = thePi
+       in NestedPi <$> ((,) <$> f know thePi1 <*> f know thePi2)
     SBTag -> NestedPi <$> f know thePi
     SCTag -> NestedPi <$> f know thePi
     SDTag -> NestedPi <$> f know thePi
     SETag -> NestedPi <$> f know thePi
 
   provideConstraint' = \_ _ -> case know @_ @a of
-    SATag -> \case SNestedProductTag SNA1 -> id
+    SATag -> \case
+      SNestedProductTag SNA1 -> id
+      SNestedProductTag SNA2 -> id
     SBTag -> \case SNestedProductTag SNB1 -> id
     SCTag -> \case SNestedProductTag SNC1 -> id
     SDTag -> \case SNestedProductTag SND1 -> id
@@ -564,7 +578,9 @@ foo =
             ( \(st :: Singleton (NestedProductTag ATag) i) ->
                 case knowns st of
                   Dict ->
-                    case know @_ @i of SNestedProductTag SNA1 -> Const "SNA1"
+                    case know @_ @i of
+                      SNestedProductTag SNA1 -> Const "SNA1"
+                      SNestedProductTag SNA2 -> Const "SNA2"
             )
         )
     )
