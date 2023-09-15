@@ -92,7 +92,7 @@ data Sigma t f where
 
 data Dict c where Dict :: (c) => Dict c
 
-class Known t (i :: t) where
+class Known t (i :: t) | i -> t where
   know :: Singleton t i
 
 -- | @Singleton t@ is the "singleton type" version of @t@
@@ -105,7 +105,7 @@ class Tag t where
   data Pi t :: (t -> Type) -> Type
 
   getPi :: forall (i :: t) (f :: t -> Type). Pi t f -> Singleton t i -> f i
-  makePi :: (forall (i :: t). Singleton t i -> f i) -> Pi t f
+  makePi :: (forall (i :: t). (Known t i) => f i) -> Pi t f
 
   knowns :: Singleton t i -> Dict (Known t i)
 
@@ -123,6 +123,9 @@ class Tag t where
     Singleton t i ->
     ((c (FieldType f i)) => r) ->
     r
+
+makePi' :: (Tag t) => (forall (i :: t). Singleton t i -> f i) -> Pi t f
+makePi' f = makePi (f know)
 
 -- Useful for obtaining @st@ and @t@ without making them visible in
 -- signatures.
@@ -297,7 +300,7 @@ instance Tag SumTag where
     SCTag -> f3
     SDTag -> f4
     SETag -> f5
-  makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag) (f SDTag) (f SETag)
+  makePi f = PiSSumTag f f f f f
 
   traversePi f (PiSSumTag a b c d e) =
     PiSSumTag <$> f SATag a <*> f SBTag b <*> f SCTag c <*> f SDTag d <*> f SETag e
@@ -325,7 +328,7 @@ type family SumFamily (a :: Type) (b :: Type) (t :: SumTag) :: Type where
 
 instance IsSum (Sum a b) (SumF a b) where
   sumConNames =
-    makePi $
+    makePi' $
       Const . \case
         SATag -> "A"
         SBTag -> "B"
@@ -377,7 +380,7 @@ instance Tag ProductTag where
     SField1 -> f1
     SField2 -> f2
     SField3 -> f3
-  makePi f = PiSProductTag (f SField1) (f SField2) (f SField3)
+  makePi f = PiSProductTag f f f
 
   traversePi f (PiSProductTag f1 f2 f3) =
     PiSProductTag <$> f SField1 f1 <*> f SField2 f2 <*> f SField3 f3
@@ -402,7 +405,7 @@ type family ProductFamily (a :: Type) (t :: ProductTag) :: Type where
 instance IsProduct (Product a) (ProductF a) where
   productConName = "Product"
   productToPi (Product f1 f2 f3) =
-    makePi
+    makePi'
       ( Newtyped . \case
           SField1 -> f1
           SField2 -> f2
