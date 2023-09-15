@@ -90,9 +90,9 @@ main = do
 data Sigma t f where
   Sigma :: Singleton t i -> f i -> Sigma t f
 
--- | @st@ is the "singleton type" version of @t@
+-- | @Singleton t@ is the "singleton type" version of @t@
 class Tag t where
-  type Singleton t :: t -> Type
+  data Singleton t :: t -> Type
 
   -- | All the types of kind @t@
   type Tags t :: [t]
@@ -257,16 +257,14 @@ genericShowProduct =
 -- | One value for each constructor of the sum type
 data SumTag = ATag | BTag | CTag | DTag | ETag
 
--- | The singleton version of the above
-data SSumTag t where
-  SATag :: SSumTag ATag
-  SBTag :: SSumTag BTag
-  SCTag :: SSumTag CTag
-  SDTag :: SSumTag DTag
-  SETag :: SSumTag ETag
-
 instance Tag SumTag where
-  type Singleton SumTag = SSumTag
+  data Singleton SumTag t where
+    SATag :: Singleton SumTag ATag
+    SBTag :: Singleton SumTag BTag
+    SCTag :: Singleton SumTag CTag
+    SDTag :: Singleton SumTag DTag
+    SETag :: Singleton SumTag ETag
+
   data Pi SumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
   type Tags SumTag = [ATag, BTag, CTag, DTag, ETag]
   getPi (PiSSumTag f1 f2 f3 f4 f5) = \case
@@ -331,14 +329,12 @@ instance IsSum (Sum a b) (SumF a b) where
 -- One value for each constructor of the product type
 data ProductTag = Field1 | Field2 | Field3
 
--- The singleton version of the above
-data SProductTag t where
-  SField1 :: SProductTag Field1
-  SField2 :: SProductTag Field2
-  SField3 :: SProductTag Field3
-
 instance Tag ProductTag where
-  type Singleton ProductTag = SProductTag
+  data Singleton ProductTag t where
+    SField1 :: Singleton ProductTag Field1
+    SField2 :: Singleton ProductTag Field2
+    SField3 :: Singleton ProductTag Field3
+
   data Pi ProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
   type Tags ProductTag = [Field1, Field2, Field3]
 
