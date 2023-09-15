@@ -293,7 +293,7 @@ instance Tag SumTag SSumTag where
 
 -- | A symbol used so that we can defunctionalize the mapping
 -- @SumFamily@
-data SumF (a :: Type) (b :: Type) (t :: Proxy SSumTag)
+data SumF (a :: Type) (b :: Type) (t :: Proxy (Singleton SumTag))
 
 instance FieldTypes (SumF a b) where
   type FieldType' _ _ (SumF a b) t = SumFamily a b t
@@ -362,7 +362,7 @@ instance Tag ProductTag SProductTag where
 
 -- | A symbol used so that we can defunctionalize the mapping
 -- @ProductFamily@
-data ProductF (a :: Type) (t :: Proxy SProductTag)
+data ProductF (a :: Type) (t :: Proxy (Singleton ProductTag))
 
 instance FieldTypes (ProductF a) where
   type FieldType' _ _ (ProductF a) t = ProductFamily a t
@@ -385,5 +385,5 @@ instance IsProduct (Product a) (ProductF a) where
   piToProduct pi =
     Product (getField SField1) (getField SField2) (getField SField3)
     where
-      getField :: forall i. SProductTag i -> ProductFamily a i
+      getField :: forall i. Singleton ProductTag i -> ProductFamily a i
       getField = getNewtyped . getPi pi
