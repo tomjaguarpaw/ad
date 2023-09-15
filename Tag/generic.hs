@@ -89,12 +89,15 @@ main = do
 
 -- Section: Generics library
 data Sigma t f where
-  Sigma :: Singleton t i -> f i -> Sigma t f
+  Sigma :: forall t i f. (Known t i) => f i -> Sigma t f
 
 data Dict c where Dict :: (c) => Dict c
 
 class Known t (i :: t) | i -> t where
   know :: Singleton t i
+
+knowProxy :: forall t i f. (Known t i) => f i -> Singleton t i
+knowProxy _ = know @_ @i
 
 -- | @Singleton t@ is the "singleton type" version of @t@
 class Tag t where
@@ -179,9 +182,9 @@ mashPiSigma ::
   (Tag t) =>
   Pi t f1 ->
   Sigma t f2 ->
-  (forall i. Singleton t i -> f1 i -> f2 i -> r) ->
+  (forall i. (Known t i) => f1 i -> f2 i -> r) ->
   r
-mashPiSigma pi (Sigma s f) k = k s (getPi' pi s) f
+mashPiSigma pi (Sigma f) k = k (getPi' pi know) f
 
 traversePi_ ::
   (Applicative m, Tag t) =>
@@ -235,8 +238,8 @@ genericShowSum' ::
   (x -> Sigma t (Newtyped f)) ->
   x ->
   String
-genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
-  conName ++ " " ++ showField t field
+genericShowSum' pi f x = mashPiSigma pi (f x) $ \(Const conName) field ->
+  conName ++ " " ++ showField know field
 
 genericShowSum ::
   forall sum t (f :: FunctionSymbol t).
@@ -342,14 +345,14 @@ instance IsSum (Sum a b) (SumF a b) where
         SETag -> "E"
 
   sumToSigma = \case
-    A p -> Sigma SATag (Newtyped p)
-    B p -> Sigma SBTag (Newtyped p)
-    C p -> Sigma SCTag (Newtyped p)
-    D p -> Sigma SDTag (Newtyped p)
-    E p -> Sigma SETag (Newtyped p)
+    A p -> Sigma @_ @ATag (Newtyped p)
+    B p -> Sigma @_ @BTag (Newtyped p)
+    C p -> Sigma @_ @CTag (Newtyped p)
+    D p -> Sigma @_ @DTag (Newtyped p)
+    E p -> Sigma @_ @ETag (Newtyped p)
 
   sigmaToSum = \case
-    Sigma t (getNewtyped -> p) -> case t of
+    Sigma (f@(getNewtyped -> p)) -> case knowProxy f of
       SATag -> A p
       SBTag -> B p
       SCTag -> C p
