@@ -87,8 +87,8 @@ main = do
   putStrLn (showProduct (Product 1 True 'x'))
 
 -- Section: Generics library
-data Sigma t (st :: t -> Type) f where
-  Sigma :: st i -> f i -> Sigma t st f
+data Sigma t f where
+  Sigma :: Singleton t i -> f i -> Sigma t f
 
 -- | @st@ is the "singleton type" version of @t@
 class Tag t where
@@ -163,7 +163,7 @@ newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 mashPiSigma ::
   (Tag t) =>
   Pi t f1 ->
-  Sigma t (Singleton t) f2 ->
+  Sigma t f2 ->
   (forall i. Singleton t i -> f1 i -> f2 i -> r) ->
   r
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
@@ -187,8 +187,8 @@ class
       sumf -> sum
   where
   sumConNames :: Pi t (Const String)
-  sumToSigma :: sum -> Sigma t (Singleton t) (Newtyped sumf)
-  sigmaToSum :: Sigma t (Singleton t) (Newtyped sumf) -> sum
+  sumToSigma :: sum -> Sigma t (Newtyped sumf)
+  sigmaToSum :: Sigma t (Newtyped sumf) -> sum
 
 -- Product types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
@@ -217,7 +217,7 @@ genericShowSum' ::
   forall t x (f :: FunctionSymbol t).
   (Tag t, ForeachField f Show) =>
   Pi t (Const String) ->
-  (x -> Sigma t (Singleton t) (Newtyped f)) ->
+  (x -> Sigma t (Newtyped f)) ->
   x ->
   String
 genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
