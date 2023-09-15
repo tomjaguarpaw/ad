@@ -90,6 +90,11 @@ main = do
 data Sigma t f where
   Sigma :: Singleton t i -> f i -> Sigma t f
 
+data Dict c where Dict :: (c) => Dict c
+
+class Known t (i :: t) where
+  know :: Singleton t i
+
 -- | @Singleton t@ is the "singleton type" version of @t@
 class Tag t where
   data Singleton t :: t -> Type
@@ -101,6 +106,8 @@ class Tag t where
 
   getPi :: forall (i :: t) (f :: t -> Type). Pi t f -> Singleton t i -> f i
   makePi :: (forall (i :: t). Singleton t i -> f i) -> Pi t f
+
+  knowns :: Singleton t i -> Dict (Known t i)
 
   traversePi ::
     forall (f :: t -> Type) (g :: t -> Type) m.
@@ -257,6 +264,16 @@ genericShowProduct =
 -- | One value for each constructor of the sum type
 data SumTag = ATag | BTag | CTag | DTag | ETag
 
+instance Known SumTag ATag where know = SATag
+
+instance Known SumTag BTag where know = SBTag
+
+instance Known SumTag CTag where know = SCTag
+
+instance Known SumTag DTag where know = SDTag
+
+instance Known SumTag ETag where know = SETag
+
 instance Tag SumTag where
   data Singleton SumTag t where
     SATag :: Singleton SumTag ATag
@@ -264,6 +281,13 @@ instance Tag SumTag where
     SCTag :: Singleton SumTag CTag
     SDTag :: Singleton SumTag DTag
     SETag :: Singleton SumTag ETag
+
+  knowns = \case
+    SATag -> Dict
+    SBTag -> Dict
+    SCTag -> Dict
+    SDTag -> Dict
+    SETag -> Dict
 
   data Pi SumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
   type Tags SumTag = [ATag, BTag, CTag, DTag, ETag]
@@ -329,11 +353,22 @@ instance IsSum (Sum a b) (SumF a b) where
 -- One value for each constructor of the product type
 data ProductTag = Field1 | Field2 | Field3
 
+instance Known ProductTag Field1 where know = SField1
+
+instance Known ProductTag Field2 where know = SField2
+
+instance Known ProductTag Field3 where know = SField3
+
 instance Tag ProductTag where
   data Singleton ProductTag t where
     SField1 :: Singleton ProductTag Field1
     SField2 :: Singleton ProductTag Field2
     SField3 :: Singleton ProductTag Field3
+
+  knowns = \case
+    SField1 -> Dict
+    SField2 -> Dict
+    SField3 -> Dict
 
   data Pi ProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
   type Tags ProductTag = [Field1, Field2, Field3]
