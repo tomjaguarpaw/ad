@@ -147,7 +147,7 @@ type family
 
 -- | Witness to the property of @ForEachField@
 provideConstraint ::
-  forall c t st (f :: FunctionSymbol st) r i.
+  forall c t (f :: FunctionSymbol t) r i.
   (Tag t) =>
   (ForeachField f c) =>
   Singleton t i ->
@@ -163,7 +163,7 @@ newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 mashPiSigma ::
   (Tag t) =>
   Pi t f1 ->
-  Sigma t st f2 ->
+  Sigma t (Singleton t) f2 ->
   (forall i. Singleton t i -> f1 i -> f2 i -> r) ->
   r
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
@@ -187,8 +187,8 @@ class
       sumf -> sum
   where
   sumConNames :: Pi t (Const String)
-  sumToSigma :: sum -> Sigma t st (Newtyped sumf)
-  sigmaToSum :: Sigma t st (Newtyped sumf) -> sum
+  sumToSigma :: sum -> Sigma t (Singleton t) (Newtyped sumf)
+  sigmaToSum :: Sigma t (Singleton t) (Newtyped sumf) -> sum
 
 -- Product types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
@@ -206,33 +206,33 @@ class
 -- Show.
 
 showField ::
-  forall t st (f :: FunctionSymbol st) i.
+  forall t (f :: FunctionSymbol t) i.
   (Tag t, ForeachField f Show) =>
   Singleton t i ->
   Newtyped f i ->
   String
-showField t = provideConstraint @Show @_ @_ @f t show . getNewtyped
+showField t = provideConstraint @Show @_ @f t show . getNewtyped
 
 genericShowSum' ::
-  forall t (st :: t -> Type) x (f :: FunctionSymbol st).
+  forall t x (f :: FunctionSymbol t).
   (Tag t, ForeachField f Show) =>
   Pi t (Const String) ->
-  (x -> Sigma t st (Newtyped f)) ->
+  (x -> Sigma t (Singleton t) (Newtyped f)) ->
   x ->
   String
 genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ showField t field
 
 genericShowSum ::
-  forall sum t st (f :: FunctionSymbol st).
+  forall sum t (f :: FunctionSymbol t).
   (Tag t, IsSum sum f, ForeachField f Show) =>
   sum ->
   String
 genericShowSum =
-  genericShowSum' @_ @_ @sum (sumConNames @_ @_ @sum) sumToSigma
+  genericShowSum' @_ @sum (sumConNames @_ @sum) sumToSigma
 
 genericShowProduct' ::
-  forall t st x (f :: FunctionSymbol st).
+  forall t x (f :: FunctionSymbol t).
   (ForeachField f Show, Tag t) =>
   String ->
   (x -> Pi t (Newtyped f)) ->
@@ -242,12 +242,12 @@ genericShowProduct' conName f x =
   conName ++ " " ++ unwords (toListPi showField (f x))
 
 genericShowProduct ::
-  forall product t st (f :: FunctionSymbol st).
+  forall product t (f :: FunctionSymbol t).
   (Tag t, IsProduct product f, ForeachField f Show) =>
   product ->
   String
 genericShowProduct =
-  genericShowProduct' @t @st (productConName @_ @_ @product) productToPi
+  genericShowProduct' @t (productConName @_ @product) productToPi
 
 -- Section: Generated code.  The generics library could in principle
 -- generate this, but that isn't implemented yet.
