@@ -23,6 +23,42 @@ import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
+{- Section: Summary of the idea
+
+The idea of this library is to take a sum type like
+
+    data Sum arg1 ... argn = C1 t1 | ... | Cm tm
+
+and generate a Sigma type that is isomorphic to it
+
+    data SumTag = C1 | ... | Cm
+
+    f = \case { C1 -> t1, ..., Cm -> tm }
+
+    Sigma (c :: SumTag). f c
+
+and to take a product type like
+
+    data Sum arg1 ... argn = C t1 tm
+
+and generate a Pi type that is isomorphic to it
+
+    data ProductTag = F1 | ... | Fm
+
+    f = \case { F1 -> t1, ..., Fm -> tm }
+
+    Pi (t :: ProductTag). f t
+
+(The isomorphisms are expressed in this library though sumToSigma,
+sigmaToSum, productToPi and piToProduct.)
+
+The hope is that it's easier to work generically with Sigma and Pi
+types than arbitrary Haskell data definitions.  Of course, to code up
+Sigma and Pi types in Haskell requires a fair bit of machinery, and
+that's the bulk of this library!
+
+-}
+
 -- Section: User code
 
 -- Currently this library works for types with multiple constructors
@@ -153,8 +189,8 @@ class
       sumf -> sum
   where
   sumConNames :: Pi st (Const String)
-  sumToGeneric :: sum -> Sigma st (Newtyped sumf)
-  genericToSum :: Sigma st (Newtyped sumf) -> sum
+  sumToSigma :: sum -> Sigma st (Newtyped sumf)
+  sigmaToSum :: Sigma st (Newtyped sumf) -> sum
 
 -- Product types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
@@ -164,8 +200,8 @@ class
       productf -> product
   where
   productConName :: String
-  productToGeneric :: product -> Pi st (Newtyped productf)
-  genericToProduct :: Pi st (Newtyped productf) -> product
+  productToPi :: product -> Pi st (Newtyped productf)
+  piToProduct :: Pi st (Newtyped productf) -> product
 
 -- Section: Client of the generics library, between the generics
 -- library and the user.  It provides a generic implementation of
@@ -195,7 +231,7 @@ genericShowSum ::
   sum ->
   String
 genericShowSum =
-  genericShowSum' @_ @sum (sumConNames @_ @sum) (sumToGeneric @_ @sum)
+  genericShowSum' @_ @sum (sumConNames @_ @sum) (sumToSigma @_ @sum)
 
 genericShowProduct' ::
   forall st x (f :: FunctionSymbol st).
@@ -213,7 +249,7 @@ genericShowProduct ::
   product ->
   String
 genericShowProduct =
-  genericShowProduct' @st (productConName @_ @product) productToGeneric
+  genericShowProduct' @st (productConName @_ @product) productToPi
 
 -- Section: Generated code.  The generics library could in principle
 -- generate this, but that isn't implemented yet.
@@ -276,14 +312,14 @@ instance IsSum (Sum a b) (SumF a b) where
         SDTag -> "D"
         SETag -> "E"
 
-  sumToGeneric = \case
+  sumToSigma = \case
     A p -> Sigma SATag (Newtyped p)
     B p -> Sigma SBTag (Newtyped p)
     C p -> Sigma SCTag (Newtyped p)
     D p -> Sigma SDTag (Newtyped p)
     E p -> Sigma SETag (Newtyped p)
 
-  genericToSum = \case
+  sigmaToSum = \case
     Sigma t (getNewtyped -> p) -> case t of
       SATag -> A p
       SBTag -> B p
@@ -334,7 +370,7 @@ type family ProductFamily (a :: Type) (t :: ProductTag) :: Type where
 
 instance IsProduct (Product a) (ProductF a) where
   productConName = "Product"
-  productToGeneric (Product f1 f2 f3) =
+  productToPi (Product f1 f2 f3) =
     makePi
       ( Newtyped . \case
           SField1 -> f1
@@ -342,7 +378,7 @@ instance IsProduct (Product a) (ProductF a) where
           SField3 -> f3
       )
 
-  genericToProduct pi =
+  piToProduct pi =
     Product (getField SField1) (getField SField2) (getField SField3)
     where
       getField :: forall i. SProductTag i -> ProductFamily a i
