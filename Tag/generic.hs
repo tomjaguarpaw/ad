@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
@@ -104,7 +105,7 @@ class Tag t where
 
   data Pi t :: (t -> Type) -> Type
 
-  getPi :: forall (i :: t) (f :: t -> Type). Pi t f -> Singleton t i -> f i
+  getPi' :: forall (i :: t) (f :: t -> Type). Pi t f -> Singleton t i -> f i
   makePi :: (forall (i :: t). (Known t i) => f i) -> Pi t f
 
   knowns :: Singleton t i -> Dict (Known t i)
@@ -126,6 +127,10 @@ class Tag t where
 
 makePi' :: (Tag t) => (forall (i :: t). Singleton t i -> f i) -> Pi t f
 makePi' f = makePi (f know)
+
+getPi ::
+  forall t (i :: t) (f :: t -> Type). (Known t i, Tag t) => Pi t f -> f i
+getPi pi = getPi' pi know
 
 -- Useful for obtaining @st@ and @t@ without making them visible in
 -- signatures.
@@ -176,7 +181,7 @@ mashPiSigma ::
   Sigma t f2 ->
   (forall i. Singleton t i -> f1 i -> f2 i -> r) ->
   r
-mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
+mashPiSigma pi (Sigma s f) k = k s (getPi' pi s) f
 
 traversePi_ ::
   (Applicative m, Tag t) =>
@@ -294,7 +299,7 @@ instance Tag SumTag where
 
   data Pi SumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
   type Tags SumTag = [ATag, BTag, CTag, DTag, ETag]
-  getPi (PiSSumTag f1 f2 f3 f4 f5) = \case
+  getPi' (PiSSumTag f1 f2 f3 f4 f5) = \case
     SATag -> f1
     SBTag -> f2
     SCTag -> f3
@@ -376,7 +381,7 @@ instance Tag ProductTag where
   data Pi ProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
   type Tags ProductTag = [Field1, Field2, Field3]
 
-  getPi (PiSProductTag f1 f2 f3) = \case
+  getPi' (PiSProductTag f1 f2 f3) = \case
     SField1 -> f1
     SField2 -> f2
     SField3 -> f3
@@ -413,7 +418,7 @@ instance IsProduct (Product a) (ProductF a) where
       )
 
   piToProduct pi =
-    Product (getField SField1) (getField SField2) (getField SField3)
+    Product (getField @Field1) (getField @Field2) (getField @Field3)
     where
-      getField :: forall i. Singleton ProductTag i -> ProductFamily a i
-      getField = getNewtyped . getPi pi
+      getField :: forall i. (Known ProductTag i) => ProductFamily a i
+      getField = getNewtyped (getPi @_ @i pi)
