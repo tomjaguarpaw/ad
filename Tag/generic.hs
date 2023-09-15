@@ -36,7 +36,7 @@ data Sum a b
 data Product a = Product Int Bool a
 
 showSum :: forall a b. (Show a, Show b) => Sum a b -> String
-showSum = genericShowSum @_ @(Sum a b) (sumConNames @_ @_ @(Sum a b)) (sumToGeneric @_ @_ @(Sum a b))
+showSum = genericShowSum @(Sum a b)
 
 showProduct :: (Show a) => Product a -> String
 showProduct = genericShowProduct productConName productToGeneric
@@ -136,7 +136,7 @@ showField ::
   String
 showField t = provideConstraint @Show @f t show . getNewtyped
 
-genericShowSum ::
+genericShowSum' ::
   forall st x (f :: FunctionSymbol st).
   (Tag st) =>
   (ForeachField f Show) =>
@@ -144,8 +144,18 @@ genericShowSum ::
   (x -> Sigma st (Newtyped f)) ->
   x ->
   String
-genericShowSum pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
+genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ showField t field
+
+genericShowSum ::
+  forall sum st (f :: FunctionSymbol st).
+  (Tag st) =>
+  (IsSum sum f) =>
+  (ForeachField f Show) =>
+  sum ->
+  String
+genericShowSum =
+  genericShowSum' @_ @sum (sumConNames @_ @_ @sum) (sumToGeneric @_ @_ @sum)
 
 genericShowProduct ::
   forall st x (f :: FunctionSymbol st).
