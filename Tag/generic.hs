@@ -91,21 +91,21 @@ data Sigma s f where
   Sigma :: s i -> f i -> Sigma s f
 
 -- | @st@ is the "singleton type" version of @t@
-class Tag (st :: t -> Type) where
+class Tag t (st :: t -> Type) where
   -- | All the types of kind @t@
-  type Tags st :: [t]
+  type Tags t st :: [t]
 
-  data Pi st :: (t -> Type) -> Type
+  data Pi t st :: (t -> Type) -> Type
 
-  getPi :: forall (i :: t) (f :: t -> Type). Pi st f -> st i -> f i
-  makePi :: (forall (i :: t). st i -> f i) -> Pi st f
+  getPi :: forall (i :: t) (f :: t -> Type). Pi t st f -> st i -> f i
+  makePi :: (forall (i :: t). st i -> f i) -> Pi t st f
 
   traversePi ::
     forall (f :: t -> Type) (g :: t -> Type) m.
     (Applicative m) =>
     (forall (i :: t). st i -> f i -> m (g i)) ->
-    Pi st f ->
-    m (Pi st g)
+    Pi t st f ->
+    m (Pi t st g)
 
   provideConstraint' ::
     (ForeachField (f :: FunctionSymbol st) c) =>
@@ -136,7 +136,7 @@ type FieldType (f :: FunctionSymbol' t st) i = FieldType' t st f i
 -- | @ForEachField f c@ means that for each @i@ of kind @t@,
 -- @FieldType f i@ has an instance for @c@.
 type ForeachField (f :: FunctionSymbol' t st) c =
-  ForeachField' t st f c (Tags st)
+  ForeachField' t st f c (Tags t st)
 
 -- | The implementation of @ForeachField@
 type family
@@ -149,8 +149,8 @@ type family
 
 -- | Witness to the property of @ForEachField@
 provideConstraint ::
-  forall c st (f :: FunctionSymbol st) r i.
-  (Tag st) =>
+  forall c t st (f :: FunctionSymbol st) r i.
+  (Tag t st) =>
   (ForeachField f c) =>
   st i ->
   ((c (FieldType f i)) => r) ->
@@ -163,62 +163,62 @@ provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 
 mashPiSigma ::
-  (Tag st) =>
-  Pi st f1 ->
+  (Tag t st) =>
+  Pi t st f1 ->
   Sigma st f2 ->
   (forall i. st i -> f1 i -> f2 i -> r) ->
   r
 mashPiSigma pi (Sigma s f) k = k s (getPi pi s) f
 
 traversePi_ ::
-  (Applicative m, Tag st) =>
+  (Applicative m, Tag t st) =>
   (forall (i :: t). st i -> f i -> m ()) ->
-  Pi st f ->
+  Pi t st f ->
   m ()
 -- This implementation could be better
 traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 
-toListPi :: (Tag st) => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
+toListPi :: (Tag t st) => (forall (i :: t). st i -> f i -> a) -> Pi t st f -> [a]
 toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
 -- Sum types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
 class
-  IsSum (sum :: Type) (sumf :: FunctionSymbol st)
+  IsSum (sum :: Type) (sumf :: FunctionSymbol' t st)
     | sum -> sumf,
       sumf -> sum
   where
-  sumConNames :: Pi st (Const String)
+  sumConNames :: Pi t st (Const String)
   sumToSigma :: sum -> Sigma st (Newtyped sumf)
   sigmaToSum :: Sigma st (Newtyped sumf) -> sum
 
 -- Product types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
 class
-  IsProduct (product :: Type) (productf :: FunctionSymbol st)
+  IsProduct (product :: Type) (productf :: FunctionSymbol' t st)
     | product -> productf,
       productf -> product
   where
   productConName :: String
-  productToPi :: product -> Pi st (Newtyped productf)
-  piToProduct :: Pi st (Newtyped productf) -> product
+  productToPi :: product -> Pi t st (Newtyped productf)
+  piToProduct :: Pi t st (Newtyped productf) -> product
 
 -- Section: Client of the generics library, between the generics
 -- library and the user.  It provides a generic implementation of
 -- Show.
 
 showField ::
-  forall st (f :: FunctionSymbol st) i.
-  (Tag st, ForeachField f Show) =>
+  forall t st (f :: FunctionSymbol st) i.
+  (Tag t st, ForeachField f Show) =>
   st i ->
   Newtyped f i ->
   String
-showField t = provideConstraint @Show @_ @f t show . getNewtyped
+showField t = provideConstraint @Show @_ @_ @f t show . getNewtyped
 
 genericShowSum' ::
-  forall st x (f :: FunctionSymbol st).
-  (Tag st, ForeachField f Show) =>
-  Pi st (Const String) ->
+  forall t st x (f :: FunctionSymbol st).
+  (Tag t st, ForeachField f Show) =>
+  Pi t st (Const String) ->
   (x -> Sigma st (Newtyped f)) ->
   x ->
   String
@@ -226,30 +226,30 @@ genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
   conName ++ " " ++ showField t field
 
 genericShowSum ::
-  forall sum st (f :: FunctionSymbol st).
-  (Tag st, IsSum sum f, ForeachField f Show) =>
+  forall sum t st (f :: FunctionSymbol st).
+  (Tag t st, IsSum sum f, ForeachField f Show) =>
   sum ->
   String
 genericShowSum =
-  genericShowSum' @_ @sum (sumConNames @_ @sum) (sumToSigma @_ @sum)
+  genericShowSum' @_ @_ @sum (sumConNames @_ @_ @sum) sumToSigma
 
 genericShowProduct' ::
-  forall st x (f :: FunctionSymbol st).
-  (ForeachField f Show, Tag st) =>
+  forall t st x (f :: FunctionSymbol st).
+  (ForeachField f Show, Tag t st) =>
   String ->
-  (x -> Pi st (Newtyped f)) ->
+  (x -> Pi t st (Newtyped f)) ->
   x ->
   String
 genericShowProduct' conName f x =
   conName ++ " " ++ unwords (toListPi showField (f x))
 
 genericShowProduct ::
-  forall product st (f :: FunctionSymbol st).
-  (Tag st, IsProduct product f, ForeachField f Show) =>
+  forall product t st (f :: FunctionSymbol st).
+  (Tag t st, IsProduct product f, ForeachField f Show) =>
   product ->
   String
 genericShowProduct =
-  genericShowProduct' @st (productConName @_ @product) productToPi
+  genericShowProduct' @t @st (productConName @_ @_ @product) productToPi
 
 -- Section: Generated code.  The generics library could in principle
 -- generate this, but that isn't implemented yet.
@@ -267,9 +267,9 @@ data SSumTag t where
   SDTag :: SSumTag DTag
   SETag :: SSumTag ETag
 
-instance Tag SSumTag where
-  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
-  type Tags SSumTag = [ATag, BTag, CTag, DTag, ETag]
+instance Tag SumTag SSumTag where
+  data Pi SumTag SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
+  type Tags SumTag SSumTag = [ATag, BTag, CTag, DTag, ETag]
   getPi (PiSSumTag f1 f2 f3 f4 f5) = \case
     SATag -> f1
     SBTag -> f2
@@ -338,9 +338,9 @@ data SProductTag t where
   SField2 :: SProductTag Field2
   SField3 :: SProductTag Field3
 
-instance Tag SProductTag where
-  data Pi SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
-  type Tags SProductTag = [Field1, Field2, Field3]
+instance Tag ProductTag SProductTag where
+  data Pi ProductTag SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
+  type Tags ProductTag SProductTag = [Field1, Field2, Field3]
 
   getPi (PiSProductTag f1 f2 f3) = \case
     SField1 -> f1
