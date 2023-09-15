@@ -92,6 +92,8 @@ data Sigma t (st :: t -> Type) f where
 
 -- | @st@ is the "singleton type" version of @t@
 class Tag t (st :: t -> Type) where
+  type Singleton t :: t -> Type
+
   -- | All the types of kind @t@
   type Tags t st :: [t]
 
@@ -268,6 +270,7 @@ data SSumTag t where
   SETag :: SSumTag ETag
 
 instance Tag SumTag SSumTag where
+  type Singleton SumTag = SSumTag
   data Pi SumTag SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
   type Tags SumTag SSumTag = [ATag, BTag, CTag, DTag, ETag]
   getPi (PiSSumTag f1 f2 f3 f4 f5) = \case
@@ -339,6 +342,7 @@ data SProductTag t where
   SField3 :: SProductTag Field3
 
 instance Tag ProductTag SProductTag where
+  type Singleton ProductTag = SProductTag
   data Pi ProductTag SProductTag f = PiSProductTag (f Field1) (f Field2) (f Field3)
   type Tags ProductTag SProductTag = [Field1, Field2, Field3]
 
