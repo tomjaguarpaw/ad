@@ -9,6 +9,7 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
@@ -137,7 +138,8 @@ getPi pi = getPi' pi know
 
 -- Useful for obtaining @st@ and @t@ without making them visible in
 -- signatures.
-type FunctionSymbol (t :: Type) = Proxy t -> Type
+type FunctionSymbol :: Type -> Type
+type FunctionSymbol t = Proxy t -> Type
 
 -- This is a defunctionalized mapping from @t@ to @Type@, represented
 -- by the function symbol @f@.  We need this defunctionalized version
@@ -147,6 +149,7 @@ class FieldTypes (f :: FunctionSymbol t) where
 
 -- Useful for passing @t@ and @st@ implicitly, without bringing them
 -- into scope.
+type FieldType :: FunctionSymbol t -> t -> Type
 type FieldType (f :: FunctionSymbol t) i = FieldType' t f i
 
 -- | @ForEachField f c@ means that for each @i@ of kind @t@,
