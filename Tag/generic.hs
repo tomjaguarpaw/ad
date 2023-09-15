@@ -25,6 +25,8 @@ import Prelude hiding (pi)
 
 -- Section: User code
 
+-- Currently this library works for types with multiple constructors
+-- each with a single field ...
 data Sum a b
   = A Int
   | B Bool
@@ -32,12 +34,15 @@ data Sum a b
   | D a
   | E b
 
+-- ... or with a single constructor with multiple fields.
 data Product a = Product Int Bool a
 
-showSum :: forall a b. (Show a, Show b) => Sum a b -> String
+-- We can obtain show generically!
+showSum :: (Show a, Show b) => Sum a b -> String
 showSum = genericShowSum
 
-showProduct :: forall a. (Show a) => Product a -> String
+-- We can obtain show generically!
+showProduct :: (Show a) => Product a -> String
 showProduct = genericShowProduct
 
 main :: IO ()
@@ -45,13 +50,16 @@ main = do
   mapM_ (putStrLn . showSum) [A 1, B True, C 'x', D 'y', E ()]
   putStrLn (showProduct (Product 1 True 'x'))
 
--- Generics library
+-- Section: Generics library
 data Sigma s f where
   Sigma :: s i -> f i -> Sigma s f
 
+-- | @st@ is the "singleton type" version of @t@
 class Tag (st :: t -> Type) where
-  data Pi st :: (t -> Type) -> Type
+  -- | All the types of kind @t@
   type Tags st :: [t]
+
+  data Pi st :: (t -> Type) -> Type
 
   getPi :: forall (i :: t) (f :: t -> Type). Pi st f -> st i -> f i
   makePi :: (forall (i :: t). st i -> f i) -> Pi st f
@@ -71,33 +79,41 @@ class Tag (st :: t -> Type) where
     ((c (FieldType f i)) => r) ->
     r
 
+-- Useful for obtaining @st@ and @t@ without making them visible in
+-- signatures.
 type FunctionSymbol' t (st :: t -> Type) = Proxy st -> Type
 
+-- Useful for obtaining @st@ and @t@ without making them visible in
+-- signatures.
 type FunctionSymbol (st :: t -> Type) = FunctionSymbol' t st
 
-type family St (a :: FunctionSymbol st) where
-  St (f :: FunctionSymbol st) = st
-
+-- This is a defunctionalized mapping from @t@ to @Type@, represented
+-- by the function symbol @f@.  We need this defunctionalized version
+-- because we can't partially apply type synonyms.
 class FieldTypes (f :: FunctionSymbol' t st) where
   type FieldType' t st f (i :: t) :: Type
 
--- Just to implicitly pass t and st
+-- Useful for passing @t@ and @st@ implicitly, without bringing them
+-- into scope.
 type FieldType (f :: FunctionSymbol' t st) i = FieldType' t st f i
 
+-- | @ForEachField f c@ means that for each @i@ of kind @t@,
+-- @FieldType f i@ has an instance for @c@.
+type ForeachField (f :: FunctionSymbol' t st) c =
+  ForeachField' t st f c (Tags st)
+
+-- | The implementation of @ForeachField@
 type family
-  ForeachField' t st (f :: FunctionSymbol' t st) c (ts :: [t]) ::
+  ForeachField' t st (f :: FunctionSymbol st) c (ts :: [t]) ::
     Constraint
   where
   ForeachField' _ _ _ _ '[] = ()
   ForeachField' t st f c (i : is) =
     (c (FieldType' t st f i), ForeachField' t st f c is)
 
-type ForeachField (f :: FunctionSymbol' t st) c =
-  ForeachField' t st f c (Tags st)
-
+-- | Witness to the property of @ForEachField@
 provideConstraint ::
-  forall c f r i st.
-  (st ~ St f) =>
+  forall c st (f :: FunctionSymbol st) r i.
   (Tag st) =>
   (ForeachField f c) =>
   st i ->
@@ -105,6 +121,9 @@ provideConstraint ::
   r
 provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 
+-- | We can't partially apply type families so instead we
+-- defunctionalize them to a symbol @f@ and then wrap them up in a
+-- newtype for use when we do need to partially apply them.
 newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 
 mashPiSigma ::
@@ -126,19 +145,43 @@ traversePi_ f = fmap (const ()) . traversePi (\st -> fmap Const . f st)
 toListPi :: (Tag st) => (forall (i :: t). st i -> f i -> a) -> Pi st f -> [a]
 toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
+-- Sum types will (or could -- that isn't implemented yet) have an
+-- instance of this class generated for them
+class
+  IsSum (sum :: Type) (sumf :: FunctionSymbol st)
+    | sum -> sumf,
+      sumf -> sum
+  where
+  sumConNames :: Pi st (Const String)
+  sumToGeneric :: sum -> Sigma st (Newtyped sumf)
+  genericToSum :: Sigma st (Newtyped sumf) -> sum
+
+-- Product types will (or could -- that isn't implemented yet) have an
+-- instance of this class generated for them
+class
+  IsProduct (product :: Type) (productf :: FunctionSymbol st)
+    | product -> productf,
+      productf -> product
+  where
+  productConName :: String
+  productToGeneric :: product -> Pi st (Newtyped productf)
+  genericToProduct :: Pi st (Newtyped productf) -> product
+
+-- Section: Client of the generics library, between the generics
+-- library and the user.  It provides a generic implementation of
+-- Show.
+
 showField ::
   forall st (f :: FunctionSymbol st) i.
-  (Tag st) =>
-  (ForeachField f Show) =>
+  (Tag st, ForeachField f Show) =>
   st i ->
   Newtyped f i ->
   String
-showField t = provideConstraint @Show @f t show . getNewtyped
+showField t = provideConstraint @Show @_ @f t show . getNewtyped
 
 genericShowSum' ::
   forall st x (f :: FunctionSymbol st).
-  (Tag st) =>
-  (ForeachField f Show) =>
+  (Tag st, ForeachField f Show) =>
   Pi st (Const String) ->
   (x -> Sigma st (Newtyped f)) ->
   x ->
@@ -148,9 +191,7 @@ genericShowSum' pi f x = mashPiSigma pi (f x) $ \t (Const conName) field ->
 
 genericShowSum ::
   forall sum st (f :: FunctionSymbol st).
-  (Tag st) =>
-  (IsSum sum f) =>
-  (ForeachField f Show) =>
+  (Tag st, IsSum sum f, ForeachField f Show) =>
   sum ->
   String
 genericShowSum =
@@ -158,8 +199,7 @@ genericShowSum =
 
 genericShowProduct' ::
   forall st x (f :: FunctionSymbol st).
-  (ForeachField f Show) =>
-  (Tag st) =>
+  (ForeachField f Show, Tag st) =>
   String ->
   (x -> Pi st (Newtyped f)) ->
   x ->
@@ -175,25 +215,15 @@ genericShowProduct ::
 genericShowProduct =
   genericShowProduct' @st (productConName @_ @product) productToGeneric
 
-class IsSum (sum :: Type) (sumf :: FunctionSymbol st) | sum -> sumf, sumf -> sum where
-  sumConNames :: Pi st (Const String)
-  sumToGeneric :: sum -> Sigma st (Newtyped sumf)
-  genericToSum :: Sigma st (Newtyped sumf) -> sum
-
-class
-  IsProduct (product :: Type) (productf :: FunctionSymbol st)
-    | product -> productf,
-      productf -> product
-  where
-  productConName :: String
-  productToGeneric :: product -> Pi st (Newtyped productf)
-  genericToProduct :: Pi st (Newtyped productf) -> product
-
--- Generated code
+-- Section: Generated code.  The generics library could in principle
+-- generate this, but that isn't implemented yet.
 
 -- For data Sum
+
+-- | One value for each constructor of the sum type
 data SumTag = ATag | BTag | CTag | DTag | ETag
 
+-- | The singleton version of the above
 data SSumTag t where
   SATag :: SSumTag ATag
   SBTag :: SSumTag BTag
@@ -222,6 +252,8 @@ instance Tag SSumTag where
     SDTag -> id
     SETag -> id
 
+-- | A symbol used so that we can defunctionalize the mapping
+-- @SumFamily@
 data SumF (a :: Type) (b :: Type) (t :: Proxy SSumTag)
 
 instance FieldTypes (SumF a b) where
@@ -260,8 +292,11 @@ instance IsSum (Sum a b) (SumF a b) where
       SETag -> E p
 
 -- For data Product
+
+-- One value for each constructor of the product type
 data ProductTag = Field1 | Field2 | Field3
 
+-- The singleton version of the above
 data SProductTag t where
   SField1 :: SProductTag Field1
   SField2 :: SProductTag Field2
@@ -285,6 +320,8 @@ instance Tag SProductTag where
     SField2 -> id
     SField3 -> id
 
+-- | A symbol used so that we can defunctionalize the mapping
+-- @ProductFamily@
 data ProductF (a :: Type) (t :: Proxy SProductTag)
 
 instance FieldTypes (ProductF a) where
