@@ -23,14 +23,14 @@ import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
 -- User code
-data Sum
+data Sum a
   = A Int
   | B Bool
-  | C Char
+  | C a
 
 data Product = Product Int Bool Char
 
-showSum :: Sum -> String
+showSum :: (Show a) => Sum a -> String
 showSum = genericShowSum sumConNames sumToGeneric
 
 showProduct :: Product -> String
@@ -71,7 +71,7 @@ type FunctionSymbol' t (st :: t -> Type) = Proxy st -> Type
 
 type FunctionSymbol (st :: t -> Type) = FunctionSymbol' t st
 
-type family St (a :: FunctionSymbol (st :: t -> Type)) where
+type family St (a :: FunctionSymbol st) where
   St (f :: FunctionSymbol st) = st
 
 class FieldTypes (f :: FunctionSymbol' t st) where
@@ -180,15 +180,15 @@ instance Tag SSumTag where
     SBTag -> id
     SCTag -> id
 
-data SumF (a :: Proxy SSumTag)
+data SumF (a :: Type) (b :: Proxy SSumTag)
 
-instance FieldTypes SumF where
-  type FieldType' _ _ SumF t = SumFamily t
+instance FieldTypes (SumF a) where
+  type FieldType' _ _ (SumF a) t = SumFamily a t
 
-type family SumFamily (t :: SumTag) :: Type where
-  SumFamily ATag = Int
-  SumFamily BTag = Bool
-  SumFamily CTag = Char
+type family SumFamily a (t :: SumTag) :: Type where
+  SumFamily _ ATag = Int
+  SumFamily _ BTag = Bool
+  SumFamily a CTag = a
 
 sumConNames :: Pi SSumTag (Const String)
 sumConNames =
@@ -198,13 +198,13 @@ sumConNames =
       SBTag -> "B"
       SCTag -> "C"
 
-sumToGeneric :: Sum -> Sigma SSumTag (Newtyped SumF)
+sumToGeneric :: Sum a -> Sigma SSumTag (Newtyped (SumF a))
 sumToGeneric = \case
   A p -> Sigma SATag (Newtyped p)
   B p -> Sigma SBTag (Newtyped p)
   C p -> Sigma SCTag (Newtyped p)
 
-genericToSum :: Sigma SSumTag (Newtyped SumF) -> Sum
+genericToSum :: Sigma SSumTag (Newtyped (SumF a)) -> Sum a
 genericToSum = \case
   Sigma t (getNewtyped -> p) -> case t of
     SATag -> A p
