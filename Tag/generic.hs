@@ -2,8 +2,10 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -22,7 +24,8 @@ import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
--- User code
+-- Section: User code
+
 data Sum a b
   = A Int
   | B Bool
@@ -32,8 +35,8 @@ data Sum a b
 
 data Product a = Product Int Bool a
 
-showSum :: (Show a, Show b) => Sum a b -> String
-showSum = genericShowSum sumConNames sumToGeneric
+showSum :: forall a b. (Show a, Show b) => Sum a b -> String
+showSum = genericShowSum @_ @(Sum a b) (sumConNames @_ @_ @(Sum a b)) (sumToGeneric @_ @_ @(Sum a b))
 
 showProduct :: (Show a) => Product a -> String
 showProduct = genericShowProduct productConName productToGeneric
@@ -155,6 +158,11 @@ genericShowProduct ::
 genericShowProduct conName f x =
   conName ++ " " ++ unwords (toListPi showField (f x))
 
+class IsSum sum (sumf :: FunctionSymbol' t st) | sum -> sumf, sumf -> sum where
+  sumConNames :: Pi st (Const String)
+  sumToGeneric :: sum -> Sigma st (Newtyped sumf)
+  genericToSum :: Sigma st (Newtyped sumf) -> sum
+
 -- Generated code
 
 -- For data Sum
@@ -200,32 +208,30 @@ type family SumFamily (a :: Type) (b :: Type) (t :: SumTag) :: Type where
   SumFamily a _ DTag = a
   SumFamily _ b ETag = b
 
-sumConNames :: Pi SSumTag (Const String)
-sumConNames =
-  makePi $
-    Const . \case
-      SATag -> "A"
-      SBTag -> "B"
-      SCTag -> "C"
-      SDTag -> "D"
-      SETag -> "E"
+instance IsSum (Sum a b) (SumF a b) where
+  sumConNames =
+    makePi $
+      Const . \case
+        SATag -> "A"
+        SBTag -> "B"
+        SCTag -> "C"
+        SDTag -> "D"
+        SETag -> "E"
 
-sumToGeneric :: Sum a b -> Sigma SSumTag (Newtyped (SumF a b))
-sumToGeneric = \case
-  A p -> Sigma SATag (Newtyped p)
-  B p -> Sigma SBTag (Newtyped p)
-  C p -> Sigma SCTag (Newtyped p)
-  D p -> Sigma SDTag (Newtyped p)
-  E p -> Sigma SETag (Newtyped p)
+  sumToGeneric = \case
+    A p -> Sigma SATag (Newtyped p)
+    B p -> Sigma SBTag (Newtyped p)
+    C p -> Sigma SCTag (Newtyped p)
+    D p -> Sigma SDTag (Newtyped p)
+    E p -> Sigma SETag (Newtyped p)
 
-genericToSum :: Sigma SSumTag (Newtyped (SumF a b)) -> Sum a b
-genericToSum = \case
-  Sigma t (getNewtyped -> p) -> case t of
-    SATag -> A p
-    SBTag -> B p
-    SCTag -> C p
-    SDTag -> D p
-    SETag -> E p
+  genericToSum = \case
+    Sigma t (getNewtyped -> p) -> case t of
+      SATag -> A p
+      SBTag -> B p
+      SCTag -> C p
+      SDTag -> D p
+      SETag -> E p
 
 -- For data Product
 data ProductTag = Field1 | Field2 | Field3
