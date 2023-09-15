@@ -136,8 +136,7 @@ getPi ::
   forall t (i :: t) (f :: t -> Type). (Known t i, Tag t) => Pi t f -> f i
 getPi pi = getPi' pi know
 
--- Useful for obtaining @st@ and @t@ without making them visible in
--- signatures.
+-- Useful for obtaining @t@ without making it visible in signatures.
 type FunctionSymbol :: Type -> Type
 type FunctionSymbol t = Proxy t -> Type
 
@@ -147,8 +146,7 @@ type FunctionSymbol t = Proxy t -> Type
 class FieldTypes (f :: FunctionSymbol t) where
   type FieldType' t f (i :: t) :: Type
 
--- Useful for passing @t@ and @st@ implicitly, without bringing them
--- into scope.
+-- Useful for passing @t@ implicitly, without bringing it into scope.
 type FieldType :: FunctionSymbol t -> t -> Type
 type FieldType (f :: FunctionSymbol t) i = FieldType' t f i
 
