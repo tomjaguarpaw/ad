@@ -23,22 +23,24 @@ import Data.Proxy (Proxy (Proxy))
 import Prelude hiding (pi)
 
 -- User code
-data Sum a
+data Sum a b
   = A Int
   | B Bool
   | C a
+  | D a
+  | E b
 
-data Product = Product Int Bool Char
+data Product a = Product Int Bool a
 
-showSum :: (Show a) => Sum a -> String
+showSum :: (Show a, Show b) => Sum a b -> String
 showSum = genericShowSum sumConNames sumToGeneric
 
-showProduct :: Product -> String
+showProduct :: (Show a) => Product a -> String
 showProduct = genericShowProduct productConName productToGeneric
 
 main :: IO ()
 main = do
-  mapM_ (putStrLn . showSum) [A 1, B True, C 'x']
+  mapM_ (putStrLn . showSum) [A 1, B True, C 'x', D 'y', E ()]
   putStrLn (showProduct (Product 1 True 'x'))
 
 -- Generics library
@@ -156,39 +158,47 @@ genericShowProduct conName f x =
 -- Generated code
 
 -- For data Sum
-data SumTag = ATag | BTag | CTag
+data SumTag = ATag | BTag | CTag | DTag | ETag
 
 data SSumTag t where
   SATag :: SSumTag ATag
   SBTag :: SSumTag BTag
   SCTag :: SSumTag CTag
+  SDTag :: SSumTag DTag
+  SETag :: SSumTag ETag
 
 instance Tag SSumTag where
-  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag)
-  type Tags SSumTag = [ATag, BTag, CTag]
-  getPi (PiSSumTag f1 f2 f3) = \case
+  data Pi SSumTag f = PiSSumTag (f ATag) (f BTag) (f CTag) (f DTag) (f ETag)
+  type Tags SSumTag = [ATag, BTag, CTag, DTag, ETag]
+  getPi (PiSSumTag f1 f2 f3 f4 f5) = \case
     SATag -> f1
     SBTag -> f2
     SCTag -> f3
-  makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag)
+    SDTag -> f4
+    SETag -> f5
+  makePi f = PiSSumTag (f SATag) (f SBTag) (f SCTag) (f SDTag) (f SETag)
 
-  traversePi f (PiSSumTag a b c) =
-    PiSSumTag <$> f SATag a <*> f SBTag b <*> f SCTag c
+  traversePi f (PiSSumTag a b c d e) =
+    PiSSumTag <$> f SATag a <*> f SBTag b <*> f SCTag c <*> f SDTag d <*> f SETag e
 
   provideConstraint' = \_ _ -> \case
     SATag -> id
     SBTag -> id
     SCTag -> id
+    SDTag -> id
+    SETag -> id
 
-data SumF (a :: Type) (b :: Proxy SSumTag)
+data SumF (a :: Type) (b :: Type) (t :: Proxy SSumTag)
 
-instance FieldTypes (SumF a) where
-  type FieldType' _ _ (SumF a) t = SumFamily a t
+instance FieldTypes (SumF a b) where
+  type FieldType' _ _ (SumF a b) t = SumFamily a b t
 
-type family SumFamily a (t :: SumTag) :: Type where
-  SumFamily _ ATag = Int
-  SumFamily _ BTag = Bool
-  SumFamily a CTag = a
+type family SumFamily (a :: Type) (b :: Type) (t :: SumTag) :: Type where
+  SumFamily _ _ ATag = Int
+  SumFamily _ _ BTag = Bool
+  SumFamily a _ CTag = a
+  SumFamily a _ DTag = a
+  SumFamily _ b ETag = b
 
 sumConNames :: Pi SSumTag (Const String)
 sumConNames =
@@ -197,19 +207,25 @@ sumConNames =
       SATag -> "A"
       SBTag -> "B"
       SCTag -> "C"
+      SDTag -> "D"
+      SETag -> "E"
 
-sumToGeneric :: Sum a -> Sigma SSumTag (Newtyped (SumF a))
+sumToGeneric :: Sum a b -> Sigma SSumTag (Newtyped (SumF a b))
 sumToGeneric = \case
   A p -> Sigma SATag (Newtyped p)
   B p -> Sigma SBTag (Newtyped p)
   C p -> Sigma SCTag (Newtyped p)
+  D p -> Sigma SDTag (Newtyped p)
+  E p -> Sigma SETag (Newtyped p)
 
-genericToSum :: Sigma SSumTag (Newtyped (SumF a)) -> Sum a
+genericToSum :: Sigma SSumTag (Newtyped (SumF a b)) -> Sum a b
 genericToSum = \case
   Sigma t (getNewtyped -> p) -> case t of
     SATag -> A p
     SBTag -> B p
     SCTag -> C p
+    SDTag -> D p
+    SETag -> E p
 
 -- For data Product
 data ProductTag = Field1 | Field2 | Field3
@@ -237,17 +253,17 @@ instance Tag SProductTag where
     SField2 -> id
     SField3 -> id
 
-data ProductF (a :: Proxy SProductTag)
+data ProductF (a :: Type) (t :: Proxy SProductTag)
 
-instance FieldTypes ProductF where
-  type FieldType' _ _ ProductF t = ProductFamily t
+instance FieldTypes (ProductF a) where
+  type FieldType' _ _ (ProductF a) t = ProductFamily a t
 
-type family ProductFamily (t :: ProductTag) :: Type where
-  ProductFamily Field1 = Int
-  ProductFamily Field2 = Bool
-  ProductFamily Field3 = Char
+type family ProductFamily (a :: Type) (t :: ProductTag) :: Type where
+  ProductFamily _ Field1 = Int
+  ProductFamily _ Field2 = Bool
+  ProductFamily a Field3 = a
 
-productToGeneric :: Product -> Pi SProductTag (Newtyped ProductF)
+productToGeneric :: Product a -> Pi SProductTag (Newtyped (ProductF a))
 productToGeneric (Product f1 f2 f3) =
   makePi
     ( Newtyped . \case
@@ -256,11 +272,12 @@ productToGeneric (Product f1 f2 f3) =
         SField3 -> f3
     )
 
-genericToProduct :: Pi SProductTag (Newtyped ProductF) -> Product
+genericToProduct ::
+  forall a. Pi SProductTag (Newtyped (ProductF a)) -> Product a
 genericToProduct pi =
   Product (getField SField1) (getField SField2) (getField SField3)
   where
-    getField :: forall i. SProductTag i -> ProductFamily i
+    getField :: forall i. SProductTag i -> ProductFamily a i
     getField = getNewtyped . getPi pi
 
 productConName :: String
