@@ -5,7 +5,6 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -36,10 +35,10 @@ data Sum a b
 data Product a = Product Int Bool a
 
 showSum :: forall a b. (Show a, Show b) => Sum a b -> String
-showSum = genericShowSum @(Sum a b)
+showSum = genericShowSum
 
-showProduct :: (Show a) => Product a -> String
-showProduct = genericShowProduct productConName productToGeneric
+showProduct :: forall a. (Show a) => Product a -> String
+showProduct = genericShowProduct
 
 main :: IO ()
 main = do
@@ -155,9 +154,9 @@ genericShowSum ::
   sum ->
   String
 genericShowSum =
-  genericShowSum' @_ @sum (sumConNames @_ @_ @sum) (sumToGeneric @_ @_ @sum)
+  genericShowSum' @_ @sum (sumConNames @_ @sum) (sumToGeneric @_ @sum)
 
-genericShowProduct ::
+genericShowProduct' ::
   forall st x (f :: FunctionSymbol st).
   (ForeachField f Show) =>
   (Tag st) =>
@@ -165,13 +164,30 @@ genericShowProduct ::
   (x -> Pi st (Newtyped f)) ->
   x ->
   String
-genericShowProduct conName f x =
+genericShowProduct' conName f x =
   conName ++ " " ++ unwords (toListPi showField (f x))
 
-class IsSum sum (sumf :: FunctionSymbol' t st) | sum -> sumf, sumf -> sum where
+genericShowProduct ::
+  forall product st (f :: FunctionSymbol st).
+  (Tag st, IsProduct product f, ForeachField f Show) =>
+  product ->
+  String
+genericShowProduct =
+  genericShowProduct' @st (productConName @_ @product) productToGeneric
+
+class IsSum (sum :: Type) (sumf :: FunctionSymbol st) | sum -> sumf, sumf -> sum where
   sumConNames :: Pi st (Const String)
   sumToGeneric :: sum -> Sigma st (Newtyped sumf)
   genericToSum :: Sigma st (Newtyped sumf) -> sum
+
+class
+  IsProduct (product :: Type) (productf :: FunctionSymbol st)
+    | product -> productf,
+      productf -> product
+  where
+  productConName :: String
+  productToGeneric :: product -> Pi st (Newtyped productf)
+  genericToProduct :: Pi st (Newtyped productf) -> product
 
 -- Generated code
 
@@ -279,22 +295,18 @@ type family ProductFamily (a :: Type) (t :: ProductTag) :: Type where
   ProductFamily _ Field2 = Bool
   ProductFamily a Field3 = a
 
-productToGeneric :: Product a -> Pi SProductTag (Newtyped (ProductF a))
-productToGeneric (Product f1 f2 f3) =
-  makePi
-    ( Newtyped . \case
-        SField1 -> f1
-        SField2 -> f2
-        SField3 -> f3
-    )
+instance IsProduct (Product a) (ProductF a) where
+  productConName = "Product"
+  productToGeneric (Product f1 f2 f3) =
+    makePi
+      ( Newtyped . \case
+          SField1 -> f1
+          SField2 -> f2
+          SField3 -> f3
+      )
 
-genericToProduct ::
-  forall a. Pi SProductTag (Newtyped (ProductF a)) -> Product a
-genericToProduct pi =
-  Product (getField SField1) (getField SField2) (getField SField3)
-  where
-    getField :: forall i. SProductTag i -> ProductFamily a i
-    getField = getNewtyped . getPi pi
-
-productConName :: String
-productConName = "Product"
+  genericToProduct pi =
+    Product (getField SField1) (getField SField2) (getField SField3)
+    where
+      getField :: forall i. SProductTag i -> ProductFamily a i
+      getField = getNewtyped . getPi pi
