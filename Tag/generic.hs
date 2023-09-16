@@ -575,12 +575,14 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
     SDTag -> \case SNestedProductTag SND1 -> id
     SETag -> \case SNestedProductTag SNE1 -> id
 
--- I don't know how to generalize the `Const String` too, because its
--- type is `t s -> Type`
-type WrapPi :: forall (t :: Type). (t -> Type) -> t -> Type
-newtype WrapPi t s = WrapPi (Pi (t s) (Const String))
+-- Wow, this WrapPi/BetterConst stuff is some deep magic
+type WrapPi :: forall (t :: Type). forall (f :: t -> Type) -> (forall z. f z -> Type) -> t -> Type
+newtype WrapPi t k s = WrapPi (Pi (t s) k)
 
-foo :: Sigma SumTag (WrapPi NestedProductTag)
+type BetterConst :: forall f. Type -> forall z. f z -> Type
+newtype BetterConst t x = BetterConst t
+
+foo :: Sigma SumTag (WrapPi NestedProductTag (BetterConst String))
 foo =
   Sigma @_ @ATag
     ( WrapPi
@@ -589,8 +591,8 @@ foo =
                 case knowns st of
                   Dict ->
                     case know @_ @i of
-                      SNestedProductTag SNA1 -> Const "SNA1"
-                      SNestedProductTag SNA2 -> Const "SNA2"
+                      SNestedProductTag SNA1 -> BetterConst "SNA1"
+                      SNestedProductTag SNA2 -> BetterConst "SNA2"
             )
         )
     )
