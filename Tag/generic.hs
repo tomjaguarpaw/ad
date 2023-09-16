@@ -548,21 +548,23 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
     SDTag -> \case SNestedProductTag SND1 -> Dict
     SETag -> \case SNestedProductTag SNE1 -> Dict
 
-  makePi thePi = case know @_ @a of
-    SATag -> NestedPi (thePi, thePi)
-    SBTag -> NestedPi thePi
-    SCTag -> NestedPi thePi
-    SDTag -> NestedPi thePi
-    SETag -> NestedPi thePi
+  makePi x = case know @_ @a of
+    SATag -> NestedPi (x, x)
+    SBTag -> NestedPi x
+    SCTag -> NestedPi x
+    SDTag -> NestedPi x
+    SETag -> NestedPi x
 
-  traversePi f (NestedPi thePi) = case know @_ @a of
-    SATag ->
-      let (thePi1, thePi2) = thePi
-       in NestedPi <$> ((,) <$> f know thePi1 <*> f know thePi2)
-    SBTag -> NestedPi <$> f know thePi
-    SCTag -> NestedPi <$> f know thePi
-    SDTag -> NestedPi <$> f know thePi
-    SETag -> NestedPi <$> f know thePi
+  traversePi f = traverseNestedPi $ case know @_ @a of
+    SATag -> \(thePi1, thePi2) ->
+      (,) <$> f know thePi1 <*> f know thePi2
+    SBTag -> f know
+    SCTag -> f know
+    SDTag -> f know
+    SETag -> f know
+    where
+      traverseNestedPi g (NestedPi thePi) =
+        NestedPi <$> g thePi
 
   provideConstraint' = \_ _ -> case know @_ @a of
     SATag -> \case
