@@ -575,13 +575,15 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
     SDTag -> \case SNestedProductTag SND1 -> id
     SETag -> \case SNestedProductTag SNE1 -> id
 
-type Blah :: SumTag -> Type
-newtype Blah s = Blah (Pi (NestedProductTag s) (Const String))
+-- I don't know how to generalize the `Const String` too, because its
+-- type is `t s -> Type`
+type WrapPi :: forall (t :: Type). (t -> Type) -> t -> Type
+newtype WrapPi t s = WrapPi (Pi (t s) (Const String))
 
-foo :: Sigma SumTag Blah
+foo :: Sigma SumTag (WrapPi NestedProductTag)
 foo =
   Sigma @_ @ATag
-    ( Blah
+    ( WrapPi
         ( makePi'
             ( \(st :: Singleton (NestedProductTag ATag) i) ->
                 case knowns st of
