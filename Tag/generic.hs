@@ -21,6 +21,7 @@
 
 module Main where
 
+import Control.Arrow ((>>>))
 import Data.Functor.Const (Const (Const, getConst))
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
@@ -526,18 +527,17 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
 
   type Tags (NestedProductTag a) = TheTags a
 
-  data Pi (NestedProductTag a) f = NestedPi (ThePi a f)
+  data Pi (NestedProductTag a) f = NestedPi {unNestedPi :: ThePi a f}
 
-  getPi' (NestedPi thePi) = case know @_ @a of
-    SATag ->
-      let (thePi1, thePi2) = thePi
-       in \case
-            SNestedProductTag SNA1 -> thePi1
-            SNestedProductTag SNA2 -> thePi2
-    SBTag -> \case SNestedProductTag SNB1 -> thePi
-    SCTag -> \case SNestedProductTag SNC1 -> thePi
-    SDTag -> \case SNestedProductTag SND1 -> thePi
-    SETag -> \case SNestedProductTag SNE1 -> thePi
+  getPi' =
+    unNestedPi >>> case know @_ @a of
+      SATag -> \(thePi1, thePi2) -> \case
+        SNestedProductTag SNA1 -> thePi1
+        SNestedProductTag SNA2 -> thePi2
+      SBTag -> \thePi -> \case SNestedProductTag SNB1 -> thePi
+      SCTag -> \thePi -> \case SNestedProductTag SNC1 -> thePi
+      SDTag -> \thePi -> \case SNestedProductTag SND1 -> thePi
+      SETag -> \thePi -> \case SNestedProductTag SNE1 -> thePi
 
   knowns = case know @_ @a of
     SATag -> \case
