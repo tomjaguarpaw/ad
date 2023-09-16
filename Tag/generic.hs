@@ -430,6 +430,12 @@ instance IsProduct (Product a) (ProductF a) where
 
 -- Attempt at a nested version
 
+-- Trying to promote constructors of non-uniform (or
+-- "non-parametric"?) data types is a mess.  This is the only way I've
+-- come up with.  For more details see
+--
+-- https://mail.haskell.org/pipermail/haskell-cafe/2023-September/136341.html
+
 data NestedProductATag = NA1 | NA2
 
 data NestedProductBTag = NB1
