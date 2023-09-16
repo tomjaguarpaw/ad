@@ -576,7 +576,12 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
     SETag -> \case SNestedProductTag SNE1 -> id
 
 -- Wow, this WrapPi/BetterConst stuff is some deep magic
-type WrapPi :: forall (t :: Type). forall (f :: t -> Type) -> (forall z. f z -> Type) -> t -> Type
+type WrapPi ::
+  forall (t :: Type).
+  forall (f :: t -> Type) ->
+  (forall z. f z -> Type) ->
+  t ->
+  Type
 newtype WrapPi t k s = WrapPi (Pi (t s) k)
 
 type BetterConst :: forall f. Type -> forall z. f z -> Type
