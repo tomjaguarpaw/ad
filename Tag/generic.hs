@@ -78,6 +78,14 @@ data Sum a b
 -- ... or with a single constructor with multiple fields.
 data Product a = Product Int Bool a
 
+-- General ADTs are work-in-progress
+data SumOfProducts a b
+  = SP1 a b
+  | SP2
+  | SP3 a
+  | SP4 b
+  | SP5 Char
+
 -- We can obtain show generically!
 showSum :: (Show a, Show b) => Sum a b -> String
 showSum = genericShowSum
@@ -180,6 +188,7 @@ provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 -- | We can't partially apply type families so instead we
 -- defunctionalize them to a symbol @f@ and then wrap them up in a
 -- newtype for use when we do need to partially apply them.
+type Newtyped :: forall t. FunctionSymbol t -> t -> Type
 newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
 
 mashPiSigma ::
@@ -580,10 +589,10 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
 type WrapPi ::
   forall (t :: Type).
   forall (f :: t -> Type) ->
-  (forall z. f z -> Type) ->
+  (forall (z :: t). f z -> Type) ->
   t ->
   Type
-newtype WrapPi t k s = WrapPi (Pi (t s) k)
+newtype WrapPi f k s = WrapPi (Pi (f s) k)
 
 type BetterConst :: forall f. Type -> forall z. f z -> Type
 newtype BetterConst t x = BetterConst t
@@ -602,3 +611,88 @@ foo =
             )
         )
     )
+
+-- | A symbol used so that we can defunctionalize the mapping
+-- @SumFamily@
+data SumOfProductsF (a :: Type) (b :: Type) (s :: SumTag) (t :: Proxy (NestedProductTag s))
+
+-- Do I need to generalise this?
+instance FieldTypes (SumOfProductsF a b s) where
+  type FieldType' _ (SumOfProductsF a b s) t = SumOfProductsFamily a b s t
+
+type SumOfProductsFamily :: Type -> Type -> forall (s :: SumTag) -> NestedProductTag s -> Type
+type family SumOfProductsFamily (a :: Type) (b :: Type) (s :: SumTag) (t :: NestedProductTag s) :: Type where
+  SumOfProductsFamily a _ ATag ('NestedProductTag NA1) = a
+  SumOfProductsFamily _ b ATag ('NestedProductTag NA2) = b
+  SumOfProductsFamily a _ CTag ('NestedProductTag NC1) = a
+  SumOfProductsFamily _ b DTag ('NestedProductTag ND1) = b
+  SumOfProductsFamily _ _ ETag ('NestedProductTag NE1) = Char
+
+type Newtyped2 :: Type -> Type -> forall (s :: SumTag). NestedProductTag s -> Type
+newtype Newtyped2 a b (i :: NestedProductTag s) = Newtyped2 (SumOfProductsFamily a b s i)
+
+sumOfProductsToSigmaOfPi ::
+  forall a b.
+  SumOfProducts a b ->
+  Sigma SumTag (WrapPi NestedProductTag (Newtyped2 a b))
+sumOfProductsToSigmaOfPi = \case
+  SP1 a b ->
+    Sigma
+      ( WrapPi
+          ( makePi'
+              ( \(st :: Singleton (NestedProductTag ATag) i) ->
+                  case knowns st of
+                    Dict ->
+                      case know @_ @i of
+                        SNestedProductTag SNA1 -> Newtyped2 a
+                        SNestedProductTag SNA2 -> Newtyped2 b
+              )
+          )
+      )
+  SP2 ->
+    Sigma
+      ( WrapPi
+          ( makePi'
+              ( \(st :: Singleton (NestedProductTag BTag) i) ->
+                  case knowns st of
+                    Dict ->
+                      case know @_ @i of {}
+              )
+          )
+      )
+  SP3 a ->
+    Sigma
+      ( WrapPi
+          ( makePi'
+              ( \(st :: Singleton (NestedProductTag CTag) i) ->
+                  case knowns st of
+                    Dict ->
+                      case know @_ @i of
+                        SNestedProductTag SNC1 -> Newtyped2 a
+              )
+          )
+      )
+  SP4 a ->
+    Sigma
+      ( WrapPi
+          ( makePi'
+              ( \(st :: Singleton (NestedProductTag DTag) i) ->
+                  case knowns st of
+                    Dict ->
+                      case know @_ @i of
+                        SNestedProductTag SND1 -> Newtyped2 a
+              )
+          )
+      )
+  SP5 a ->
+    Sigma
+      ( WrapPi
+          ( makePi'
+              ( \(st :: Singleton (NestedProductTag ETag) i) ->
+                  case knowns st of
+                    Dict ->
+                      case know @_ @i of
+                        SNestedProductTag SNE1 -> Newtyped2 a
+              )
+          )
+      )
