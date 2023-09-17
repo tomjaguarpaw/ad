@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE EmptyCase #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
@@ -439,7 +440,7 @@ instance IsProduct (Product a) (ProductF a) where
 
 data NestedProductATag = NA1 | NA2
 
-data NestedProductBTag = NB1
+data NestedProductBTag
 
 data NestedProductCTag = NC1
 
@@ -464,8 +465,7 @@ data SNestedProductATag a where
   SNA2 :: SNestedProductATag ('NestedProductTag NA2)
 
 type SNestedProductBTag :: NestedProductTag BTag -> Type
-data SNestedProductBTag a where
-  SNB1 :: SNestedProductBTag ('NestedProductTag NB1)
+data SNestedProductBTag a
 
 type SNestedProductCTag :: NestedProductTag CTag -> Type
 data SNestedProductCTag a where
@@ -493,9 +493,6 @@ instance Known (NestedProductTag ATag) ('NestedProductTag NA1) where
 instance Known (NestedProductTag ATag) ('NestedProductTag NA2) where
   know = SNestedProductTag SNA2
 
-instance Known (NestedProductTag BTag) ('NestedProductTag NB1) where
-  know = SNestedProductTag SNB1
-
 instance Known (NestedProductTag CTag) ('NestedProductTag NC1) where
   know = SNestedProductTag SNC1
 
@@ -508,7 +505,7 @@ instance Known (NestedProductTag ETag) ('NestedProductTag NE1) where
 type TheTags :: forall (a :: SumTag) -> [NestedProductTag a]
 type family TheTags a where
   TheTags ATag = '[ 'NestedProductTag NA1, 'NestedProductTag NA2]
-  TheTags BTag = '[ 'NestedProductTag NB1]
+  TheTags BTag = '[]
   TheTags CTag = '[ 'NestedProductTag NC1]
   TheTags DTag = '[ 'NestedProductTag ND1]
   TheTags ETag = '[ 'NestedProductTag NE1]
@@ -516,49 +513,53 @@ type family TheTags a where
 type ThePi :: forall (a :: SumTag) -> (NestedProductTag a -> Type) -> Type
 type family ThePi a b where
   ThePi ATag f = (f ('NestedProductTag NA1), f ('NestedProductTag NA2))
-  ThePi BTag f = f ('NestedProductTag NB1)
+  ThePi BTag f = ()
   ThePi CTag f = f ('NestedProductTag NC1)
   ThePi DTag f = f ('NestedProductTag ND1)
   ThePi ETag f = f ('NestedProductTag NE1)
 
 instance (Known SumTag a) => Tag (NestedProductTag a) where
-  data Singleton (NestedProductTag a) i
-    = SNestedProductTag (SNestedProductTagF a i)
+  newtype Singleton (NestedProductTag a) i = SNestedProductTag {unSNestedProductTag :: SNestedProductTagF a i}
 
   type Tags (NestedProductTag a) = TheTags a
 
   data Pi (NestedProductTag a) f = NestedPi {unNestedPi :: ThePi a f}
 
   getPi' =
-    unNestedPi >>> case know @_ @a of
-      SATag -> \(thePi1, thePi2) -> \case
-        SNestedProductTag SNA1 -> thePi1
-        SNestedProductTag SNA2 -> thePi2
-      SBTag -> \thePi -> \case SNestedProductTag SNB1 -> thePi
-      SCTag -> \thePi -> \case SNestedProductTag SNC1 -> thePi
-      SDTag -> \thePi -> \case SNestedProductTag SND1 -> thePi
-      SETag -> \thePi -> \case SNestedProductTag SNE1 -> thePi
+    unNestedPi
+      >>> fmap
+        (. unSNestedProductTag)
+        ( case know @_ @a of
+            SATag -> \(thePi1, thePi2) -> \case
+              SNA1 -> thePi1
+              SNA2 -> thePi2
+            SBTag -> \() -> \case {}
+            SCTag -> \thePi -> \case SNC1 -> thePi
+            SDTag -> \thePi -> \case SND1 -> thePi
+            SETag -> \thePi -> \case SNE1 -> thePi
+        )
 
-  knowns = case know @_ @a of
-    SATag -> \case
-      SNestedProductTag SNA1 -> Dict
-      SNestedProductTag SNA2 -> Dict
-    SBTag -> \case SNestedProductTag SNB1 -> Dict
-    SCTag -> \case SNestedProductTag SNC1 -> Dict
-    SDTag -> \case SNestedProductTag SND1 -> Dict
-    SETag -> \case SNestedProductTag SNE1 -> Dict
+  knowns =
+    unSNestedProductTag >>> case know @_ @a of
+      SATag -> \case
+        SNA1 -> Dict
+        SNA2 -> Dict
+      SBTag -> \case {}
+      SCTag -> \case SNC1 -> Dict
+      SDTag -> \case SND1 -> Dict
+      SETag -> \case SNE1 -> Dict
 
-  makePi x = case know @_ @a of
-    SATag -> NestedPi (x, x)
-    SBTag -> NestedPi x
-    SCTag -> NestedPi x
-    SDTag -> NestedPi x
-    SETag -> NestedPi x
+  makePi x = NestedPi $ case know @_ @a of
+    SATag -> (x, x)
+    SBTag -> ()
+    SCTag -> x
+    SDTag -> x
+    SETag -> x
 
   traversePi f = traverseNestedPi $ case know @_ @a of
     SATag -> \(thePi1, thePi2) ->
       (,) <$> f know thePi1 <*> f know thePi2
-    SBTag -> f know
+    SBTag -> pure
     SCTag -> f know
     SDTag -> f know
     SETag -> f know
@@ -570,7 +571,7 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
     SATag -> \case
       SNestedProductTag SNA1 -> id
       SNestedProductTag SNA2 -> id
-    SBTag -> \case SNestedProductTag SNB1 -> id
+    SBTag -> \case SNestedProductTag a -> case a of {}
     SCTag -> \case SNestedProductTag SNC1 -> id
     SDTag -> \case SNestedProductTag SND1 -> id
     SETag -> \case SNestedProductTag SNE1 -> id
