@@ -78,7 +78,8 @@ data Sum a b
 -- ... or with a single constructor with multiple fields.
 data Product a = Product Int Bool a
 
--- General ADTs are work-in-progress
+-- General ADTs are work-in-progress.  The work-in-progress is under
+-- "Attempt at a nested version" below.
 data SumOfProducts a b
   = SP1 a b
   | SP2
