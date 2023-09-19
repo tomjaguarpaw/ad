@@ -722,20 +722,16 @@ sumOfProductsToSigmaOfPi ::
   SumOfProducts a b ->
   Sigma SumTag (WrapPi NestedProductTag (Newtyped2 a b))
 sumOfProductsToSigmaOfPi = \case
-  SP1 a b ->
-    k $ \case
-      SNA1 -> a
-      SNA2 -> b
-  SP2 ->
-    k @BTag $ \case {}
-  SP3 a ->
-    k $ \case SNC1 -> a
-  SP4 a ->
-    k $ \case
-      SND1 -> a
-  SP5 a ->
-    k $ \case
-      SNE1 -> a
+  SP1 a b -> k $ \case
+    SNA1 -> a
+    SNA2 -> b
+  SP2 -> k @BTag $ \case {}
+  SP3 a -> k $ \case
+    SNC1 -> a
+  SP4 a -> k $ \case
+    SND1 -> a
+  SP5 a -> k $ \case
+    SNE1 -> a
   where
     f ::
       forall s i.
