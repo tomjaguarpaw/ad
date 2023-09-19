@@ -725,11 +725,10 @@ sumOfProductsToSigmaOfPi = \case
   SP1 a b ->
     Sigma
       ( WrapPi
-          ( makePiProxy
-              ( \(_ :: Proxy i) ->
-                  f $ \case
-                    SNA1 -> a
-                    SNA2 -> b
+          ( makePi
+              ( f $ \case
+                  SNA1 -> a
+                  SNA2 -> b
               )
           )
       )
@@ -738,38 +737,34 @@ sumOfProductsToSigmaOfPi = \case
       @_
       @BTag
       ( WrapPi
-          ( makePiProxy
-              ( \(_ :: Proxy i) ->
-                  f $ \case {}
+          ( makePi
+              ( f $ \case {}
               )
           )
       )
   SP3 a ->
     Sigma
       ( WrapPi
-          ( makePiProxy
-              ( \(_ :: Proxy i) ->
-                  f $ \case SNC1 -> a
+          ( makePi
+              ( f $ \case SNC1 -> a
               )
           )
       )
   SP4 a ->
     Sigma
       ( WrapPi
-          ( makePiProxy
-              ( \(_ :: Proxy i) ->
-                  f $ \case
-                    SND1 -> a
+          ( makePi
+              ( f $ \case
+                  SND1 -> a
               )
           )
       )
   SP5 a ->
     Sigma
       ( WrapPi
-          ( makePiProxy
-              ( \(_ :: Proxy i) ->
-                  f $ \case
-                    SNE1 -> a
+          ( makePi
+              ( f $ \case
+                  SNE1 -> a
               )
           )
       )
