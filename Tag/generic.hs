@@ -328,11 +328,11 @@ instance Tag SumTag where
     PiSSumTag <$> f know a <*> f know b <*> f know c <*> f know d <*> f know e
 
   provideConstraint' = \_ _ -> \case
-    SATag -> id
-    SBTag -> id
-    SCTag -> id
-    SDTag -> id
-    SETag -> id
+    SATag -> \r -> r
+    SBTag -> \r -> r
+    SCTag -> \r -> r
+    SDTag -> \r -> r
+    SETag -> \r -> r
 
 -- | A symbol used so that we can defunctionalize the mapping
 -- @SumFamily@
@@ -408,9 +408,9 @@ instance Tag ProductTag where
     PiSProductTag <$> f know f1 <*> f know f2 <*> f know f3
 
   provideConstraint' = \_ _ -> \case
-    SField1 -> id
-    SField2 -> id
-    SField3 -> id
+    SField1 -> \r -> r
+    SField2 -> \r -> r
+    SField3 -> \r -> r
 
 -- | A symbol used so that we can defunctionalize the mapping
 -- @ProductFamily@
@@ -579,12 +579,12 @@ instance (Known SumTag a) => Tag (NestedProductTag a) where
 
   provideConstraint' = \_ _ -> case know @_ @a of
     SATag -> \case
-      SNestedProductTag SNA1 -> id
-      SNestedProductTag SNA2 -> id
+      SNestedProductTag SNA1 -> \r -> r
+      SNestedProductTag SNA2 -> \r -> r
     SBTag -> \case SNestedProductTag a -> case a of {}
-    SCTag -> \case SNestedProductTag SNC1 -> id
-    SDTag -> \case SNestedProductTag SND1 -> id
-    SETag -> \case SNestedProductTag SNE1 -> id
+    SCTag -> \case SNestedProductTag SNC1 -> \r -> r
+    SDTag -> \case SNestedProductTag SND1 -> \r -> r
+    SETag -> \case SNestedProductTag SNE1 -> \r -> r
 
 -- Wow, this WrapPi/BetterConst stuff is some deep magic
 type WrapPi ::
@@ -630,7 +630,41 @@ type family SumOfProductsFamily (a :: Type) (b :: Type) (s :: SumTag) (t :: Nest
   SumOfProductsFamily _ _ ETag ('NestedProductTag NE1) = Char
 
 type Newtyped2 :: Type -> Type -> forall (s :: SumTag). NestedProductTag s -> Type
-newtype Newtyped2 a b (i :: NestedProductTag s) = Newtyped2 (SumOfProductsFamily a b s i)
+newtype Newtyped2 a b (i :: NestedProductTag s) = Newtyped2 {getNewtyped2 :: SumOfProductsFamily a b s i}
+
+type ForeachTopField a b c = ForeachTopField' a b c (Tags SumTag)
+
+type ForeachTopField' ::
+  Type -> Type -> (Type -> Constraint) -> [SumTag] -> Constraint
+type family ForeachTopField' a b c ts where
+  ForeachTopField' _ _ _ '[] = ()
+  ForeachTopField' a b c (t : ts) =
+    (ForeachNestedField a b c t, ForeachTopField' a b c ts)
+
+type ForeachNestedField a b c s =
+  ForeachNestedField' a b c s (Tags (NestedProductTag s))
+
+type ForeachNestedField' ::
+  Type ->
+  Type ->
+  (Type -> Constraint) ->
+  forall (s :: SumTag) ->
+  [NestedProductTag s] ->
+  Constraint
+type family ForeachNestedField' a b c s ns where
+  ForeachNestedField' _ _ _ _ '[] = ()
+  ForeachNestedField' a b c s (n : ns) =
+    (c (SumOfProductsFamily a b s n), ForeachNestedField' a b c s ns)
+
+sumOfProductsConNames :: Pi SumTag (Const String)
+sumOfProductsConNames =
+  makePi' $
+    Const . \case
+      SATag -> "SP1"
+      SBTag -> "SP2"
+      SCTag -> "SP3"
+      SDTag -> "SP4"
+      SETag -> "SP5"
 
 sumOfProductsToSigmaOfPi ::
   forall a b.
