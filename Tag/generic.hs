@@ -724,39 +724,29 @@ sumOfProductsToSigmaOfPi ::
 sumOfProductsToSigmaOfPi = \case
   SP1 a b ->
     Sigma
-      ( WrapPi
-          ( h $ \case
-              SNA1 -> a
-              SNA2 -> b
-          )
+      ( j $ \case
+          SNA1 -> a
+          SNA2 -> b
       )
   SP2 ->
     Sigma
       @_
       @BTag
-      ( WrapPi
-          ( h $ \case {}
-          )
+      ( j $ \case {}
       )
   SP3 a ->
     Sigma
-      ( WrapPi
-          ( h $ \case SNC1 -> a
-          )
+      ( j $ \case SNC1 -> a
       )
   SP4 a ->
     Sigma
-      ( WrapPi
-          ( h $ \case
-              SND1 -> a
-          )
+      ( j $ \case
+          SND1 -> a
       )
   SP5 a ->
     Sigma
-      ( WrapPi
-          ( h $ \case
-              SNE1 -> a
-          )
+      ( j $ \case
+          SNE1 -> a
       )
   where
     f ::
@@ -778,3 +768,14 @@ sumOfProductsToSigmaOfPi = \case
       ) ->
       Pi (NestedProductTag s) (Newtyped2 a b)
     h g = makePi (f g)
+
+    j ::
+      forall s.
+      (Known SumTag s) =>
+      ( forall i'.
+        (Known (NestedProductTag s) i') =>
+        SNestedProductTagF s i' ->
+        SumOfProductsFamily a b s i'
+      ) ->
+      WrapPi NestedProductTag (Newtyped2 a b) s
+    j g = WrapPi (h g)
