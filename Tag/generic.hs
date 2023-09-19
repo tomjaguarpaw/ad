@@ -150,6 +150,10 @@ class Tag t where
 makePi' :: (Tag t) => (forall (i :: t). Singleton t i -> f i) -> Pi t f
 makePi' f = makePi (f know)
 
+makePiProxy ::
+  (Tag t) => (forall (i :: t). (Known t i) => Proxy i -> f i) -> Pi t f
+makePiProxy f = makePi (f Proxy)
+
 getPi ::
   forall t (i :: t) (f :: t -> Type). (Known t i, Tag t) => Pi t f -> f i
 getPi pi = getPi' pi know
@@ -721,60 +725,52 @@ sumOfProductsToSigmaOfPi = \case
   SP1 a b ->
     Sigma
       ( WrapPi
-          ( makePi'
-              ( \(st :: Singleton (NestedProductTag ATag) i) ->
-                  case knowns st of
-                    Dict ->
-                      case know @_ @i of
-                        SNestedProductTag SNA1 -> Newtyped2 a
-                        SNestedProductTag SNA2 -> Newtyped2 b
+          ( makePiProxy
+              ( \(_ :: Proxy i) ->
+                  case unSNestedProductTag (know @_ @i) of
+                    SNA1 -> Newtyped2 a
+                    SNA2 -> Newtyped2 b
               )
           )
       )
   SP2 ->
     Sigma
+      @_
+      @BTag
       ( WrapPi
-          ( makePi'
-              ( \(st :: Singleton (NestedProductTag BTag) i) ->
-                  case knowns st of
-                    Dict ->
-                      case know @_ @i of {}
+          ( makePiProxy
+              ( \(_ :: Proxy i) ->
+                  case know @_ @i of {}
               )
           )
       )
   SP3 a ->
     Sigma
       ( WrapPi
-          ( makePi'
-              ( \(st :: Singleton (NestedProductTag CTag) i) ->
-                  case knowns st of
-                    Dict ->
-                      case know @_ @i of
-                        SNestedProductTag SNC1 -> Newtyped2 a
+          ( makePiProxy
+              ( \(_ :: Proxy i) ->
+                  case unSNestedProductTag (know @_ @i) of
+                    SNC1 -> Newtyped2 a
               )
           )
       )
   SP4 a ->
     Sigma
       ( WrapPi
-          ( makePi'
-              ( \(st :: Singleton (NestedProductTag DTag) i) ->
-                  case knowns st of
-                    Dict ->
-                      case know @_ @i of
-                        SNestedProductTag SND1 -> Newtyped2 a
+          ( makePiProxy
+              ( \(_ :: Proxy i) ->
+                  case unSNestedProductTag (know @_ @i) of
+                    SND1 -> Newtyped2 a
               )
           )
       )
   SP5 a ->
     Sigma
       ( WrapPi
-          ( makePi'
-              ( \(st :: Singleton (NestedProductTag ETag) i) ->
-                  case knowns st of
-                    Dict ->
-                      case know @_ @i of
-                        SNestedProductTag SNE1 -> Newtyped2 a
+          ( makePiProxy
+              ( \(_ :: Proxy i) ->
+                  case unSNestedProductTag (know @_ @i) of
+                    SNE1 -> Newtyped2 a
               )
           )
       )
