@@ -95,10 +95,16 @@ showSum = genericShowSum
 showProduct :: (Show a) => Product a -> String
 showProduct = genericShowProduct
 
+showSumOfProducts :: (Show a, Show b) => SumOfProducts a b -> String
+showSumOfProducts = genericShowNested
+
 main :: IO ()
 main = do
   mapM_ (putStrLn . showSum) [A 1, B True, C 'x', D 'y', E ()]
   putStrLn (showProduct (Product 1 True 'x'))
+  putStrLn (showSumOfProducts (SP1 True 'x'))
+  putStrLn (showSumOfProducts @() @() SP2)
+  putStrLn (showSumOfProducts @() @() (SP5 'y'))
 
 -- Section: Generics library
 data Sigma t f where
@@ -655,6 +661,47 @@ type family ForeachNestedField' a b c s ns where
   ForeachNestedField' _ _ _ _ '[] = ()
   ForeachNestedField' a b c s (n : ns) =
     (c (SumOfProductsFamily a b s n), ForeachNestedField' a b c s ns)
+
+provideConstraintNested ::
+  forall a b c (s :: SumTag) (n :: NestedProductTag s) r.
+  (Known SumTag s) =>
+  (ForeachTopField a b c) =>
+  Singleton (NestedProductTag s) n ->
+  ((c (SumOfProductsFamily a b s n)) => r) ->
+  r
+provideConstraintNested s = case know @_ @s of
+  SATag -> case s of
+    SNestedProductTag SNA1 -> \r -> r
+    SNestedProductTag SNA2 -> \r -> r
+  SBTag -> case s of {}
+  SCTag -> case s of
+    SNestedProductTag SNC1 -> \r -> r
+  SDTag -> case s of
+    SNestedProductTag SND1 -> \r -> r
+  SETag -> case s of
+    SNestedProductTag SNE1 -> \r -> r
+
+genericShow' ::
+  forall a b x.
+  (ForeachTopField a b Show) =>
+  Pi SumTag (Const String) ->
+  (x -> Sigma SumTag (WrapPi NestedProductTag (Newtyped2 a b))) ->
+  x ->
+  String
+genericShow' pi f x = mashPiSigma pi (f x) $ \(Const conName) (WrapPi fields) ->
+  conName
+    ++ " "
+    ++ unwords
+      ( toListPi
+          ( \(su :: Singleton (NestedProductTag s) n) ->
+              provideConstraintNested @a @b @Show su show . getNewtyped2
+          )
+          fields
+      )
+
+genericShowNested :: (Show a, Show b) => SumOfProducts a b -> String
+genericShowNested =
+  genericShow' sumOfProductsConNames sumOfProductsToSigmaOfPi
 
 sumOfProductsConNames :: Pi SumTag (Const String)
 sumOfProductsConNames =
