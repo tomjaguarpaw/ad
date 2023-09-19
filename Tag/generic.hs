@@ -758,17 +758,6 @@ sumOfProductsToSigmaOfPi = \case
       Newtyped2 a b i
     f g = Newtyped2 $ g (unSNestedProductTag (know @_ @i))
 
-    h ::
-      forall s.
-      (Known SumTag s) =>
-      ( forall i'.
-        (Known (NestedProductTag s) i') =>
-        SNestedProductTagF s i' ->
-        SumOfProductsFamily a b s i'
-      ) ->
-      Pi (NestedProductTag s) (Newtyped2 a b)
-    h g = makePi (f g)
-
     j ::
       forall s.
       (Known SumTag s) =>
@@ -778,4 +767,4 @@ sumOfProductsToSigmaOfPi = \case
         SumOfProductsFamily a b s i'
       ) ->
       WrapPi NestedProductTag (Newtyped2 a b) s
-    j g = WrapPi (h g)
+    j g = WrapPi (makePi (f g))
