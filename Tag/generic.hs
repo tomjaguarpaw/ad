@@ -727,9 +727,9 @@ sumOfProductsToSigmaOfPi = \case
       ( WrapPi
           ( makePiProxy
               ( \(_ :: Proxy i) ->
-                  case unSNestedProductTag (know @_ @i) of
-                    SNA1 -> Newtyped2 a
-                    SNA2 -> Newtyped2 b
+                  Newtyped2 $ case unSNestedProductTag (know @_ @i) of
+                    SNA1 -> a
+                    SNA2 -> b
               )
           )
       )
@@ -749,8 +749,8 @@ sumOfProductsToSigmaOfPi = \case
       ( WrapPi
           ( makePiProxy
               ( \(_ :: Proxy i) ->
-                  case unSNestedProductTag (know @_ @i) of
-                    SNC1 -> Newtyped2 a
+                  Newtyped2 $ case unSNestedProductTag (know @_ @i) of
+                    SNC1 -> a
               )
           )
       )
@@ -759,8 +759,8 @@ sumOfProductsToSigmaOfPi = \case
       ( WrapPi
           ( makePiProxy
               ( \(_ :: Proxy i) ->
-                  case unSNestedProductTag (know @_ @i) of
-                    SND1 -> Newtyped2 a
+                  Newtyped2 $ case unSNestedProductTag (know @_ @i) of
+                    SND1 -> a
               )
           )
       )
@@ -769,8 +769,8 @@ sumOfProductsToSigmaOfPi = \case
       ( WrapPi
           ( makePiProxy
               ( \(_ :: Proxy i) ->
-                  case unSNestedProductTag (know @_ @i) of
-                    SNE1 -> Newtyped2 a
+                  Newtyped2 $ case unSNestedProductTag (know @_ @i) of
+                    SNE1 -> a
               )
           )
       )
