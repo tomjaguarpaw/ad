@@ -669,17 +669,17 @@ provideConstraintNested ::
   Singleton (NestedProductTag s) n ->
   ((c (SumOfProductsFamily a b s n)) => r) ->
   r
-provideConstraintNested s = case know @_ @s of
-  SATag -> case s of
-    SNestedProductTag SNA1 -> \r -> r
-    SNestedProductTag SNA2 -> \r -> r
-  SBTag -> case s of {}
-  SCTag -> case s of
-    SNestedProductTag SNC1 -> \r -> r
-  SDTag -> case s of
-    SNestedProductTag SND1 -> \r -> r
-  SETag -> case s of
-    SNestedProductTag SNE1 -> \r -> r
+provideConstraintNested = case know @_ @s of
+  SATag -> \s -> case unSNestedProductTag s of
+    SNA1 -> \r -> r
+    SNA2 -> \r -> r
+  SBTag -> \case {}
+  SCTag -> \s -> case unSNestedProductTag s of
+    SNC1 -> \r -> r
+  SDTag -> \s -> case unSNestedProductTag s of
+    SND1 -> \r -> r
+  SETag -> \s -> case unSNestedProductTag s of
+    SNE1 -> \r -> r
 
 genericShow' ::
   forall a b x.
