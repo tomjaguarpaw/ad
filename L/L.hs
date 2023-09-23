@@ -530,7 +530,13 @@ example = do
             lift (putStrLn (showComputation c'))
             loop c'
 
-  let c = Computation @(Perp TermType) term Stop
+  let c =
+        Computation @(Perp TermType)
+          term
+          ( MuReturn @LInt
+              "theres"
+              (Computation Stop (Var @LInt "theres"))
+          )
 
   putStrLn (showComputation c)
 
