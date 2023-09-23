@@ -430,6 +430,24 @@ modi t x =
         _ -> Map.insert x (TypedTerm t)
     )
 
+lookupLinear ::
+  (Monad m) =>
+  String ->
+  Term Positive t ->
+  State.StateT (Map.Map String typedTerm) m typedTerm
+lookupLinear x v =
+  State.gets (Map.lookup x) >>= \case
+    Just tt -> do
+      State.modify' (Map.delete x)
+      pure tt
+    Nothing ->
+      error
+        ( unlines
+            [ "Missing key " ++ x,
+              show (termType v)
+            ]
+        )
+
 -- p21
 -- These are the opposite way round!
 step :: (Monad m) => Computation -> State.StateT Subst m (Maybe Computation)
@@ -439,19 +457,9 @@ step (Computation (Mu x c) t) = do
 step (Computation (Return t) (MuReturn x c)) = do
   modi t x
   pure (Just c)
+-- Would be nice to explicity convert heap values to stack values
 step (Computation t1 v@(Var x)) = do
-  TypedTerm t2 <-
-    State.gets (Map.lookup x) >>= \case
-      Just tt -> do
-        State.modify' (Map.delete x)
-        pure tt
-      Nothing ->
-        error
-          ( unlines
-              [ "Missing key " ++ x,
-                show (termType t1)
-              ]
-          )
+  TypedTerm t2 <- lookupLinear x v
   case eqSLType (perpSLType (termType t2)) (termType t1) of
     Just Dict -> pure (Just (Computation t1 t2))
     Nothing ->
