@@ -480,7 +480,15 @@ example = do
                           @One
                           @(Down (Up (Tensor One (Down Bottom))))
                           ("arg1", "mstack2")
-                          (Computation Stop (Var @(Down (Up (Tensor One (Down Bottom)))) "mstack2"))
+                          ( Computation
+                              ( Return
+                                  ( MuReturn @(Tensor One (Down Bottom))
+                                      "mustack2"
+                                      (Computation @(Tensor One (Down Bottom)) Stop (Var "mustack2"))
+                                  )
+                              )
+                              (Var @(Down (Up (Tensor One (Down Bottom)))) "mstack2")
+                          )
                       )
                       (Var @SubType "mstack")
                   )
