@@ -495,7 +495,7 @@ macro ::
   forall (t :: LType Positive) (t' :: LType Positive).
   (KnownLType t) =>
   (KnownLType t') =>
-  Term Negative (Perp t') ->
+  (String -> Term Negative (Perp t')) ->
   M (Term 'Positive (Perp ('Up ('Tensor t t'))))
 macro x = do
   stack <- fresh "stack"
@@ -507,7 +507,7 @@ macro x = do
       ( Computation
           ( MuPair @t @t'
               (arg, rest)
-              (Computation x (Var @t' rest))
+              (Computation (x arg) (Var @t' rest))
           )
           (Var @(Tensor t t') stack)
       )
@@ -532,7 +532,7 @@ example = do
 
   putStrLn (showComputation c)
 
-  let inner =
+  let inner arg1 =
         Return
           ( MuReturn @(Tensor LInt RestOfStack)
               "mustack2"
@@ -553,14 +553,15 @@ example = do
                                   )
                               )
                           )
-                          (Pair @LInt @LInt (Var "arg1", Var "arg2"))
+                          (Pair @LInt @LInt (Var arg1, Var "arg2"))
                       )
                   )
                   (Var @(Tensor LInt RestOfStack) "mustack2")
               )
           )
 
-  let outer = runM (macro @LInt inner)
+  let outer = runM $ do
+        macro @LInt inner
 
   flip
     State.evalStateT
