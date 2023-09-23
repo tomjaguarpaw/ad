@@ -77,11 +77,11 @@ data Dict c where
 perpSLType :: SLType p t -> SLType (Flip p) (Perp t)
 perpSLType = \case
   STensor a b -> SDna (perpSLType a) (perpSLType b)
-  SDna {} -> error "SDna"
-  SDown {} -> error "SDown"
-  SUp {} -> error "SUp"
-  SBottom {} -> error "SBottom"
-  SOne {} -> error "SOne"
+  SDna a b -> STensor (perpSLType a) (perpSLType b)
+  SDown a -> SUp (perpSLType a)
+  SUp a -> SDown (perpSLType a)
+  SBottom -> SOne
+  SOne -> SBottom
 
 -- ~~ is annoying here
 eqSLType :: SLType p t -> SLType p' t' -> Maybe (Dict (p ~ p', t ~~ t'))
@@ -89,6 +89,18 @@ eqSLType (STensor a b) (STensor a' b') = do
   Dict <- eqSLType a a'
   Dict <- eqSLType b b'
   pure Dict
+eqSLType (SDna a b) (SDna a' b') = do
+  Dict <- eqSLType a a'
+  Dict <- eqSLType b b'
+  pure Dict
+eqSLType (SDown a) (SDown a') = do
+  Dict <- eqSLType a a'
+  pure Dict
+eqSLType (SUp a) (SUp a') = do
+  Dict <- eqSLType a a'
+  pure Dict
+eqSLType SBottom SBottom = pure Dict
+eqSLType SOne SOne = pure Dict
 eqSLType _ _ = Nothing
 
 class KnownLType' (a :: LType p) where
@@ -140,12 +152,11 @@ data Term p t where
   Mu :: VarId a -> Computation -> Term Negative (Perp a)
   Pair ::
     (KnownLType' (a `Tensor` b)) =>
-    Term Positive a ->
-    Term Positive b ->
+    (Term Positive a, Term Positive b) ->
     Term Positive (a `Tensor` b)
   MuPair ::
-    VarId a ->
-    VarId b ->
+    (KnownLType' (Perp a `Dna` Perp b)) =>
+    (VarId a, VarId b) ->
     Computation ->
     Term Negative (Perp a `Dna` Perp b)
   Unit :: Term Positive One
@@ -159,7 +170,10 @@ data Term p t where
     Computation ->
     Term Negative (Perp a `And` Perp b)
   EmptyCase :: Term Negative Top
-  Return :: Term Positive a -> Term Negative (Up a)
+  Return ::
+    (KnownLType' (Up a)) =>
+    Term Positive a ->
+    Term Negative (Up a)
   MuReturn ::
     (KnownLType' (Down (Perp a))) =>
     VarId a ->
@@ -179,8 +193,8 @@ showTerm :: Term p t -> String
 showTerm = \case
   Var v -> v
   Mu v c -> "μ" ++ v ++ ". " ++ showComputation c
-  Pair t1 t2 -> "(" ++ showTerm t1 ++ ", " ++ showTerm t2 ++ ")"
-  MuPair v1 v2 c -> "μ(" ++ v1 ++ ", " ++ v2 ++ "). " ++ showComputation c
+  Pair (t1, t2) -> "(" ++ showTerm t1 ++ ", " ++ showTerm t2 ++ ")"
+  MuPair (v1, v2) c -> "μ(" ++ v1 ++ ", " ++ v2 ++ "). " ++ showComputation c
   Unit -> "()"
   MuUnit {} -> error "MuUnit"
   OneDot {} -> error "OneDot"
@@ -218,6 +232,7 @@ fresh s = do
 -- p5
 lam ::
   forall a b.
+  (KnownLType a) =>
   (KnownLType b) =>
   VarId a ->
   Term' b ->
@@ -227,7 +242,7 @@ lam x t = do
   a <- fresh "α"
   let comp :: Computation
       comp = Computation t (Var @(Perp b) a)
-  pure (MuPair @a @(Perp b) x a comp)
+  pure (MuPair @a @(Perp b) (x, a) comp)
 
 type Term' (t :: LType p) = Term p t
 
@@ -241,7 +256,7 @@ apply ::
 apply t u = do
   alpha <- fresh "α"
   let pair :: Term' (a `Tensor` Perp b)
-      pair = u `Pair` Var alpha
+      pair = Pair (u, Var alpha)
   pure (Mu @(Perp b) alpha (Computation t pair))
 
 -- p20
@@ -287,7 +302,7 @@ force t = do
 -- p23
 cbvLam ::
   forall a b.
-  (KnownLType (CBVType b)) =>
+  (KnownLType a) =>
   (KnownLType b) =>
   (KnownLType (a `Lolly` Up b)) =>
   VarId a ->
@@ -349,14 +364,14 @@ termType = \case
   Var {} -> know
   Mu {} -> error "Mu"
   Pair {} -> know
-  MuPair {} -> error "MuPair"
+  MuPair {} -> know
   Unit {} -> error "Unit"
   MuUnit {} -> error "MuUnit"
   OneDot {} -> error "OneDot"
   TwoDot {} -> error "TwoDot"
   MuDot {} -> error "MuDot"
   EmptyCase {} -> error "EmptCase"
-  Return {} -> error "Retur"
+  Return {} -> know
   MuReturn {} -> know
   Stop {} -> know
 
@@ -379,11 +394,17 @@ step (Computation (Return t) (MuReturn x c)) = do
 step (Computation t1 (Var x)) = do
   TypedTerm t t2 <-
     State.gets (Map.lookup x) >>= \case
-      Just tt -> pure tt
+      Just tt -> do
+        State.modify' (Map.delete x)
+        pure tt
       Nothing -> error ("Missing key " ++ x)
   case eqSLType (perpSLType t) (termType t1) of
-    Just Dict -> step (Computation t1 t2)
+    Just Dict -> pure (Just (Computation t1 t2))
     Nothing -> error "Mismatched types"
+step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
+  State.modify' (Map.insert x (typedTerm t))
+  State.modify' (Map.insert y (typedTerm u))
+  pure (Just c)
 step c = error (show c)
 
 type TermType = CBVType One
@@ -402,6 +423,8 @@ example = do
             flip mapM_ (Map.toList m) $ \(k, v) -> do
               pure ()
             -- lift (putStrLn (show k ++ ": " ++ show v))
+            lift (putStrLn (showComputation c'))
+            (lift . print) =<< State.gets Map.keys
             loop c'
 
   let c = Computation @(Perp TermType) term Stop
