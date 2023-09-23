@@ -538,9 +538,8 @@ example = do
         macro
           @LInt
           @(Down (Up (Tensor LInt RestOfStack)))
-          @(Down (Up (Tensor LInt RestOfStack)))
           $ \(arg1, rest) -> do
-            ii <- macro $ \(arg2, bottom) ->
+            ii <- macro @LInt @RestOfStack $ \(arg2, bottom) ->
               pure
                 ( Sub
                     ( Mu
