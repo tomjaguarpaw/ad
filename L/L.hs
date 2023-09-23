@@ -415,7 +415,7 @@ termType = \case
   MuReturn {} -> know
   Stop {} -> know
   Sub {} -> error "Sub"
-  IntLit {} -> error "IntLit"
+  IntLit {} -> know
 
 type Subst = Map.Map String (TypedTerm Positive)
 
@@ -486,7 +486,7 @@ step (Computation (Sub c) (Pair (t1, v@(Var t)))) = do
   t2 <- lookupLinear t v
   pure (Just (Computation (Sub c) (Pair (t1, t2))))
 step (Computation (Sub c) (Pair (IntLit i1, IntLit i2))) = do
-  pure (Just (Computation c (IntLit (i1 + i2))))
+  pure (Just (Computation c (IntLit (i1 - i2))))
 step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType t2))
 
 type TermType = CBVType LInt
@@ -514,7 +514,9 @@ example = do
   flip
     State.evalStateT
     ( Map.fromList
-        [ ( "sub",
+        [ ("one", TypedTerm (IntLit 1)),
+          ("two", TypedTerm (IntLit 2)),
+          ( "sub",
             TypedTerm
               ( MuReturn @SubType
                   "mstack"
