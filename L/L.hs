@@ -462,7 +462,6 @@ example = do
             flip mapM_ (Map.toList m) $ \(k, v) -> do
               lift (putStrLn (k ++ ": " ++ showTypedTerm v))
             lift (putStrLn (showComputation c'))
-            (lift . print) =<< State.gets Map.keys
             loop c'
 
   let c = Computation @(Perp TermType) term Stop
