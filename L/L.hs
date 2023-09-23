@@ -444,7 +444,7 @@ step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
   modi t x
   modi u y
   pure (Just c)
-step c = error (show c)
+step (Computation t1 t2) = error (showTerm t1 ++ " | " ++ showTerm t2)
 
 type TermType = CBVType One
 
