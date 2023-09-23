@@ -1,7 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -9,7 +9,6 @@
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -61,8 +60,14 @@ data SLType p a where
     SLType' a ->
     SLType' b ->
     SLType' (a `Tensor` b)
+  SDna ::
+    SLType' a ->
+    SLType' b ->
+    SLType' (a `Dna` b)
   SDown :: SLType' a -> SLType' (Down a)
+  SUp :: SLType' a -> SLType' (Up a)
   SBottom :: SLType' Bottom
+  SOne :: SLType' One
 
 class KnownLType' (a :: LType p) where
   know :: SLType p a
@@ -70,11 +75,20 @@ class KnownLType' (a :: LType p) where
 instance (KnownLType' a, KnownLType' b) => KnownLType' (a `Tensor` b) where
   know = STensor know know
 
+instance (KnownLType' a, KnownLType' b) => KnownLType' (a `Dna` b) where
+  know = SDna know know
+
+instance KnownLType' One where
+  know = SOne
+
 instance KnownLType' Bottom where
   know = SBottom
 
 instance (KnownLType' a) => KnownLType' (Down a) where
   know = SDown know
+
+instance (KnownLType' a) => KnownLType' (Up a) where
+  know = SUp know
 
 type Perp :: forall (p :: Polarity). LType p -> LType (Flip p)
 type family Perp t = t' {- can't do | t' -> t -} where
@@ -100,7 +114,7 @@ type VarId a = String
 
 type Term :: forall (p :: Polarity) -> LType p -> Type
 data Term p t where
-  Var :: VarId a -> Term Positive a
+  Var :: (KnownLType' a) => VarId a -> Term Positive a
   Mu :: VarId a -> Computation -> Term Negative (Perp a)
   Pair :: Term Positive a -> Term Positive b -> Term Positive (a `Tensor` b)
   MuPair ::
@@ -157,8 +171,8 @@ type Lolly a b = Perp a `Dna` b
 -- To be improved ...
 type KnownLType :: forall (p :: Polarity). LType p -> Constraint
 type family KnownLType t where
-  KnownLType (t :: LType Positive) = t ~ Perp (Perp t)
-  KnownLType (t :: LType Negative) = t ~ Perp (Perp t)
+  KnownLType (t :: LType Positive) = (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
+  KnownLType (t :: LType Negative) = (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
 
 type M = State.State Int
 
@@ -242,6 +256,7 @@ force t = do
 -- p23
 cbvLam ::
   forall a b.
+  (KnownLType (CBVType b)) =>
   (KnownLType b) =>
   (KnownLType (a `Lolly` Up b)) =>
   VarId a ->
@@ -255,7 +270,6 @@ cbvApply ::
   forall a b.
   (KnownLType a) =>
   (KnownLType b) =>
-  (KnownLType (a `Lolly` Up b)) =>
   Term Negative (CBVType (a `CBVLolly` b)) ->
   Term Negative (CBVType a) ->
   M (Term' (CBVType b))
@@ -264,12 +278,12 @@ cbvApply t u = do
   f <- fresh "f"
   (u `to` x) <*> ((t `to` f) <*> (do f' <- force (Var f); apply f' (Var @a x)))
 
-cbvVar :: VarId a -> Term 'Negative ('Up a)
+cbvVar :: (KnownLType a) => VarId a -> Term 'Negative ('Up a)
 cbvVar = Return . Var
 
 type CBVType a = Up a
 
-type CBVLolly a b = Down (a `Lolly` Up b)
+type CBVLolly a b = Down (a `Lolly` CBVType b)
 
 exampleTerm ::
   forall a0 a1 b.
@@ -301,9 +315,9 @@ data TypedTerm p where
 
 -- This is silly and expensive.  We should store the type with each
 -- constructor.
-typedTerm :: Term p t -> TypedTerm p
+typedTerm :: forall p t. Term p t -> TypedTerm p
 typedTerm = \case
-  Var {} -> error "Var"
+  Var {} -> error "typed term Var"
   Mu {} -> error "Mu"
   Pair {} -> error "Pair"
   MuPair {} -> error "MuPair"
@@ -315,6 +329,7 @@ typedTerm = \case
   EmptyCase {} -> error "EmptCase"
   Return {} -> error "Retur"
   MuReturn {} -> error "MuReturn"
+  Stop -> TypedTerm know (Stop @_ @t)
 
 type Subst = Map.Map String (TypedTerm Positive)
 
@@ -322,6 +337,9 @@ type Subst = Map.Map String (TypedTerm Positive)
 -- These are the opposite way round!
 step :: (Monad m) => Computation -> State.StateT Subst m (Maybe Computation)
 step (Computation (Mu x c) t) = do
+  State.modify' (Map.insert x (typedTerm t))
+  pure (Just c)
+step (Computation (Return t) (MuReturn x c)) = do
   State.modify' (Map.insert x (typedTerm t))
   pure (Just c)
 step c = error (show c)
