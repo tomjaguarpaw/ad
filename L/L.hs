@@ -492,10 +492,11 @@ step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType 
 type TermType = CBVType LInt
 
 macro ::
-  forall (t :: LType Positive) (t' :: LType Positive).
+  forall (t :: LType Positive) (t' :: LType Positive) c.
   (KnownLType t) =>
+  (KnownLType c) =>
   (KnownLType t') =>
-  (String -> Term Negative (Perp t')) ->
+  ((VarId t', VarId t) -> (Term Negative (Perp c), Term Positive c)) ->
   M (Term 'Positive (Perp ('Up ('Tensor t t'))))
 macro x = do
   stack <- fresh "stack"
@@ -507,7 +508,7 @@ macro x = do
       ( Computation
           ( MuPair @t @t'
               (arg, rest)
-              (Computation (x arg) (Var @t' rest))
+              (uncurry Computation (x (arg, rest)))
           )
           (Var @(Tensor t t') stack)
       )
@@ -532,36 +533,38 @@ example = do
 
   putStrLn (showComputation c)
 
-  let inner arg1 =
-        Return
-          ( MuReturn @(Tensor LInt RestOfStack)
-              "mustack2"
-              ( Computation
-                  ( MuPair
-                      @LInt
-                      @RestOfStack
-                      ("arg2", "bottom")
-                      ( Computation
-                          ( Sub
-                              ( Mu
-                                  @LInt
-                                  "res"
-                                  ( Computation
-                                      @(Tensor LInt RestOfStack)
-                                      Stop
-                                      (Pair (Var "res", Var "bottom"))
-                                  )
-                              )
-                          )
-                          (Pair @LInt @LInt (Var arg1, Var "arg2"))
-                      )
-                  )
-                  (Var @(Tensor LInt RestOfStack) "mustack2")
-              )
-          )
+  let inner (arg1, rest) =
+        ( Return
+            ( MuReturn @(Tensor LInt RestOfStack)
+                "mustack2"
+                ( Computation
+                    ( MuPair
+                        @LInt
+                        @RestOfStack
+                        ("arg2", "bottom")
+                        ( Computation
+                            ( Sub
+                                ( Mu
+                                    @LInt
+                                    "res"
+                                    ( Computation
+                                        @(Tensor LInt RestOfStack)
+                                        Stop
+                                        (Pair (Var "res", Var "bottom"))
+                                    )
+                                )
+                            )
+                            (Pair @LInt @LInt (Var arg1, Var "arg2"))
+                        )
+                    )
+                    (Var @(Tensor LInt RestOfStack) "mustack2")
+                )
+            ),
+          Var rest
+        )
 
   let outer = runM $ do
-        macro @LInt inner
+        macro @LInt @(Down (Up (Tensor LInt RestOfStack))) inner
 
   flip
     State.evalStateT
