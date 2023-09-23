@@ -71,6 +71,8 @@ data SLType p a where
   SBottom :: SLType' Bottom
   SOne :: SLType' One
 
+deriving instance Show (SLType p t)
+
 data Dict c where
   Dict :: (c) => Dict c
 
@@ -155,6 +157,7 @@ data Term p t where
     (Term Positive a, Term Positive b) ->
     Term Positive (a `Tensor` b)
   MuPair ::
+    forall a b.
     (KnownLType' (Perp a `Dna` Perp b)) =>
     (VarId a, VarId b) ->
     Computation ->
@@ -171,11 +174,12 @@ data Term p t where
     Term Negative (Perp a `And` Perp b)
   EmptyCase :: Term Negative Top
   Return ::
-    (KnownLType' (Up a)) =>
+    (KnownLType' a) =>
     Term Positive a ->
     Term Negative (Up a)
   MuReturn ::
-    (KnownLType' (Down (Perp a))) =>
+    forall a.
+    (KnownLType' a, KnownLType' (Perp a)) =>
     VarId a ->
     Computation ->
     Term Positive (Down (Perp a))
@@ -304,14 +308,14 @@ cbvLam ::
   forall a b.
   (KnownLType a) =>
   (KnownLType b) =>
-  (KnownLType (a `Lolly` Up b)) =>
+  (KnownLType (a `Lolly` CBVType b)) =>
   VarId a ->
   Term' (CBVType b) ->
   M (Term' (CBVType (a `CBVLolly` b)))
 cbvLam x t =
   Return <$> (thunk =<< lam @a x t)
 
--- p21
+-- p23
 cbvApply ::
   forall a b.
   (KnownLType a) =>
@@ -324,7 +328,7 @@ cbvApply t u = do
   f <- fresh "f"
   (u `to` x) <*> ((t `to` f) <*> (do f' <- force (Var f); apply f' (Var @a x)))
 
-cbvVar :: (KnownLType a) => VarId a -> Term 'Negative ('Up a)
+cbvVar :: (KnownLType a) => VarId a -> Term' (CBVType a)
 cbvVar = Return . Var
 
 type CBVType a = Up a
@@ -340,9 +344,9 @@ exampleTerm ::
 exampleTerm = do
   x <- fresh "x"
   y <- fresh "y"
-  one <- fresh "one"
-  two <- fresh "two"
-  minus <- fresh "sub"
+  let one = "one"
+  let two = "two"
+  let minus = "sub"
 
   inner <-
     cbvApply <$> cbvApply (cbvVar minus) (cbvVar @a0 x) <*> pure (cbvVar @a1 y)
@@ -358,6 +362,11 @@ data TypedTerm p where
     SLType p t ->
     Term p t ->
     TypedTerm p
+
+deriving instance Show (TypedTerm p)
+
+showTypedTerm :: TypedTerm p -> String
+showTypedTerm (TypedTerm _ t) = showTerm t
 
 termType :: Term p t -> SLType p t
 termType = \case
@@ -382,28 +391,58 @@ typedTerm t = TypedTerm (termType t) t
 
 type Subst = Map.Map String (TypedTerm Positive)
 
+modi :: (Monad m) => Term Positive t -> VarId t -> State.StateT Subst m ()
+modi t x =
+  State.modify'
+    ( case t of
+        Var v -> \m -> case Map.lookup v m of
+          Nothing -> Map.insert x (typedTerm t) m
+          Just tt -> Map.delete v (Map.insert x tt m)
+        _ -> Map.insert x (typedTerm t)
+    )
+
 -- p21
 -- These are the opposite way round!
 step :: (Monad m) => Computation -> State.StateT Subst m (Maybe Computation)
 step (Computation (Mu x c) t) = do
-  State.modify' (Map.insert x (typedTerm t))
+  modi t x
   pure (Just c)
 step (Computation (Return t) (MuReturn x c)) = do
-  State.modify' (Map.insert x (typedTerm t))
+  modi t x
   pure (Just c)
-step (Computation t1 (Var x)) = do
+step (Computation t1 v@(Var x)) = do
   TypedTerm t t2 <-
     State.gets (Map.lookup x) >>= \case
       Just tt -> do
         State.modify' (Map.delete x)
         pure tt
-      Nothing -> error ("Missing key " ++ x)
+      Nothing ->
+        error
+          ( unlines
+              [ "Missing key " ++ x,
+                show (termType t1)
+              ]
+          )
   case eqSLType (perpSLType t) (termType t1) of
     Just Dict -> pure (Just (Computation t1 t2))
-    Nothing -> error "Mismatched types"
+    Nothing ->
+      error
+        ( unlines
+            [ "Mismatched types",
+              showTerm t1 ++ " :: " ++ show (termType t1),
+              showTerm v ++ " ::perp " ++ show (perpSLType (termType v)),
+              "env("
+                ++ showTerm v
+                ++ ") = "
+                ++ showTerm t2
+                ++ " ::perp "
+                ++ show (perpSLType (termType t2)),
+              "annotated with ::perp " ++ show (perpSLType t)
+            ]
+        )
 step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
-  State.modify' (Map.insert x (typedTerm t))
-  State.modify' (Map.insert y (typedTerm u))
+  modi t x
+  modi u y
   pure (Just c)
 step c = error (show c)
 
@@ -421,8 +460,7 @@ example = do
             lift (putStrLn "--")
             m <- State.get
             flip mapM_ (Map.toList m) $ \(k, v) -> do
-              pure ()
-            -- lift (putStrLn (show k ++ ": " ++ show v))
+              lift (putStrLn (k ++ ": " ++ showTypedTerm v))
             lift (putStrLn (showComputation c'))
             (lift . print) =<< State.gets Map.keys
             loop c'
@@ -433,6 +471,25 @@ example = do
 
   flip
     State.evalStateT
-    Map.empty
+    ( Map.fromList
+        [ ( "sub",
+            typedTerm
+              ( MuReturn @SubType
+                  "mstack"
+                  ( Computation
+                      ( MuPair
+                          @One
+                          @(Down (Up (Tensor One (Down Bottom))))
+                          ("arg1", "mstack2")
+                          (Computation Stop (Var @(Down (Up (Tensor One (Down Bottom)))) "mstack2"))
+                      )
+                      (Var @SubType "mstack")
+                  )
+              )
+          )
+        ]
+    )
     -- This type argument is annoying
     (loop c)
+
+type SubType = Tensor One (Down (Up (Tensor One (Down Bottom))))
