@@ -460,7 +460,7 @@ step (Computation (Return t) (MuReturn x c)) = do
 -- Would be nice to explicity convert heap values to stack values
 step (Computation t1 v@(Var x)) = do
   TypedTerm t2 <- lookupLinear x v
-  case eqSLType (perpSLType (termType t2)) (termType t1) of
+  case eqSLType (termType t2) (termType v) of
     Just Dict -> pure (Just (Computation t1 t2))
     Nothing ->
       error
