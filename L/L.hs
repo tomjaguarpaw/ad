@@ -563,7 +563,6 @@ example = do
           )
         ]
     )
-    -- This type argument is annoying
     (loop c)
 
 type SubType = Tensor LInt (Down (Up (Tensor LInt RestOfStack)))
