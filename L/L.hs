@@ -491,6 +491,27 @@ step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType 
 
 type TermType = CBVType LInt
 
+macro ::
+  forall (t :: LType Positive) (t' :: LType Positive).
+  (KnownLType t) =>
+  (KnownLType t') =>
+  Term Negative (Perp t') ->
+  M (Term 'Positive (Perp ('Up ('Tensor t t'))))
+macro x = do
+  stack <- fresh "stack"
+  arg <- fresh "arg"
+  rest <- fresh "rest"
+  pure $
+    MuReturn @(Tensor t t')
+      stack
+      ( Computation
+          ( MuPair @t @t'
+              (arg, rest)
+              (Computation x (Var @t' rest))
+          )
+          (Var @(Tensor t t') stack)
+      )
+
 example :: IO ()
 example = do
   let term :: Term' TermType
@@ -511,6 +532,36 @@ example = do
 
   putStrLn (showComputation c)
 
+  let inner =
+        Return
+          ( MuReturn @(Tensor LInt RestOfStack)
+              "mustack2"
+              ( Computation
+                  ( MuPair
+                      @LInt
+                      @RestOfStack
+                      ("arg2", "bottom")
+                      ( Computation
+                          ( Sub
+                              ( Mu
+                                  @LInt
+                                  "res"
+                                  ( Computation
+                                      @(Tensor LInt RestOfStack)
+                                      Stop
+                                      (Pair (Var "res", Var "bottom"))
+                                  )
+                              )
+                          )
+                          (Pair @LInt @LInt (Var "arg1", Var "arg2"))
+                      )
+                  )
+                  (Var @(Tensor LInt RestOfStack) "mustack2")
+              )
+          )
+
+  let outer = runM (macro @LInt inner)
+
   flip
     State.evalStateT
     ( Map.fromList
@@ -518,47 +569,7 @@ example = do
           ("two", TypedTerm (IntLit 2)),
           ( "sub",
             TypedTerm
-              ( MuReturn @SubType
-                  "mstack"
-                  ( Computation
-                      ( MuPair
-                          @LInt
-                          @(Down (Up (Tensor LInt RestOfStack)))
-                          ("arg1", "mstack2")
-                          ( Computation
-                              ( Return
-                                  ( MuReturn @(Tensor LInt RestOfStack)
-                                      "mustack2"
-                                      ( Computation
-                                          @(Tensor LInt RestOfStack)
-                                          ( MuPair
-                                              @LInt
-                                              @RestOfStack
-                                              ("arg2", "bottom")
-                                              ( Computation
-                                                  ( Sub
-                                                      ( Mu
-                                                          @LInt
-                                                          "res"
-                                                          ( Computation
-                                                              @(Tensor LInt RestOfStack)
-                                                              Stop
-                                                              (Pair (Var "res", Var "bottom"))
-                                                          )
-                                                      )
-                                                  )
-                                                  (Pair @LInt @LInt (Var "arg1", Var "arg2"))
-                                              )
-                                          )
-                                          (Var "mustack2")
-                                      )
-                                  )
-                              )
-                              (Var @(Down (Up (Tensor LInt RestOfStack))) "mstack2")
-                          )
-                      )
-                      (Var @SubType "mstack")
-                  )
+              ( outer
               )
           )
         ]
