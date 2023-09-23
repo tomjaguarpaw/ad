@@ -193,7 +193,7 @@ cbvLam x t =
   Return <$> (thunk =<< lam @a x t)
 
 -- p21
-cbaApply ::
+cbvApply ::
   forall a b.
   (KnownLType a) =>
   (KnownLType b) =>
@@ -201,7 +201,7 @@ cbaApply ::
   Term Negative (Up (Down (a `Lolly` Up b))) ->
   Term Negative (Up a) ->
   M (Term Negative (Up b))
-cbaApply t u = do
+cbvApply t u = do
   x <- fresh "x"
   f <- fresh "f"
   (u `to` x) <*> ((t `to` f) <*> (do f' <- force (Var f); apply f' (Var @a x)))
