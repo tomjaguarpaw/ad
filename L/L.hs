@@ -93,7 +93,7 @@ data Term p t where
   MuReturn :: VarId a -> Computation -> Term Positive (Down (Perp a))
 
 data Computation where
-  Computation :: Term Positive a -> Term Negative (Perp a) -> Computation
+  Computation :: Term Negative (Perp a) -> Term Positive a -> Computation
 
 type Lolly :: LType Positive -> LType Negative -> LType Negative
 type Lolly a b = Perp a `Dna` b
@@ -104,6 +104,7 @@ type family KnownLType t where
   KnownLType (t :: LType Positive) = t ~ Perp (Perp t)
   KnownLType (t :: LType Negative) = t ~ Perp (Perp t)
 
+-- p5
 lam ::
   forall a b.
   (KnownLType b) =>
@@ -120,7 +121,7 @@ lam x t = MuPair @a @(Perp b) x a comp
     a = "alpha"
 
     comp :: Computation
-    comp = Computation vara t
+    comp = Computation t vara
 
 type Term' (t :: LType p) = Term p t
 
@@ -131,8 +132,7 @@ apply ::
   Term' a ->
   Term Negative b
 apply t u =
-  -- < pair | t> is the opposite way round from p5
-  Mu @(Perp b) alpha (Computation pair t)
+  Mu @(Perp b) alpha (Computation t pair)
   where
     alpha = "alpha1"
 
@@ -145,7 +145,35 @@ thunk ::
   (KnownLType n) =>
   Term Negative n ->
   Term Positive (Down n)
-thunk t = MuReturn @(Perp n) alpha (Computation @(Perp n) (Var alpha) t)
+thunk t = MuReturn @(Perp n) alpha (Computation t (Var @(Perp n) alpha))
   where
     alpha :: VarId (Perp n)
     alpha = "alpha2"
+
+-- p22
+to ::
+  forall a n.
+  (KnownLType a) =>
+  (KnownLType n) =>
+  Term' (Up a) ->
+  VarId a ->
+  Term Negative n ->
+  Term' n
+(t `to` x) u = Mu @(Perp n) alpha comp2
+  where
+    alpha = "alpha3"
+    comp1 = Computation u (Var @(Perp n) alpha)
+    comp2 = Computation t (MuReturn @a x comp1)
+
+-- p22
+force ::
+  forall n.
+  (KnownLType n) =>
+  Term Positive (Down n) ->
+  Term Negative n
+force t = Mu @(Perp n) alpha (Computation returnAlpha t)
+  where
+    alpha = "alpha"
+
+    returnAlpha :: Term Negative (Up (Perp n))
+    returnAlpha = Return (Var alpha)
