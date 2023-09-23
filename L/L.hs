@@ -114,14 +114,10 @@ lam ::
 -- fixme: fresh variable
 lam x t = MuPair @a @(Perp b) x a comp
   where
-    vara :: Term Positive (Perp b)
-    vara = Var a
-
-    a :: VarId a
     a = "alpha"
 
     comp :: Computation
-    comp = Computation t vara
+    comp = Computation t (Var @(Perp b) a)
 
 type Term' (t :: LType p) = Term p t
 
@@ -186,8 +182,9 @@ cbvLam ::
   VarId a ->
   Term Negative (Up b) ->
   Term Negative (Up (Down (a `Lolly` Up b)))
-cbvLam x t = Return (thunk @(a `Lolly` Up b) (lam @a x t))
+cbvLam x t = Return (thunk (lam @a x t))
 
+-- p21
 cbaApply ::
   forall a b.
   (KnownLType a) =>
