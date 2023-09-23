@@ -434,12 +434,26 @@ lookupLinear ::
   (Monad m) =>
   String ->
   Term Positive t ->
-  State.StateT (Map.Map String typedTerm) m typedTerm
+  State.StateT Subst m (Term Positive t)
 lookupLinear x v =
   State.gets (Map.lookup x) >>= \case
-    Just tt -> do
+    Just (TypedTerm t2) -> do
       State.modify' (Map.delete x)
-      pure tt
+      case eqSLType (termType t2) (termType v) of
+        Just Dict -> pure t2
+        Nothing ->
+          error
+            ( unlines
+                [ "Mismatched types",
+                  showTerm v ++ " :: " ++ show (termType v),
+                  "env("
+                    ++ showTerm v
+                    ++ ") = "
+                    ++ showTerm t2
+                    ++ " :: "
+                    ++ show (termType t2)
+                ]
+            )
     Nothing ->
       error
         ( unlines
@@ -459,22 +473,8 @@ step (Computation (Return t) (MuReturn x c)) = do
   pure (Just c)
 -- Would be nice to explicity convert heap values to stack values
 step (Computation t1 v@(Var x)) = do
-  TypedTerm t2 <- lookupLinear x v
-  case eqSLType (termType t2) (termType v) of
-    Just Dict -> pure (Just (Computation t1 t2))
-    Nothing ->
-      error
-        ( unlines
-            [ "Mismatched types",
-              showTerm v ++ " :: " ++ show (termType v),
-              "env("
-                ++ showTerm v
-                ++ ") = "
-                ++ showTerm t2
-                ++ " :: "
-                ++ show (termType t2)
-            ]
-        )
+  t2 <- lookupLinear x v
+  pure (Just (Computation t1 t2))
 step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
   modi t x
   modi u y
