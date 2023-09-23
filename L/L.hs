@@ -177,3 +177,27 @@ force t = Mu @(Perp n) alpha (Computation returnAlpha t)
 
     returnAlpha :: Term Negative (Up (Perp n))
     returnAlpha = Return (Var alpha)
+
+-- p23
+cbvLam ::
+  forall a b.
+  (KnownLType b) =>
+  (KnownLType (Perp a `Dna` Up b)) =>
+  VarId a ->
+  Term Negative (Up b) ->
+  Term Negative (Up (Down (a `Lolly` Up b)))
+cbvLam x t = Return (thunk @(a `Lolly` Up b) (lam @a x t))
+
+cbaApply ::
+  forall a b.
+  (KnownLType a) =>
+  (KnownLType b) =>
+  (KnownLType (Perp a `Dna` Up b)) =>
+  Term Negative (Up (Down (a `Lolly` Up b))) ->
+  Term Negative (Up a) ->
+  Term Negative (Up b)
+cbaApply t u =
+  u `to` x $ t `to` f $ force (Var f) `apply` Var @a x
+  where
+    x = "x"
+    f = "f"
