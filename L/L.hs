@@ -496,19 +496,20 @@ macro ::
   (KnownLType t) =>
   (KnownLType c) =>
   (KnownLType t') =>
-  ((VarId t', VarId t) -> (Term Negative (Perp c), Term Positive c)) ->
-  M (Term 'Positive (Perp ('Up ('Tensor t t'))))
+  ((VarId t', VarId t) -> M (Term Negative (Perp c), Term Positive c)) ->
+  M (Term Positive (Perp (Up ('Tensor t t'))))
 macro x = do
   stack <- fresh "stack"
   arg <- fresh "arg"
   rest <- fresh "rest"
+  ii <- x (arg, rest)
   pure $
     MuReturn @(Tensor t t')
       stack
       ( Computation
           ( MuPair @t @t'
               (arg, rest)
-              (uncurry Computation (x (arg, rest)))
+              (uncurry Computation ii)
           )
           (Var @(Tensor t t') stack)
       )
@@ -533,58 +534,35 @@ example = do
 
   putStrLn (showComputation c)
 
-  let inner ::
-        ( VarId 'LInt,
-          VarId ('Down ('Up ('Tensor 'LInt ('Down 'PerpLInt))))
-        ) ->
-        ( Term 'Negative ('Up ('Down ('Dna 'PerpLInt ('Up 'LInt)))),
-          Term 'Positive ('Down ('Up ('Tensor 'LInt ('Down 'PerpLInt))))
-        )
-      inner (arg1, rest) =
-        ( Return
-            ( MuReturn @(Tensor LInt RestOfStack)
-                "mustack2"
-                ( Computation
-                    ( MuPair
-                        @LInt
-                        @RestOfStack
-                        ("arg2", "bottom")
-                        (uncurry Computation (innerInner ("arg2", "bottom")))
-                    )
-                    (Var @(Tensor LInt RestOfStack) "mustack2")
-                )
-            ),
-          Var rest
-        )
-        where
-          innerInner (arg2, bottom) =
-            ( ( Sub
-                  ( Mu
-                      @LInt
-                      "res"
-                      ( Computation
-                          @(Tensor LInt RestOfStack)
-                          Stop
-                          (Pair (Var "res", Var bottom))
-                      )
-                  )
-              ),
-              (Pair @LInt @LInt (Var arg1, Var arg2))
-            )
-
   let outer = runM $ do
-        macro @LInt @(Down (Up (Tensor LInt RestOfStack))) inner
+        macro
+          @LInt
+          @(Down (Up (Tensor LInt RestOfStack)))
+          @(Down (Up (Tensor LInt RestOfStack)))
+          $ \(arg1, rest) -> do
+            ii <- macro $ \(arg2, bottom) ->
+              pure
+                ( Sub
+                    ( Mu
+                        @LInt
+                        "res"
+                        ( Computation
+                            @(Tensor LInt RestOfStack)
+                            Stop
+                            (Pair (Var "res", Var bottom))
+                        )
+                    ),
+                  Pair (Var arg1, Var arg2)
+                )
+
+            pure (Return ii, Var rest)
 
   flip
     State.evalStateT
     ( Map.fromList
         [ ("one", TypedTerm (IntLit 1)),
           ("two", TypedTerm (IntLit 2)),
-          ( "sub",
-            TypedTerm
-              ( outer
-              )
-          )
+          ("sub", TypedTerm outer)
         ]
     )
     (loop c)
