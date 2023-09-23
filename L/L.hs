@@ -60,6 +60,7 @@ type family Perp t = t' {- can't do | t' -> t -} where
   Perp Zero = Top
   Perp (Bang a) = WhyNot (Perp a)
   Perp (Down a) = Up (Perp a)
+  Perp (a `Dna` b) = Perp a `Tensor` Perp b
   Perp Bottom = One
   Perp (a `And` b) = Perp a `Plus` Perp b
   Perp Top = Zero
@@ -107,7 +108,7 @@ type family KnownLType t where
 
 type M = State.State Int
 
-fresh :: String -> M String
+fresh :: String -> M (VarId a)
 fresh s = do
   i <- State.get
   State.modify' (+ 1)
@@ -185,10 +186,10 @@ force t = do
 cbvLam ::
   forall a b.
   (KnownLType b) =>
-  (KnownLType (Perp a `Dna` Up b)) =>
+  (KnownLType (a `Lolly` Up b)) =>
   VarId a ->
-  Term Negative (Up b) ->
-  M (Term Negative (Up (Down (a `Lolly` Up b))))
+  Term' (CBVType b) ->
+  M (Term' (CBVType (a `CBVLolly` b)))
 cbvLam x t =
   Return <$> (thunk =<< lam @a x t)
 
@@ -197,11 +198,34 @@ cbvApply ::
   forall a b.
   (KnownLType a) =>
   (KnownLType b) =>
-  (KnownLType (Perp a `Dna` Up b)) =>
-  Term Negative (Up (Down (a `Lolly` Up b))) ->
-  Term Negative (Up a) ->
-  M (Term Negative (Up b))
+  (KnownLType (a `Lolly` Up b)) =>
+  Term Negative (CBVType (a `CBVLolly` b)) ->
+  Term Negative (CBVType a) ->
+  M (Term' (CBVType b))
 cbvApply t u = do
   x <- fresh "x"
   f <- fresh "f"
   (u `to` x) <*> ((t `to` f) <*> (do f' <- force (Var f); apply f' (Var @a x)))
+
+cbvVar :: VarId a -> Term 'Negative ('Up a)
+cbvVar = Return . Var
+
+type CBVType a = Up a
+
+type CBVLolly a b = Down (a `Lolly` Up b)
+
+exampleTerm ::
+  forall a0 a1 b.
+  (KnownLType a0) =>
+  (KnownLType a1) =>
+  (KnownLType b) =>
+  M (Term' (CBVType (a0 `CBVLolly` (a1 `CBVLolly` b))))
+exampleTerm = do
+  x <- fresh "one"
+  y <- fresh "two"
+  minus <- fresh "-"
+
+  inner <-
+    cbvApply <$> cbvApply (cbvVar minus) (cbvVar @a0 x) <*> pure (cbvVar @a1 y)
+
+  cbvLam @a0 x =<< cbvLam @a1 y =<< inner
