@@ -1,4 +1,5 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -21,6 +22,7 @@ import Control.Monad.Trans.Class (lift)
 import qualified Control.Monad.Trans.State as State
 import Data.Kind (Constraint, Type)
 import qualified Data.Map.Strict as Map
+import Data.Type.Equality (type (~~))
 
 data Polarity = Positive | Negative
 
@@ -69,6 +71,26 @@ data SLType p a where
   SBottom :: SLType' Bottom
   SOne :: SLType' One
 
+data Dict c where
+  Dict :: (c) => Dict c
+
+perpSLType :: SLType p t -> SLType (Flip p) (Perp t)
+perpSLType = \case
+  STensor a b -> SDna (perpSLType a) (perpSLType b)
+  SDna {} -> error "SDna"
+  SDown {} -> error "SDown"
+  SUp {} -> error "SUp"
+  SBottom {} -> error "SBottom"
+  SOne {} -> error "SOne"
+
+-- ~~ is annoying here
+eqSLType :: SLType p t -> SLType p' t' -> Maybe (Dict (p ~ p', t ~~ t'))
+eqSLType (STensor a b) (STensor a' b') = do
+  Dict <- eqSLType a a'
+  Dict <- eqSLType b b'
+  pure Dict
+eqSLType _ _ = Nothing
+
 class KnownLType' (a :: LType p) where
   know :: SLType p a
 
@@ -116,7 +138,11 @@ type Term :: forall (p :: Polarity) -> LType p -> Type
 data Term p t where
   Var :: (KnownLType' a) => VarId a -> Term Positive a
   Mu :: VarId a -> Computation -> Term Negative (Perp a)
-  Pair :: Term Positive a -> Term Positive b -> Term Positive (a `Tensor` b)
+  Pair ::
+    (KnownLType' (a `Tensor` b)) =>
+    Term Positive a ->
+    Term Positive b ->
+    Term Positive (a `Tensor` b)
   MuPair ::
     VarId a ->
     VarId b ->
@@ -134,7 +160,11 @@ data Term p t where
     Term Negative (Perp a `And` Perp b)
   EmptyCase :: Term Negative Top
   Return :: Term Positive a -> Term Negative (Up a)
-  MuReturn :: VarId a -> Computation -> Term Positive (Down (Perp a))
+  MuReturn ::
+    (KnownLType' (Down (Perp a))) =>
+    VarId a ->
+    Computation ->
+    Term Positive (Down (Perp a))
   -- Not sure how to stop the computation
   Stop :: (KnownLType' a) => Term p a
 
@@ -203,6 +233,7 @@ type Term' (t :: LType p) = Term p t
 
 apply ::
   forall a b.
+  (KnownLType a) =>
   (KnownLType b) =>
   Term' (a `Lolly` b) ->
   Term' a ->
@@ -313,13 +344,11 @@ data TypedTerm p where
     Term p t ->
     TypedTerm p
 
--- This is silly and expensive.  We should store the type with each
--- constructor.
-typedTerm :: forall p t. Term p t -> TypedTerm p
-typedTerm = \case
-  Var {} -> error "typed term Var"
+termType :: Term p t -> SLType p t
+termType = \case
+  Var {} -> know
   Mu {} -> error "Mu"
-  Pair {} -> error "Pair"
+  Pair {} -> know
   MuPair {} -> error "MuPair"
   Unit {} -> error "Unit"
   MuUnit {} -> error "MuUnit"
@@ -328,8 +357,13 @@ typedTerm = \case
   MuDot {} -> error "MuDot"
   EmptyCase {} -> error "EmptCase"
   Return {} -> error "Retur"
-  MuReturn {} -> error "MuReturn"
-  Stop -> TypedTerm know (Stop @_ @t)
+  MuReturn {} -> know
+  Stop {} -> know
+
+-- This is silly and expensive.  We should store the type with each
+-- constructor.
+typedTerm :: forall p t. Term p t -> TypedTerm p
+typedTerm t = TypedTerm (termType t) t
 
 type Subst = Map.Map String (TypedTerm Positive)
 
@@ -342,6 +376,14 @@ step (Computation (Mu x c) t) = do
 step (Computation (Return t) (MuReturn x c)) = do
   State.modify' (Map.insert x (typedTerm t))
   pure (Just c)
+step (Computation t1 (Var x)) = do
+  TypedTerm t t2 <-
+    State.gets (Map.lookup x) >>= \case
+      Just tt -> pure tt
+      Nothing -> error ("Missing key " ++ x)
+  case eqSLType (perpSLType t) (termType t1) of
+    Just Dict -> step (Computation t1 t2)
+    Nothing -> error "Mismatched types"
 step c = error (show c)
 
 type TermType = CBVType One
@@ -351,17 +393,23 @@ example = do
   let term :: Term' TermType
       term = runM (exampleTerm @One @One @One)
 
-  putStrLn (showTerm term)
-
   let loop c =
         step c >>= \case
           Nothing -> pure ()
           Just c' -> do
-            lift (putStrLn (showComputation c'))
+            lift (putStrLn "--")
+            m <- State.get
+            flip mapM_ (Map.toList m) $ \(k, v) -> do
+              pure ()
+            -- lift (putStrLn (show k ++ ": " ++ show v))
             loop c'
+
+  let c = Computation @(Perp TermType) term Stop
+
+  putStrLn (showComputation c)
 
   flip
     State.evalStateT
     Map.empty
     -- This type argument is annoying
-    (loop (Computation @(Perp TermType) term Stop))
+    (loop c)
