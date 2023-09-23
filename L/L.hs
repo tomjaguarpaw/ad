@@ -212,7 +212,8 @@ data Term p t where
     Computation ->
     Term Positive (Down (Perp a))
   -- Not sure how to stop the computation
-  Stop :: (KnownLType' a) => Term p a
+  Debug :: (KnownLType' a) => String -> Term p a
+  Stop :: (KnownLType' a) => Term Negative a
   Sub :: Term Negative (Perp LInt) -> Term Negative (Perp (LInt `Tensor` LInt))
   IntLit :: Int -> Term Positive LInt
 
@@ -237,6 +238,7 @@ showTerm = \case
   EmptyCase {} -> error "EmptyCase"
   Return t -> "⇑" ++ showTerm t
   MuReturn v c -> "μ⇑" ++ v ++ "." ++ showComputation c
+  Debug s -> "Debug " ++ s
   Stop -> "Stop"
   Sub c -> "Sub. " ++ showTerm c
   IntLit i -> show i
@@ -413,6 +415,7 @@ termType = \case
   EmptyCase {} -> error "EmptCase"
   Return {} -> know
   MuReturn {} -> know
+  Debug {} -> know
   Stop {} -> know
   Sub {} -> error "Sub"
   IntLit {} -> know
@@ -487,6 +490,7 @@ step (Computation (Sub c) (Pair (t1, v@(Var t)))) = do
   pure (Just (Computation (Sub c) (Pair (t1, t2))))
 step (Computation (Sub c) (Pair (IntLit i1, IntLit i2))) = do
   pure (Just (Computation c (IntLit (i1 - i2))))
+step (Computation (Stop {}) _) = pure Nothing
 step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType t2))
 
 type TermType = CBVType LInt
@@ -553,7 +557,16 @@ example = do
                         "res"
                         ( Computation
                             @(Tensor LInt RestOfStack)
-                            Stop
+                            ( MuPair
+                                @LInt
+                                @RestOfStack
+                                ("theup", "thestop")
+                                ( Computation
+                                    @(Perp (Up LInt))
+                                    (Return (Var "theup"))
+                                    (Var "thestop")
+                                )
+                            )
                             (Pair (Var "res", Var bottom))
                         )
                     ),
