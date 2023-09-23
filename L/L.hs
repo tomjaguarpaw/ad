@@ -566,6 +566,4 @@ example = do
     )
     (loop c)
 
-type SubType = Tensor LInt (Down (Up (Tensor LInt RestOfStack)))
-
 type RestOfStack = Down (Perp LInt)
