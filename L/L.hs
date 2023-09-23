@@ -16,7 +16,9 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
-{-# HLINT ignore "Redundant flip" #-}
+{- HLINT ignore "Use join" -}
+{- HLINT ignore "Use forM_" -}
+{- HLINT ignore "Redundant flip" -}
 
 module L where
 
@@ -57,6 +59,8 @@ data LType p where
   Up :: LType Positive -> LType Negative
   LInt :: LType Positive
   PerpLInt :: LType Negative
+  Heap :: LType Positive -> LType Positive
+  PerpHeap :: LType Negative -> LType Negative
 
 type SLType' (t :: LType p) = SLType p t
 
@@ -76,6 +80,8 @@ data SLType p a where
   SOne :: SLType' One
   SLInt :: SLType' LInt
   SPerpLInt :: SLType' PerpLInt
+  SHeap :: SLType' a -> SLType' (Heap a)
+  SPerpHeap :: SLType' a -> SLType' (PerpHeap a)
 
 deriving instance Show (SLType p t)
 
@@ -92,6 +98,8 @@ perpSLType = \case
   SOne -> SBottom
   SLInt -> SPerpLInt
   SPerpLInt -> SLInt
+  SHeap a -> SPerpHeap (perpSLType a)
+  SPerpHeap a -> SHeap (perpSLType a)
 
 -- ~~ is annoying here
 eqSLType :: SLType p t -> SLType p' t' -> Maybe (Dict (p ~ p', t ~~ t'))
@@ -162,6 +170,8 @@ type family Perp t = t' {- can't do | t' -> t -} where
   Perp (Up a) = Down (Perp a)
   Perp LInt = PerpLInt
   Perp PerpLInt = LInt
+  Perp (Heap a) = PerpHeap (Perp a)
+  Perp (PerpHeap a) = Heap (Perp a)
 
 type VarId :: LType Positive -> Type
 type VarId a = String
