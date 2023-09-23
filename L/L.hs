@@ -101,15 +101,15 @@ type Lolly :: LType Positive -> LType Negative -> LType Negative
 type Lolly a b = Perp a `Dna` b
 
 lam ::
-  forall a b b'.
-  b ~ Perp b' =>
+  forall a b.
+  b ~ Perp (Perp b) =>
   VarId a ->
   Term' b ->
   Term' (a `Lolly` b)
 -- fixme: fresh variable
-lam x t = MuPair @a @b' x a comp
+lam x t = MuPair @a @(Perp b) x a comp
   where
-    vara :: Term Positive b'
+    vara :: Term Positive (Perp b)
     vara = Var a
 
     a :: VarId a
@@ -121,14 +121,14 @@ lam x t = MuPair @a @b' x a comp
 type Term' (t :: LType p) = Term p t
 
 apply ::
-  forall a b b'.
-  (b ~ Perp b', Perp b ~ b') =>
+  forall a b.
+  Perp (Perp b) ~ b =>
   Term' (a `Lolly` b) ->
   Term' a ->
   Term Negative b
 apply t u =
   -- < pair | t> is the opposite way round from p5
-  Mu @b' alpha (Computation pair t)
+  Mu @(Perp b) alpha (Computation pair t)
   where
     alpha = "alpha1"
 
@@ -137,11 +137,11 @@ apply t u =
 
 -- p20
 thunk ::
-  forall n n'.
-  n ~ Perp n' =>
+  forall n.
+  Perp (Perp n) ~ n =>
   Term Negative n ->
   Term Positive (Down n)
-thunk t = MuReturn @n' alpha (Computation @n' (Var alpha) t)
+thunk t = MuReturn @(Perp n) alpha (Computation @(Perp n) (Var alpha) t)
   where
-    alpha :: VarId n'
+    alpha :: VarId (Perp n)
     alpha = "alpha2"
