@@ -466,14 +466,13 @@ step (Computation t1 v@(Var x)) = do
       error
         ( unlines
             [ "Mismatched types",
-              showTerm t1 ++ " :: " ++ show (termType t1),
-              showTerm v ++ " ::perp " ++ show (perpSLType (termType v)),
+              showTerm v ++ " :: " ++ show (termType v),
               "env("
                 ++ showTerm v
                 ++ ") = "
                 ++ showTerm t2
-                ++ " ::perp "
-                ++ show (perpSLType (termType t2))
+                ++ " :: "
+                ++ show (termType t2)
             ]
         )
 step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
