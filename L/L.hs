@@ -533,7 +533,14 @@ example = do
 
   putStrLn (showComputation c)
 
-  let inner (arg1, rest) =
+  let inner ::
+        ( VarId 'LInt,
+          VarId ('Down ('Up ('Tensor 'LInt ('Down 'PerpLInt))))
+        ) ->
+        ( Term 'Negative ('Up ('Down ('Dna 'PerpLInt ('Up 'LInt)))),
+          Term 'Positive ('Down ('Up ('Tensor 'LInt ('Down 'PerpLInt))))
+        )
+      inner (arg1, rest) =
         ( Return
             ( MuReturn @(Tensor LInt RestOfStack)
                 "mustack2"
