@@ -138,7 +138,6 @@ apply t u =
 -- p20
 thunk ::
   forall n n'.
-  n' ~ Perp n =>
   n ~ Perp n' =>
   Term Negative n ->
   Term Positive (Down n)
