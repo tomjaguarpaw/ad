@@ -16,6 +16,8 @@
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
+{-# HLINT ignore "Redundant flip" #-}
+
 module L where
 
 import Control.Monad.Trans.Class (lift)
@@ -53,6 +55,8 @@ data LType p where
   Top :: LType Negative
   WhyNot :: LType Negative -> LType Negative
   Up :: LType Positive -> LType Negative
+  LInt :: LType Positive
+  PerpLInt :: LType Negative
 
 type SLType' (t :: LType p) = SLType p t
 
@@ -70,6 +74,8 @@ data SLType p a where
   SUp :: SLType' a -> SLType' (Up a)
   SBottom :: SLType' Bottom
   SOne :: SLType' One
+  SLInt :: SLType' LInt
+  SPerpLInt :: SLType' PerpLInt
 
 deriving instance Show (SLType p t)
 
@@ -84,6 +90,8 @@ perpSLType = \case
   SUp a -> SDown (perpSLType a)
   SBottom -> SOne
   SOne -> SBottom
+  SLInt -> SPerpLInt
+  SPerpLInt -> SLInt
 
 -- ~~ is annoying here
 eqSLType :: SLType p t -> SLType p' t' -> Maybe (Dict (p ~ p', t ~~ t'))
@@ -103,6 +111,8 @@ eqSLType (SUp a) (SUp a') = do
   pure Dict
 eqSLType SBottom SBottom = pure Dict
 eqSLType SOne SOne = pure Dict
+eqSLType SLInt SLInt = pure Dict
+eqSLType SPerpLInt SPerpLInt = pure Dict
 eqSLType _ _ = Nothing
 
 class KnownLType' (a :: LType p) where
@@ -126,6 +136,12 @@ instance (KnownLType' a) => KnownLType' (Down a) where
 instance (KnownLType' a) => KnownLType' (Up a) where
   know = SUp know
 
+instance KnownLType' LInt where
+  know = SLInt
+
+instance KnownLType' PerpLInt where
+  know = SPerpLInt
+
 type Perp :: forall (p :: Polarity). LType p -> LType (Flip p)
 type family Perp t = t' {- can't do | t' -> t -} where
   Perp (TyVar a) = TyVarPerp a
@@ -144,6 +160,8 @@ type family Perp t = t' {- can't do | t' -> t -} where
   Perp Top = Zero
   Perp (WhyNot a) = Bang (Perp a)
   Perp (Up a) = Down (Perp a)
+  Perp LInt = PerpLInt
+  Perp PerpLInt = LInt
 
 type VarId :: LType Positive -> Type
 type VarId a = String
@@ -185,6 +203,8 @@ data Term p t where
     Term Positive (Down (Perp a))
   -- Not sure how to stop the computation
   Stop :: (KnownLType' a) => Term p a
+  Sub :: Term Positive LInt -> Term Negative (Perp (LInt `Tensor` LInt))
+  IntLit :: Int -> Term Positive LInt
 
 deriving instance Show (Term p t)
 
@@ -208,6 +228,8 @@ showTerm = \case
   Return t -> "⇑" ++ showTerm t
   MuReturn v c -> "μ⇑" ++ v ++ "." ++ showComputation c
   Stop -> "Stop"
+  Sub c -> "Sub. " ++ showTerm c
+  IntLit i -> show i
 
 showComputation :: Computation -> String
 showComputation (Computation t1 t2) =
@@ -383,6 +405,8 @@ termType = \case
   Return {} -> know
   MuReturn {} -> know
   Stop {} -> know
+  Sub {} -> error "Sub"
+  IntLit {} -> error "IntLit"
 
 -- This is silly and expensive.  We should store the type with each
 -- constructor.
@@ -447,12 +471,12 @@ step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
   pure (Just c)
 step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType t2))
 
-type TermType = CBVType One
+type TermType = CBVType LInt
 
 example :: IO ()
 example = do
   let term :: Term' TermType
-      term = runM (exampleTerm @One @One @One)
+      term = runM (exampleTerm @LInt @LInt @LInt)
 
   let loop c =
         step c >>= \case
@@ -478,37 +502,29 @@ example = do
                   "mstack"
                   ( Computation
                       ( MuPair
-                          @One
-                          @(Down (Up (Tensor One (Down Bottom))))
+                          @LInt
+                          @(Down (Up (Tensor LInt RestOfStack)))
                           ("arg1", "mstack2")
                           ( Computation
                               ( Return
-                                  ( MuReturn @(Tensor One (Down Bottom))
+                                  ( MuReturn @(Tensor LInt RestOfStack)
                                       "mustack2"
                                       ( Computation
-                                          @(Tensor One (Down Bottom))
+                                          @(Tensor LInt RestOfStack)
                                           ( MuPair
-                                              @One
-                                              @(Down Bottom)
+                                              @LInt
+                                              @RestOfStack
                                               ("arg2", "bottom")
                                               ( Computation
-                                                  ( Mu
-                                                      @(Tensor One One)
-                                                      "thePair"
-                                                      ( Computation
-                                                          @((Tensor One One) `Tensor` Down Bottom)
-                                                          Stop
-                                                          (Pair (Var "thePair", Var "bottom"))
-                                                      )
-                                                  )
-                                                  (Pair @One @One (Var "arg1", Var "arg2"))
+                                                  (Sub (Var "bottom"))
+                                                  (Pair @LInt @LInt (Var "arg1", Var "arg2"))
                                               )
                                           )
                                           (Var "mustack2")
                                       )
                                   )
                               )
-                              (Var @(Down (Up (Tensor One (Down Bottom)))) "mstack2")
+                              (Var @(Down (Up (Tensor LInt RestOfStack))) "mstack2")
                           )
                       )
                       (Var @SubType "mstack")
@@ -520,4 +536,6 @@ example = do
     -- This type argument is annoying
     (loop c)
 
-type SubType = Tensor One (Down (Up (Tensor One (Down Bottom))))
+type SubType = Tensor LInt (Down (Up (Tensor LInt RestOfStack)))
+
+type RestOfStack = Down (Perp LInt)
