@@ -391,14 +391,13 @@ exampleTerm = do
 data TypedTerm p where
   TypedTerm ::
     forall (p :: Polarity) (t :: LType p).
-    SLType p t ->
     Term p t ->
     TypedTerm p
 
 deriving instance Show (TypedTerm p)
 
 showTypedTerm :: TypedTerm p -> String
-showTypedTerm (TypedTerm _ t) = showTerm t
+showTypedTerm (TypedTerm t) = showTerm t
 
 termType :: Term p t -> SLType p t
 termType = \case
@@ -418,11 +417,6 @@ termType = \case
   Sub {} -> error "Sub"
   IntLit {} -> error "IntLit"
 
--- This is silly and expensive.  We should store the type with each
--- constructor.
-typedTerm :: forall p t. Term p t -> TypedTerm p
-typedTerm t = TypedTerm (termType t) t
-
 type Subst = Map.Map String (TypedTerm Positive)
 
 modi :: (Monad m) => Term Positive t -> VarId t -> State.StateT Subst m ()
@@ -430,10 +424,10 @@ modi t x =
   State.modify'
     ( case t of
         Var v -> \m -> case Map.lookup v m of
-          Nothing -> Map.insert x (typedTerm t) m
+          Nothing -> Map.insert x (TypedTerm t) m
           Just tt -> Map.delete v (Map.insert x tt m)
         -- Do pairs too
-        _ -> Map.insert x (typedTerm t)
+        _ -> Map.insert x (TypedTerm t)
     )
 
 -- p21
@@ -446,7 +440,7 @@ step (Computation (Return t) (MuReturn x c)) = do
   modi t x
   pure (Just c)
 step (Computation t1 v@(Var x)) = do
-  TypedTerm t t2 <-
+  TypedTerm t2 <-
     State.gets (Map.lookup x) >>= \case
       Just tt -> do
         State.modify' (Map.delete x)
@@ -458,7 +452,7 @@ step (Computation t1 v@(Var x)) = do
                 show (termType t1)
               ]
           )
-  case eqSLType (perpSLType t) (termType t1) of
+  case eqSLType (perpSLType (termType t2)) (termType t1) of
     Just Dict -> pure (Just (Computation t1 t2))
     Nothing ->
       error
@@ -471,8 +465,7 @@ step (Computation t1 v@(Var x)) = do
                 ++ ") = "
                 ++ showTerm t2
                 ++ " ::perp "
-                ++ show (perpSLType (termType t2)),
-              "annotated with ::perp " ++ show (perpSLType t)
+                ++ show (perpSLType (termType t2))
             ]
         )
 step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
@@ -507,7 +500,7 @@ example = do
     State.evalStateT
     ( Map.fromList
         [ ( "sub",
-            typedTerm
+            TypedTerm
               ( MuReturn @SubType
                   "mstack"
                   ( Computation
