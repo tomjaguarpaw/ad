@@ -542,26 +542,28 @@ example = do
                         @LInt
                         @RestOfStack
                         ("arg2", "bottom")
-                        ( Computation
-                            ( Sub
-                                ( Mu
-                                    @LInt
-                                    "res"
-                                    ( Computation
-                                        @(Tensor LInt RestOfStack)
-                                        Stop
-                                        (Pair (Var "res", Var "bottom"))
-                                    )
-                                )
-                            )
-                            (Pair @LInt @LInt (Var arg1, Var "arg2"))
-                        )
+                        (uncurry Computation (innerInner ("arg2", "bottom")))
                     )
                     (Var @(Tensor LInt RestOfStack) "mustack2")
                 )
             ),
           Var rest
         )
+        where
+          innerInner (arg2, bottom) =
+            ( ( Sub
+                  ( Mu
+                      @LInt
+                      "res"
+                      ( Computation
+                          @(Tensor LInt RestOfStack)
+                          Stop
+                          (Pair (Var "res", Var bottom))
+                      )
+                  )
+              ),
+              (Pair @LInt @LInt (Var arg1, Var arg2))
+            )
 
   let outer = runM $ do
         macro @LInt @(Down (Up (Tensor LInt RestOfStack))) inner
