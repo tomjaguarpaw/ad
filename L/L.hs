@@ -10,12 +10,13 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeFamilyDependencies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wall #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 module L where
 
-import Data.Kind (Type)
+import Data.Kind (Constraint, Type)
 
 data Polarity = Positive | Negative
 
@@ -25,7 +26,6 @@ type family Flip a = f | f -> a where
   Flip Negative = Positive
 
 type TyVarId :: Polarity -> Type
-
 type TyVarId a = String
 
 type LType :: Polarity -> Type
@@ -66,7 +66,6 @@ type family Perp t = t' {- can't do | t' -> t -} where
   Perp (Up a) = Down (Perp a)
 
 type VarId :: LType Positive -> Type
-
 type VarId a = String
 
 type Term :: forall (p :: Polarity) -> LType p -> Type
@@ -97,12 +96,17 @@ data Computation where
   Computation :: Term Positive a -> Term Negative (Perp a) -> Computation
 
 type Lolly :: LType Positive -> LType Negative -> LType Negative
-
 type Lolly a b = Perp a `Dna` b
+
+-- To be improved ...
+type KnownLType :: forall (p :: Polarity). LType p -> Constraint
+type family KnownLType t where
+  KnownLType (t :: LType Positive) = t ~ Perp (Perp t)
+  KnownLType (t :: LType Negative) = t ~ Perp (Perp t)
 
 lam ::
   forall a b.
-  b ~ Perp (Perp b) =>
+  (KnownLType b) =>
   VarId a ->
   Term' b ->
   Term' (a `Lolly` b)
@@ -122,7 +126,7 @@ type Term' (t :: LType p) = Term p t
 
 apply ::
   forall a b.
-  Perp (Perp b) ~ b =>
+  (KnownLType b) =>
   Term' (a `Lolly` b) ->
   Term' a ->
   Term Negative b
@@ -138,7 +142,7 @@ apply t u =
 -- p20
 thunk ::
   forall n.
-  Perp (Perp n) ~ n =>
+  (KnownLType n) =>
   Term Negative n ->
   Term Positive (Down n)
 thunk t = MuReturn @(Perp n) alpha (Computation @(Perp n) (Var alpha) t)
