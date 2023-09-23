@@ -213,7 +213,7 @@ data Term p t where
     Term Positive (Down (Perp a))
   -- Not sure how to stop the computation
   Stop :: (KnownLType' a) => Term p a
-  Sub :: Term Positive LInt -> Term Negative (Perp (LInt `Tensor` LInt))
+  Sub :: Term Negative (Perp LInt) -> Term Negative (Perp (LInt `Tensor` LInt))
   IntLit :: Int -> Term Positive LInt
 
 deriving instance Show (Term p t)
@@ -479,6 +479,14 @@ step (Computation (MuPair (x, y) c) (Pair (t, u))) = do
   modi t x
   modi u y
   pure (Just c)
+step (Computation (Sub c) (Pair (v@(Var t), t2))) = do
+  t1 <- lookupLinear t v
+  pure (Just (Computation (Sub c) (Pair (t1, t2))))
+step (Computation (Sub c) (Pair (t1, v@(Var t)))) = do
+  t2 <- lookupLinear t v
+  pure (Just (Computation (Sub c) (Pair (t1, t2))))
+step (Computation (Sub c) (Pair (IntLit i1, IntLit i2))) = do
+  pure (Just (Computation c (IntLit (i1 + i2))))
 step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType t2))
 
 type TermType = CBVType LInt
@@ -526,7 +534,17 @@ example = do
                                               @RestOfStack
                                               ("arg2", "bottom")
                                               ( Computation
-                                                  (Sub (Var "bottom"))
+                                                  ( Sub
+                                                      ( Mu
+                                                          @LInt
+                                                          "res"
+                                                          ( Computation
+                                                              @(Tensor LInt RestOfStack)
+                                                              Stop
+                                                              (Pair (Var "res", Var "bottom"))
+                                                          )
+                                                      )
+                                                  )
                                                   (Pair @LInt @LInt (Var "arg1", Var "arg2"))
                                               )
                                           )
