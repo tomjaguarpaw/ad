@@ -398,6 +398,7 @@ modi t x =
         Var v -> \m -> case Map.lookup v m of
           Nothing -> Map.insert x (typedTerm t) m
           Just tt -> Map.delete v (Map.insert x tt m)
+        -- Do pairs too
         _ -> Map.insert x (typedTerm t)
     )
 
@@ -484,7 +485,27 @@ example = do
                               ( Return
                                   ( MuReturn @(Tensor One (Down Bottom))
                                       "mustack2"
-                                      (Computation @(Tensor One (Down Bottom)) Stop (Var "mustack2"))
+                                      ( Computation
+                                          @(Tensor One (Down Bottom))
+                                          ( MuPair
+                                              @One
+                                              @(Down Bottom)
+                                              ("arg2", "bottom")
+                                              ( Computation
+                                                  ( Mu
+                                                      @(Tensor One One)
+                                                      "thePair"
+                                                      ( Computation
+                                                          @((Tensor One One) `Tensor` Down Bottom)
+                                                          Stop
+                                                          (Pair (Var "thePair", Var "bottom"))
+                                                      )
+                                                  )
+                                                  (Pair @One @One (Var "arg1", Var "arg2"))
+                                              )
+                                          )
+                                          (Var "mustack2")
+                                      )
                                   )
                               )
                               (Var @(Down (Up (Tensor One (Down Bottom)))) "mstack2")
