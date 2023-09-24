@@ -131,8 +131,14 @@ eqSLType SLInt SLInt = pure Dict
 eqSLType SLInt {} _ = Nothing
 eqSLType SPerpLInt SPerpLInt = pure Dict
 eqSLType SPerpLInt {} _ = Nothing
-eqSLType SHeap {} _ = error "Heap not yet supported"
-eqSLType SPerpHeap {} _ = error "Heap not yet supported"
+eqSLType (SHeap a) (SHeap a') = do
+  Dict <- eqSLType a a'
+  pure Dict
+eqSLType SHeap {} _ = Nothing
+eqSLType (SPerpHeap a) (SPerpHeap a') = do
+  Dict <- eqSLType a a'
+  pure Dict
+eqSLType SPerpHeap {} _ = Nothing
 
 class KnownLType' (a :: LType p) where
   know :: SLType p a
