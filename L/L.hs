@@ -189,29 +189,43 @@ type VarId a = String
 
 type Term :: forall (p :: Polarity) -> LType p -> Type
 data Term p t where
-  Var :: (KnownLType' a) => VarId a -> Term Positive a
-  Mu :: VarId a -> Computation -> Term Negative (Perp a)
+  Var ::
+    (KnownLType' a) =>
+    VarId a ->
+    Term Positive a
+  Mu ::
+    VarId a ->
+    Computation ->
+    Term Negative (Perp a)
   Pair ::
-    (KnownLType' (a `Tensor` b)) =>
+    (KnownLType' a, KnownLType' b) =>
     (Term Positive a, Term Positive b) ->
     Term Positive (a `Tensor` b)
   MuPair ::
     forall a b.
-    (KnownLType' (Perp a `Dna` Perp b)) =>
+    (KnownLType (Perp a), KnownLType (Perp b)) =>
     (VarId a, VarId b) ->
     Computation ->
     Term Negative (Perp a `Dna` Perp b)
-  Unit :: Term Positive One
-  MuUnit :: Computation -> Term Negative Bottom
-  OneDot :: Term Positive a -> Term Positive (a `Plus` b)
-  TwoDot :: Term Positive b -> Term Positive (a `Plus` b)
+  Unit ::
+    Term Positive One
+  MuUnit ::
+    Computation ->
+    Term Negative Bottom
+  OneDot ::
+    Term Positive a ->
+    Term Positive (a `Plus` b)
+  TwoDot ::
+    Term Positive b ->
+    Term Positive (a `Plus` b)
   MuDot ::
     VarId a ->
     Computation ->
     VarId b ->
     Computation ->
     Term Negative (Perp a `And` Perp b)
-  EmptyCase :: Term Negative Top
+  EmptyCase ::
+    Term Negative Top
   Return ::
     (KnownLType' a) =>
     Term Positive a ->
@@ -222,11 +236,20 @@ data Term p t where
     VarId a ->
     Computation ->
     Term Positive (Down (Perp a))
+  Debug ::
+    (KnownLType' a) =>
+    String ->
+    Term p a
   -- Not sure how to stop the computation
-  Debug :: (KnownLType' a) => String -> Term p a
-  Stop :: (KnownLType' a) => Term Negative a
-  Sub :: Term Negative (Perp LInt) -> Term Negative (Perp (LInt `Tensor` LInt))
-  IntLit :: Int -> Term Positive LInt
+  Stop ::
+    (KnownLType' a) =>
+    Term Negative a
+  Sub ::
+    Term Negative (Perp LInt) ->
+    Term Negative (Perp (LInt `Tensor` LInt))
+  IntLit ::
+    Int ->
+    Term Positive LInt
 
 deriving instance Show (Term p t)
 
@@ -264,8 +287,10 @@ type Lolly a b = Perp a `Dna` b
 -- To be improved ...
 type KnownLType :: forall (p :: Polarity). LType p -> Constraint
 type family KnownLType t where
-  KnownLType (t :: LType Positive) = (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
-  KnownLType (t :: LType Negative) = (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
+  KnownLType (t :: LType Positive) =
+    (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
+  KnownLType (t :: LType Negative) =
+    (t ~ Perp (Perp t), KnownLType' t, KnownLType' (Perp t))
 
 type M = State.State Int
 
@@ -501,8 +526,10 @@ step (Computation (Sub c) (Pair (t1, v@(Var t)))) = do
   pure (Just (Computation (Sub c) (Pair (t1, t2))))
 step (Computation (Sub c) (Pair (IntLit i1, IntLit i2))) = do
   pure (Just (Computation c (IntLit (i1 - i2))))
-step (Computation (Stop {}) _) = pure Nothing
-step (Computation t1 t2) = error (show (termType t1) ++ " | " ++ show (termType t2))
+step (Computation (Stop {}) _) =
+  pure Nothing
+step (Computation t1 t2) =
+  error (show (termType t1) ++ " | " ++ show (termType t2))
 
 type TermType = CBVType LInt
 
