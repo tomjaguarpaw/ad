@@ -168,7 +168,7 @@ instance KnownLType' PerpLInt where
   know = SPerpLInt
 
 type Perp :: forall (p :: Polarity). LType p -> LType (Flip p)
-type family Perp t = t' {- can't do | t' -> t -} where
+type family Perp t = t' | t' -> t where
   Perp (TyVar a) = TyVarPerp a
   Perp (TyVar a) = TyVarPerp' a
   Perp (TyVarPerp a) = TyVar a
