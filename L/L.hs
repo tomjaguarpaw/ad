@@ -102,26 +102,37 @@ perpSLType = \case
   SPerpHeap a -> SHeap (perpSLType a)
 
 -- ~~ is annoying here
+--
+-- This not complete!
 eqSLType :: SLType p t -> SLType p' t' -> Maybe (Dict (p ~ p', t ~~ t'))
 eqSLType (STensor a b) (STensor a' b') = do
   Dict <- eqSLType a a'
   Dict <- eqSLType b b'
   pure Dict
+eqSLType STensor {} _ = Nothing
 eqSLType (SDna a b) (SDna a' b') = do
   Dict <- eqSLType a a'
   Dict <- eqSLType b b'
   pure Dict
+eqSLType SDna {} _ = Nothing
 eqSLType (SDown a) (SDown a') = do
   Dict <- eqSLType a a'
   pure Dict
+eqSLType SDown {} _ = Nothing
 eqSLType (SUp a) (SUp a') = do
   Dict <- eqSLType a a'
   pure Dict
+eqSLType SUp {} _ = Nothing
 eqSLType SBottom SBottom = pure Dict
+eqSLType SBottom {} _ = Nothing
 eqSLType SOne SOne = pure Dict
+eqSLType SOne {} _ = Nothing
 eqSLType SLInt SLInt = pure Dict
+eqSLType SLInt {} _ = Nothing
 eqSLType SPerpLInt SPerpLInt = pure Dict
-eqSLType _ _ = Nothing
+eqSLType SPerpLInt {} _ = Nothing
+eqSLType SHeap {} _ = error "Heap not yet supported"
+eqSLType SPerpHeap {} _ = error "Heap not yet supported"
 
 class KnownLType' (a :: LType p) where
   know :: SLType p a
