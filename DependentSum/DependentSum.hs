@@ -3,18 +3,22 @@
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module DependentSum where
 
+import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
 import GHC.Read (expectP, paren)
 import Text.Read
@@ -24,6 +28,7 @@ import Text.Read
     parens,
     readMaybe,
   )
+import Type.Reflection ((:~:) (Refl))
 
 -- Index definiton
 
@@ -33,10 +38,10 @@ data T = A | B deriving (Show, Read)
 -- is to go via a type family, but that's still quite heavyweight!
 
 data FooA = FooA1 Int | FooA2 Bool
-  deriving (Read, Show)
+  deriving (Eq, Ord, Read, Show)
 
 data FooB = FooB1 Char | FooB2 String
-  deriving (Read, Show)
+  deriving (Eq, Ord, Read, Show)
 
 type FooF :: T -> Type
 type family FooF a where
@@ -50,6 +55,17 @@ newtype Foo t = Foo {getFoo :: FooF t}
 data ST :: T -> Type where
   SA :: ST A
   SB :: ST B
+
+eqT :: forall t t'. (KnownT t, KnownT t') => Maybe (t :~: t')
+eqT
+  | SA <- knownT @t,
+    SA <- knownT @t' =
+      Just Refl
+  | SB <- knownT @t,
+    SB <- knownT @t' =
+      Just Refl
+  | otherwise =
+      Nothing
 
 stTot :: ST t -> T
 stTot = \case
@@ -77,11 +93,36 @@ withKnownT r = case knownT @t of
   SA -> r
   SB -> r
 
-instance (KnownT t, ForallFooF Show) => Show (Foo t) where
-  show (Foo v) = withKnownT @t @Show show v
+coerceMethod ::
+  forall t (c :: Type -> Constraint) a2 a3.
+  (Coercible a2 a3) =>
+  (c (FooF A), c (FooF B)) =>
+  (KnownT t) =>
+  ((c (FooF t)) => a2) ->
+  a3
+coerceMethod a2 = coerce @a2 @a3 (withKnownT @t @c a2)
 
-instance (KnownT t, ForallFooF Read) => Read (Foo t) where
-  readPrec = Foo <$> withKnownT @t @Read readPrec
+newtype FooWrapper t = FooWrapper {getFooWrapper :: FooF t}
+
+deriving newtype instance (Show (FooF t)) => Show (FooWrapper t)
+
+deriving newtype instance (Read (FooF t)) => Read (FooWrapper t)
+
+deriving newtype instance (Eq (FooF t)) => Eq (FooWrapper t)
+
+deriving newtype instance (Ord (FooF t)) => Ord (FooWrapper t)
+
+instance (KnownT t) => Show (Foo t) where
+  show = coerceMethod @t @Show (show @(FooWrapper t))
+
+instance (KnownT t) => Read (Foo t) where
+  readPrec = coerceMethod @t @Read (readPrec @(FooWrapper t))
+
+instance (KnownT t) => Eq (Foo t) where
+  (==) = coerceMethod @t @Eq ((==) @(FooWrapper t))
+
+instance (KnownT t) => Ord (Foo t) where
+  compare = coerceMethod @t @Ord (compare @(FooWrapper t))
 
 data SomeT k where
   SomeT :: (KnownT t) => k t -> SomeT k
@@ -91,6 +132,11 @@ mkSomeFoo = SomeT @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
   show (SomeT (v :: k t)) = show (stTot (knownT @t), v)
+
+instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
+  SomeT (v1 :: k t1) == SomeT (v2 :: k t2) = case eqT @t1 @t2 of
+    Just Refl -> v1 == v2
+    Nothing -> False
 
 readSomeTPayload :: forall i k. (Read (k i), KnownT i) => ReadPrec (SomeT k)
 readSomeTPayload = SomeT @i <$> readPrec
@@ -105,6 +151,7 @@ instance (forall t. (KnownT t) => Read (k t)) => Read (SomeT k) where
 
 -- Example to show that it works
 
+testCases :: [SomeT Foo]
 testCases =
   [ mkSomeFoo @A (FooA1 1),
     mkSomeFoo @A (FooA2 True),
@@ -119,9 +166,10 @@ example :: IO ()
 example = flip mapM_ testCases $ \someT -> do
   print someT
   let mr = roundtrip someT
-  case mr of
-    Just r -> print r
-    Nothing -> putStrLn "No read"
+  putStrLn $ case mr of
+    Just r
+      | r == someT -> "Round-tripped successfully"
+    _ -> "ROUND-TRIP FAILURE!"
 
 -- These ReadPrec combinators are borrowed from
 --
