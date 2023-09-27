@@ -8,7 +8,6 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -18,10 +17,35 @@ module DependentSum where
 
 import Data.Kind (Constraint, Type)
 import GHC.Read (expectP, paren)
-import Text.ParserCombinators.ReadP
 import Text.Read
+  ( Lexeme (Punc),
+    Read (readPrec),
+    ReadPrec,
+    parens,
+    readMaybe,
+  )
+
+-- Index definiton
 
 data T = A | B deriving (Show, Read)
+
+-- Definition of type that depends on index.  The most lightweight way
+-- is to go via a type family, but that's still quite heavyweight!
+
+data FooA = FooA1 Int | FooA2 Bool
+  deriving (Read, Show)
+
+data FooB = FooB1 Char | FooB2 String
+  deriving (Read, Show)
+
+type FooF :: T -> Type
+type family FooF a where
+  FooF A = FooA
+  FooF B = FooB
+
+newtype Foo t = Foo {getFoo :: FooF t}
+
+-- Lots of boilerplate
 
 data ST :: T -> Type where
   SA :: ST A
@@ -40,19 +64,6 @@ instance KnownT A where
 
 instance KnownT B where
   knownT = SB
-
-data FooA = FooA1 Int | FooA2 Bool
-  deriving (Read, Show)
-
-data FooB = FooB1 Char | FooB2 String
-  deriving (Read, Show)
-
-type FooF :: T -> Type
-type family FooF a where
-  FooF A = FooA
-  FooF B = FooB
-
-newtype Foo t = Foo {getFoo :: FooF t}
 
 type ForallFooF :: (Type -> Constraint) -> Constraint
 type ForallFooF c = (c (FooF A), c (FooF B))
@@ -92,21 +103,7 @@ instance (forall t. (KnownT t) => Read (k t)) => Read (SomeT k) where
       A -> readSomeTPayload @A
       B -> readSomeTPayload @B
 
--- Borrowed from
--- https://hackage.haskell.org/package/base-4.18.1.0/docs/src/GHC.Read.html#line-681
-wrap_tup :: ReadPrec a -> ReadPrec a
-wrap_tup p = parens (paren p)
-
-read_tup2 :: (Read a, Read b) => ReadPrec (a, b)
--- Reads "a , b"  no parens!
-read_tup2 = do
-  x <- readPrec
-  read_comma
-  y <- readPrec
-  return (x, y)
-
-read_comma :: ReadPrec ()
-read_comma = expectP (Punc ",")
+-- Example to show that it works
 
 testCases =
   [ mkSomeFoo @A (FooA1 1),
@@ -125,3 +122,21 @@ example = flip mapM_ testCases $ \someT -> do
   case mr of
     Just r -> print r
     Nothing -> putStrLn "No read"
+
+-- These ReadPrec combinators are borrowed from
+--
+-- https://hackage.haskell.org/package/base-4.18.1.0/docs/src/GHC.Read.html#line-681
+
+wrap_tup :: ReadPrec a -> ReadPrec a
+wrap_tup p = parens (paren p)
+
+read_tup2 :: (Read a, Read b) => ReadPrec (a, b)
+-- Reads "a , b"  no parens!
+read_tup2 = do
+  x <- readPrec
+  read_comma
+  y <- readPrec
+  return (x, y)
+
+read_comma :: ReadPrec ()
+read_comma = expectP (Punc ",")
