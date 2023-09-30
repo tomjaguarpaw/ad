@@ -76,10 +76,17 @@ class Known (i :: t) where
 -- example @data T = A | B | C@.
 type Index :: Type -> Constraint
 class (Eq t) => Index t where
+  -- | @
+  -- type Singleton T i where
+  --   SA :: ST A
+  --   SB :: SB B
+  --   SC :: SC C
+  -- @
   data Singleton t :: t -> Type
 
   type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
 
+  -- | Use 'eqT' instead, except when defining this class.
   eqT' ::
     forall (i :: t) (i' :: t).
     (Known i, Known i') =>
@@ -88,6 +95,7 @@ class (Eq t) => Index t where
     Proxy i' ->
     Maybe (i :~: i')
 
+  -- | From this we derive 'toValue'.
   singletonToValue :: Singleton t i -> t
 
   -- | Not sure why this requires Proxy arguments
@@ -99,7 +107,8 @@ class (Eq t) => Index t where
     Proxy c ->
     -- | _
     Proxy f ->
-    (Known i, Forall t c f) =>
+    (Forall t c f) =>
+    (Known i) =>
     ((c (f i)) => r) ->
     r
 
