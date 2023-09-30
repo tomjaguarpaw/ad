@@ -14,11 +14,12 @@
 module IndexedTypes.Index
   ( Index (..),
     eqT,
+    knowAll,
     withKnown,
     coerceMethod,
     Known (..),
     toValue,
-    Dict (..),
+    Dict (Dict),
 
     -- * Converting between value and type level
     toValue,
@@ -48,6 +49,17 @@ eqT ::
   Maybe (i :~: i')
 eqT = eqT' Proxy Proxy
 
+-- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
+-- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
+-- once (@Known i => Dict (c (f i))@).
+knowAll ::
+  forall (t :: Type) (i :: t) c f.
+  (Index t) =>
+  (Forall t c f) =>
+  -- | _
+  ((Known i) => Dict (c (f i)))
+knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
+
 withKnown ::
   forall (t :: Type) (i :: t) c f r.
   (Known i, Index t, Forall t c f) =>
@@ -55,8 +67,7 @@ withKnown ::
   ((c (f i)) => r) ->
   -- | _
   r
-withKnown r = case knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f) of
-  Dict -> r
+withKnown r = case knowAll @t @i @c @f of Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
@@ -86,6 +97,9 @@ class (Eq t) => Index t where
   -- @
   data Singleton t :: t -> Type
 
+  -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
+  -- kind @t@ separately.  'knowAll' allows us to know them all at
+  -- once.
   type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
 
   -- | Use 'eqT' instead, except when defining this class.
@@ -106,12 +120,11 @@ class (Eq t) => Index t where
   -- @'Forall' t@ is correct
   knowAll' ::
     (Forall t c f) =>
-    (Known i) =>
     Proxy i ->
     Proxy c ->
     -- | _
     Proxy f ->
-    Dict (c (f i))
+    ((Known i) => Dict (c (f i)))
 
   -- | Take the value level index @i@ (i.e. a value of type @t@) and
   -- return it at the type level as a type of kind @t@.

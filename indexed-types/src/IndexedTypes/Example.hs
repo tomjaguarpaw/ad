@@ -39,7 +39,12 @@ where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import IndexedTypes.Index (Dict (Dict), Index (..), Known (know), TypeOfKind (TypeIs))
+import IndexedTypes.Index
+  ( Dict (Dict),
+    Index (..),
+    Known (know),
+    TypeOfKind (TypeIs),
+  )
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
