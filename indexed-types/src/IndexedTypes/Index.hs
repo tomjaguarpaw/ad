@@ -1,29 +1,19 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingVia #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
-{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 module IndexedTypes.Index where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
-import Text.Read
-  ( Read (readPrec),
-  )
 import Type.Reflection ((:~:))
 
 -- Library
@@ -98,23 +88,6 @@ class (Eq t) => Index t where
     (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     t ->
     r
-
-newtype Knownly a = Knownly a
-
-instance (Known i, Forall t Show k, Index t) => Show (Knownly (k i)) where
-  show = coerceMethod @t @i @Show @k (show @(k i))
-
-instance (Known i, Forall t Read k, Index t) => Read (Knownly (k i)) where
-  readPrec = coerceMethod @t @i @Read @k (readPrec @(k i))
-
-instance (Known i, Forall t Eq k, Index t) => Eq (Knownly (k i)) where
-  (==) = coerceMethod @t @i @Eq @k ((==) @(k i))
-
-instance
-  (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) =>
-  Ord (Knownly (k i))
-  where
-  compare = coerceMethod @t @i @Ord @k (compare @(k i))
 
 applyAny ::
   forall t r.

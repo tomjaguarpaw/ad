@@ -20,7 +20,8 @@ module IndexedTypes.Example where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import IndexedTypes.Index (Index (..), Known (know), Knownly (Knownly))
+import IndexedTypes.Index (Index (..), Known (know))
+import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
 import Type.Reflection ((:~:) (Refl))
