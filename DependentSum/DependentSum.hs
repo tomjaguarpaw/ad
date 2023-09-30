@@ -61,11 +61,11 @@ newtype Foo t = Foo {getFoo :: FF FooFF t}
 
 eqT :: forall t t'. (KnownT t, KnownT t') => Maybe (t :~: t')
 eqT
-  | SA <- knownT @t,
-    SA <- knownT @t' =
+  | SA <- know @_ @t,
+    SA <- know @_ @t' =
       Just Refl
-  | SB <- knownT @t,
-    SB <- knownT @t' =
+  | SB <- know @_ @t,
+    SB <- know @_ @t' =
       Just Refl
   | otherwise =
       Nothing
@@ -127,7 +127,7 @@ instance Index T where
     \(Proxy :: Proxy i)
      (Proxy :: Proxy c)
      (Proxy :: Proxy f)
-     r -> case knownT @i of
+     r -> case know @_ @i of
         SA -> r
         SB -> r
 
@@ -137,9 +137,6 @@ instance Index T where
 
 type KnownT :: T -> Constraint
 type KnownT = Known
-
-knownT :: forall (t :: T). (Known t) => Singleton T t
-knownT = know
 
 instance Known A where
   know = SA
@@ -188,7 +185,7 @@ mkSomeFoo :: forall t. (KnownT t) => FF FooFF t -> SomeT Foo
 mkSomeFoo = Some @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
-  show (Some (v :: k t)) = show (toVal (knownT @t), v)
+  show (Some (v :: k t)) = show (toVal (know @_ @t), v)
 
 instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
   Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @t1 @t2 of
