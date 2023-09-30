@@ -66,43 +66,69 @@ data FooBC = FooBC1 Char | FooBC2 String
   deriving (Eq, Ord, Read, Show)
 
 type FooF :: T -> Type
-type family FooF t :: Type where
+type family FooF i :: Type where
   FooF A = FooA
   FooF B = FooBC
   FooF C = FooBC
 
-newtype Foo t = Foo {getFoo :: FooF t}
+newtype Foo i = Foo (FooF i)
 
--- | A wrapper type, with the contents as @Foo@, purely for the purpose
--- of deriving instances.
-newtype FooWrapper t = Wrapper {getFooWrapper :: FooF t}
+-- | A wrapper type, with the same contents as @Foo@, purely for the
+-- purpose of deriving instances.
+--
+-- The instances we derive for @FooWrapper@ are only used by the
+-- @deriving via@ clauses which derive instances for @Foo@.  If you
+-- were defining an indexed type like @Foo@ in your own code you
+-- wouldn't export the equivalent of @FooWrapper@.  It wouldn't be
+-- needed anywhere else.
+--
+-- The technical reason that we need to do this is that we want
+-- the instance
+--
+-- * @Known i => Show (Foo i)@
+--
+-- However, GHC's @deriving@ only allows us to directly derive
+--
+-- * @Show (FooF A) => Show (Foo A)@
+-- * @Show (FooF B) => Show (Foo B)@
+-- * @Show (FooF C) => Show (Foo C)@
+--
+-- so instead we derive those instances for the @newtype@ @FooWrapper@
+-- instead, and then use @deriving via@ with 'Knownly', to derive the
+-- instances for @Foo@.  'Knownly'\'s purpose is to convert the
+-- constraint @(Show (FooF A), Show (FooF B), Show (FooF C))@ into
+-- @Known i@.
+--
+-- If GHC's deriving mechanism were more flexible perhaps we wouldn't
+-- have to go all round the houses like this.
+newtype FooWrapper i = Wrapper (FooF i)
 
 -- | derived as a @newtype@ instance
-deriving newtype instance (Show (FooF t)) => Show (FooWrapper t)
+deriving newtype instance (Show (FooF i)) => Show (FooWrapper i)
 
 -- | derived as a @newtype@ instance
-deriving newtype instance (Read (FooF t)) => Read (FooWrapper t)
+deriving newtype instance (Read (FooF i)) => Read (FooWrapper i)
 
 -- | derived as a @stock@ instance
-deriving stock instance (Eq (FooF t)) => Eq (FooWrapper t)
+deriving stock instance (Eq (FooF i)) => Eq (FooWrapper i)
 
 -- | derived as a @stock@ instance
-deriving stock instance (Ord (FooF t)) => Ord (FooWrapper t)
+deriving stock instance (Ord (FooF i)) => Ord (FooWrapper i)
 
--- | derived via @Knownly (FooWrapper t)@
-deriving via Knownly (FooWrapper t) instance (Known t) => Show (Foo t)
+-- | derived via @Knownly (FooWrapper i)@
+deriving via Knownly (FooWrapper i) instance (Known i) => Show (Foo i)
 
--- | derived via @Knownly (FooWrapper t)@
-deriving via Knownly (FooWrapper t) instance (Known t) => Read (Foo t)
+-- | derived via @Knownly (FooWrapper i)@
+deriving via Knownly (FooWrapper i) instance (Known i) => Read (Foo i)
 
--- | derived via @Knownly (FooWrapper t)@
-deriving via Knownly (FooWrapper t) instance (Known t) => Eq (Foo t)
+-- | derived via @Knownly (FooWrapper i)@
+deriving via Knownly (FooWrapper i) instance (Known i) => Eq (Foo i)
 
--- | derived via @Knownly (FooWrapper t)@
-deriving via Knownly (FooWrapper t) instance (Known t) => Ord (Foo t)
+-- | derived via @Knownly (FooWrapper i)@
+deriving via Knownly (FooWrapper i) instance (Known i) => Ord (Foo i)
 
-mkSomeFoo :: forall t. (Known t) => FooF t -> Some Foo
-mkSomeFoo = Some @t . Foo
+mkSomeFoo :: forall i. (Known i) => FooF i -> Some Foo
+mkSomeFoo = Some @i . Foo
 
 testCases :: [Some Foo]
 testCases =
@@ -145,7 +171,7 @@ example = flip mapM_ testCases $ \someT -> do
 -- Lots of boilerplate.  This is all derivable, in principle.
 
 instance Index T where
-  data Singleton T t where
+  data Singleton T i where
     SA :: Singleton T A
     SB :: Singleton T B
     SC :: Singleton T C

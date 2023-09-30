@@ -9,6 +9,8 @@ module IndexedTypes.Knownly where
 import IndexedTypes.Index (Index (Forall), Known, coerceMethod)
 import Text.Read (Read (readPrec))
 
+-- | Knownly is a @newtype@ that exists to allow deriving of instances
+-- for indexed types.  See "IndexedTypes.Example" for an example.
 newtype Knownly a = Knownly a
 
 instance (Known i, Index t, Forall t Show k) => Show (Knownly (k i)) where

@@ -96,7 +96,7 @@ applyAny ::
   (Index t) =>
   -- | _
   t ->
-  (forall (i' :: t). (Known i') => Proxy i' -> r) ->
+  (forall (i :: t). (Known i) => Proxy i -> r) ->
   r
 applyAny = applyAny' Proxy
 
