@@ -156,16 +156,16 @@ deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
 
 newtype Wrapper2 a = Worapper2 a
 
-instance (KnownT t) => Show (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t) => Show (Wrapper2 (Wrapper FooFF t)) where
   show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
 
-instance (KnownT t) => Read (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t) => Read (Wrapper2 (Wrapper FooFF t)) where
   readPrec = coerceMethod @T @t @Read @(Wrapper FooFF) (readPrec @(Wrapper FooFF t))
 
-instance (KnownT t) => Eq (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t) => Eq (Wrapper2 (Wrapper FooFF t)) where
   (==) = coerceMethod @T @t @Eq @(Wrapper FooFF) ((==) @(Wrapper FooFF t))
 
-instance (KnownT t) => Ord (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t) => Ord (Wrapper2 (Wrapper FooFF t)) where
   compare = coerceMethod @T @t @Ord @(Wrapper FooFF) (compare @(Wrapper FooFF t))
 
 deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Show (Foo t)
@@ -180,9 +180,6 @@ data Some k where
   Some :: (Known t) => k t -> Some k
 
 type SomeT = Some
-
-mkSomeFoo :: forall t. (KnownT t) => FF FooFF t -> SomeT Foo
-mkSomeFoo = Some @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
   show (Some (v :: k t)) = show (toVal (know @_ @t), v)
@@ -204,6 +201,9 @@ instance (forall t. (KnownT t) => Read (k t)) => Read (SomeT k) where
       B -> readSomeTPayload @B
 
 -- Example to show that it works
+
+mkSomeFoo :: forall t. (Known t) => FF FooFF t -> SomeT Foo
+mkSomeFoo = Some @t . Foo
 
 testCases :: [SomeT Foo]
 testCases =
