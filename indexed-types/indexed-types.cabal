@@ -1,0 +1,22 @@
+cabal-version:      3.0
+name:               indexed-types
+version:            0.0.0.0
+license:            MIT
+author:             Tom Ellis
+maintainer:         Tom Ellis
+build-type:         Simple
+extra-doc-files:    CHANGELOG.md
+
+common warnings
+    ghc-options: -Wall
+
+library
+    import:           warnings
+
+    exposed-modules:  IndexedTypes.Index
+
+    build-depends:    base ^>=4.14.3.0
+
+    hs-source-dirs:   src
+
+    default-language: Haskell2010

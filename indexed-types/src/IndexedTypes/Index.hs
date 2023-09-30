@@ -17,7 +17,9 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module DependentSum where
+{-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
+
+module IndexedTypes.Index where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
@@ -175,7 +177,7 @@ instance
     Nothing -> False
 
 applyAny ::
-  forall t (i :: t) r.
+  forall t r.
   (Index t) =>
   (forall (i' :: t). (Known i') => Proxy i' -> r) ->
   t ->
