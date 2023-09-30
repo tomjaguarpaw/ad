@@ -20,9 +20,11 @@ module IndexedTypes.Index
     toType,
     TypeOfKind (..),
 
+    -- * Type equality
+    eqT,
+
     -- * Random bits
     Index (..),
-    eqT,
     knowAll,
     Known (..),
     toValue,
@@ -43,6 +45,12 @@ import Type.Reflection ((:~:))
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
 -- are equal, and if so returns @(i :~: i')@ which allows you to write
 -- code that depends on them being equal.
+--
+-- @
+-- case eqT @i @i' of
+--    Nothing -> ... not equal ...
+--    Just Refl -> ... use i and i' as though they were equal ...
+-- @
 eqT ::
   forall (t :: Type) (i :: t) (i' :: t).
   (Index t, Known i, Known i') =>
@@ -80,6 +88,10 @@ class (Eq t) => Index t where
   -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
   -- kind @t@ separately.  'knowAll' allows us to know them all at
   -- once.
+  --
+  -- @
+  -- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+  -- @
   type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
 
   -- | Use 'eqT' instead, except when defining this class.
@@ -106,16 +118,32 @@ class (Eq t) => Index t where
     Proxy f ->
     ((Known i) => Dict (c (f i)))
 
-  -- | Take the value level index @i@ (i.e. a value of type @t@) and
-  -- return it at the type level as a type of kind @t@.
-  toType :: t -> TypeOfKind t
+  -- | Convert a value level index to a type level index.
+  --
+  -- @
+  -- toType A = TypeIs (Proxy :: Proxy @A)
+  -- @
+  toType ::
+    -- | Take a value level index (i.e. a value of type @t@)
+    t ->
+    -- | return it at the type level as a type of kind @t@
+    TypeOfKind t
 
 data Dict c where
   Dict :: (c) => Dict c
 
--- | Take the type level index @i@ (i.e. a type of kind @t@) and
--- return it at the value level as a value of type @t@.
-toValue :: forall t (i :: t). (Index t) => (Known i) => t
+-- | Convert a type level index to a value level index. Take the type
+-- level index @i@ (i.e. a type of kind @t@) and ...
+--
+-- @
+-- toValue @A = A
+-- @
+toValue ::
+  forall t (i :: t).
+  (Index t) =>
+  (Known i) =>
+  -- | ... return it at the value level as a value of type @t@
+  t
 toValue = singletonToValue (know @_ @i)
 
 -- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
