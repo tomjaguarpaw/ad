@@ -147,9 +147,6 @@ instance Known A where
 instance Known B where
   know = SB
 
--- FIXME: Eventually remove this
-type ST = Singleton T
-
 newtype Wrapper k t = Wrapper {getFooWrapper :: FF k t}
 
 deriving newtype instance (Show (FF FooFF t)) => Show (Wrapper FooFF t)
