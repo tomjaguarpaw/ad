@@ -115,10 +115,6 @@ class Index t where
     ((c (f i)) => r) ->
     r
 
--- FIXME: Get rid of this
-type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
-type ForallFooF f c = Forall T f c
-
 instance Index T where
   data Singleton T t where
     SA :: Singleton T A
