@@ -75,12 +75,12 @@ stTot = \case
   SA -> A
   SB -> B
 
-withKnownT ::
-  forall (t :: T) c f r.
-  (KnownT t, ForallFooF f c) =>
-  ((c (f t)) => r) ->
+withKnown ::
+  forall t (i :: t) c f r.
+  (Known i, Index t, Forall t f c) =>
+  ((c (f i)) => r) ->
   r
-withKnownT = withKnown' @T (Proxy @t) (Proxy @c) (Proxy @f)
+withKnown = withKnown' @t (Proxy @i) (Proxy @c) (Proxy @f)
 
 coerceMethod ::
   forall t (c :: Type -> Constraint) f a2 a3.
@@ -89,7 +89,7 @@ coerceMethod ::
   (KnownT t) =>
   ((c (f t)) => a2) ->
   a3
-coerceMethod a2 = coerce @a2 @a3 (withKnownT @t @c @f a2)
+coerceMethod a2 = coerce @a2 @a3 (withKnown @T @t @c @f a2)
 
 type Known :: forall t. t -> Constraint
 class Known (i :: t) where
