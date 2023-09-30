@@ -21,6 +21,7 @@ module DependentSum where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
+import Data.Proxy (Proxy (Proxy))
 import GHC.Read (expectP, paren)
 import Text.Read
   ( Lexeme (Punc),
@@ -75,13 +76,11 @@ stTot = \case
   SB -> B
 
 withKnownT ::
-  forall t c f r.
+  forall (t :: T) c f r.
   (KnownT t, ForallFooF f c) =>
   ((c (f t)) => r) ->
   r
-withKnownT r = case knownT @t of
-  SA -> r
-  SB -> r
+withKnownT = withKnown' @T (Proxy @t) (Proxy @c) (Proxy @f)
 
 coerceMethod ::
   forall t (c :: Type -> Constraint) f a2 a3.
@@ -96,11 +95,26 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know :: Singleton t i
 
+data Dict c where Dict :: (c) => Dict c
+
 type Index :: Type -> Constraint
 class Index t where
   data Singleton t :: t -> Type
 
   type Forall t (f :: t -> Type) (c :: Type -> Constraint) :: Constraint
+
+  -- The existence of this method confirms that `instance Known (i ::
+  -- t)` has been implemented for all i.
+  knowns :: Singleton t i -> Dict (Known i)
+
+  -- Not sure why this requires Proxy arguments
+  withKnown' ::
+    Proxy i ->
+    Proxy c ->
+    Proxy f ->
+    (Known i, Forall t f c) =>
+    ((c (f i)) => r) ->
+    r
 
 -- FIXME: Get rid of this
 type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
@@ -112,6 +126,18 @@ instance Index T where
     SB :: Singleton T B
 
   type Forall T f c = (c (f A), c (f B))
+
+  withKnown' =
+    \(Proxy :: Proxy i)
+     (Proxy :: Proxy c)
+     (Proxy :: Proxy f)
+     r -> case knownT @i of
+        SA -> r
+        SB -> r
+
+  knowns = \case
+    SA -> Dict
+    SB -> Dict
 
 type KnownT :: T -> Constraint
 type KnownT = Known
