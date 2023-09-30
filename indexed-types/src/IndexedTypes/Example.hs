@@ -16,6 +16,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
+-- | This example shows how to define an index type ('T') and a type
+-- index on that index type ('Foo').
 module IndexedTypes.Example
   ( -- * The type index
     T (..),
@@ -45,8 +47,9 @@ import Type.Reflection ((:~:) (Refl))
 
 -- Index definiton
 
--- | @T@ has an 'Index' instance, and its values have 'Known'
--- instances.
+-- | To make @T@ an index type we have to define an 'Index' instance
+-- for it, and 'Known' instances for all of its values ('A', 'B' and
+-- 'C').
 data T = A | B | C deriving (Eq, Show, Read)
 
 -- The most lightweight way is to go via a type family, but that's
