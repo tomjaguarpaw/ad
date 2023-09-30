@@ -67,14 +67,14 @@ eqT = eqT' Proxy Proxy
 
 withKnown ::
   forall (t :: Type) (i :: t) c f r.
-  (Known i, Index t, Forall t f c) =>
+  (Known i, Index t, Forall t c f) =>
   ((c (f i)) => r) ->
   r
 withKnown = withKnown' @t (Proxy @i) (Proxy @c) (Proxy @f)
 
 coerceMethod ::
   forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
-  (Coercible a2 a3, Index t, Forall t f c) =>
+  (Coercible a2 a3, Index t, Forall t c f) =>
   (Known i) =>
   ((c (f i)) => a2) ->
   a3
@@ -90,7 +90,7 @@ type Index :: Type -> Constraint
 class Index t where
   data Singleton t :: t -> Type
 
-  type Forall t (f :: t -> Type) (c :: Type -> Constraint) :: Constraint
+  type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
 
   eqT' ::
     forall (i :: t) (i' :: t).
@@ -110,7 +110,7 @@ class Index t where
     Proxy i ->
     Proxy c ->
     Proxy f ->
-    (Known i, Forall t f c) =>
+    (Known i, Forall t c f) =>
     ((c (f i)) => r) ->
     r
 
@@ -125,7 +125,7 @@ instance Index T where
     SA :: Singleton T A
     SB :: Singleton T B
 
-  type Forall T f c = (c (f A), c (f B))
+  type Forall T c f = (c (f A), c (f B))
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- know @_ @i,
@@ -150,8 +150,8 @@ instance Index T where
         SB -> r
 
   applyAny' (Proxy :: i) r = \case
-    A -> r @A (Proxy)
-    B -> r @B (Proxy)
+    A -> r @A Proxy
+    B -> r @B Proxy
 
   knowns = \case
     SA -> Dict
@@ -175,16 +175,16 @@ deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
 
 newtype Wrapper2 a = Worapper2 a
 
-instance (Known t, Forall T (Wrapper FooFF) Show) => Show (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T Show (Wrapper FooFF)) => Show (Wrapper2 (Wrapper FooFF t)) where
   show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
 
-instance (Known t, Forall T (Wrapper FooFF) Read) => Read (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T Read (Wrapper FooFF)) => Read (Wrapper2 (Wrapper FooFF t)) where
   readPrec = coerceMethod @T @t @Read @(Wrapper FooFF) (readPrec @(Wrapper FooFF t))
 
-instance (Known t, Forall T (Wrapper FooFF) Eq) => Eq (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T Eq (Wrapper FooFF)) => Eq (Wrapper2 (Wrapper FooFF t)) where
   (==) = coerceMethod @T @t @Eq @(Wrapper FooFF) ((==) @(Wrapper FooFF t))
 
-instance (Known t, Forall T (Wrapper FooFF) Ord) => Ord (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T Ord (Wrapper FooFF)) => Ord (Wrapper2 (Wrapper FooFF t)) where
   compare = coerceMethod @T @t @Ord @(Wrapper FooFF) (compare @(Wrapper FooFF t))
 
 deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Show (Foo t)
