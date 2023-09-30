@@ -207,10 +207,20 @@ instance
     Nothing -> False
 
 readSomeTPayload ::
-  forall tt i (k :: tt -> Type).
+  forall tt (k :: tt -> Type) i.
   (Read (k i), Known i) =>
+  Proxy i ->
   ReadPrec (SomeT k)
-readSomeTPayload = Some @i <$> readPrec
+readSomeTPayload Proxy = Some @i <$> readPrec
+
+applyAny ::
+  forall (i :: T) (k :: T -> Type) r.
+  (forall (i' :: T). (Known i') => Proxy i' -> r) ->
+  T ->
+  r
+applyAny r = \case
+  A -> r @A Proxy
+  B -> r @B Proxy
 
 instance
   forall (tt :: Type) (k :: tt -> Type).
@@ -220,9 +230,7 @@ instance
   readPrec = wrap_tup $ do
     x <- readPrec
     read_comma
-    case x of
-      A -> readSomeTPayload @_ @A
-      B -> readSomeTPayload @_ @B
+    applyAny (readSomeTPayload @tt @_) x
 
 -- Example to show that it works
 
