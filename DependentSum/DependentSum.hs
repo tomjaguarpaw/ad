@@ -223,9 +223,10 @@ readSomeTPayload ::
 readSomeTPayload = Some @i <$> readPrec
 
 applyAny ::
-  forall (i :: T) r.
-  (forall (i' :: T). (Known i') => Proxy i' -> r) ->
-  T ->
+  forall t (i :: t) r.
+  (Index t) =>
+  (forall (i' :: t). (Known i') => Proxy i' -> r) ->
+  t ->
   r
 applyAny = applyAny' Proxy
 
