@@ -217,11 +217,10 @@ instance
     Nothing -> False
 
 readSomeTPayload ::
-  forall tt (k :: tt -> Type) i.
+  forall tt i (k :: tt -> Type).
   (Read (k i), Known i) =>
-  Proxy i ->
   ReadPrec (SomeT k)
-readSomeTPayload Proxy = Some @i <$> readPrec
+readSomeTPayload = Some @i <$> readPrec
 
 applyAny ::
   forall (i :: T) r.
@@ -238,7 +237,7 @@ instance
   readPrec = wrap_tup $ do
     x <- readPrec
     read_comma
-    applyAny (readSomeTPayload @tt) x
+    applyAny (\(Proxy :: Proxy i) -> readSomeTPayload @_ @i) x
 
 -- Example to show that it works
 
