@@ -2,6 +2,7 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
@@ -16,7 +17,6 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
-
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 module IndexedTypes.Index where
@@ -207,15 +207,15 @@ instance Index T where
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- know @_ @i,
       SA <- know @_ @i' =
-      Just Refl
+        Just Refl
     | SB <- know @_ @i,
       SB <- know @_ @i' =
-      Just Refl
+        Just Refl
     | SC <- know @_ @i,
       SC <- know @_ @i' =
-      Just Refl
+        Just Refl
     | otherwise =
-      Nothing
+        Nothing
 
   toVal = \case
     SA -> A
