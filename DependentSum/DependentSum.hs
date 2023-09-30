@@ -74,9 +74,6 @@ stTot = \case
   SA -> A
   SB -> B
 
-type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
-type ForallFooF f c = (c (f A), c (f B))
-
 withKnownT ::
   forall t c f r.
   (KnownT t, ForallFooF f c) =>
@@ -103,10 +100,18 @@ type Index :: Type -> Constraint
 class Index t where
   data Singleton t :: t -> Type
 
+  type Forall t (f :: t -> Type) (c :: Type -> Constraint) :: Constraint
+
+-- FIXME: Get rid of this
+type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
+type ForallFooF f c = Forall T f c
+
 instance Index T where
   data Singleton T t where
     SA :: Singleton T A
     SB :: Singleton T B
+
+  type Forall T f c = (c (f A), c (f B))
 
 type KnownT :: T -> Constraint
 type KnownT = Known
