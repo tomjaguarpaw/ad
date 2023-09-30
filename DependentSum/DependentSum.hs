@@ -54,11 +54,7 @@ type instance FF FooFF A = FooA
 
 type instance FF FooFF B = FooB
 
--- FIXME: Eventually remove this
-type FooF :: T -> Type
-type FooF t = FF FooFF t
-
-newtype Foo t = Foo {getFoo :: FooF t}
+newtype Foo t = Foo {getFoo :: FF FooFF t}
 
 -- Lots of boilerplate
 
@@ -127,15 +123,15 @@ instance Known B where
 -- FIXME: Eventually remove this
 type ST = Singleton T
 
-newtype FooWrapper t = FooWrapper {getFooWrapper :: FooF t}
+newtype FooWrapper t = FooWrapper {getFooWrapper :: FF FooFF t}
 
-deriving newtype instance (Show (FooF t)) => Show (FooWrapper t)
+deriving newtype instance (Show (FF FooFF t)) => Show (FooWrapper t)
 
-deriving newtype instance (Read (FooF t)) => Read (FooWrapper t)
+deriving newtype instance (Read (FF FooFF t)) => Read (FooWrapper t)
 
-deriving newtype instance (Eq (FooF t)) => Eq (FooWrapper t)
+deriving newtype instance (Eq (FF FooFF t)) => Eq (FooWrapper t)
 
-deriving newtype instance (Ord (FooF t)) => Ord (FooWrapper t)
+deriving newtype instance (Ord (FF FooFF t)) => Ord (FooWrapper t)
 
 newtype Wrapper2 f t = Worapper2 (f t)
 
@@ -162,7 +158,7 @@ deriving via Wrapper2 FooWrapper t instance (KnownT t) => Ord (Foo t)
 data SomeT k where
   SomeT :: (KnownT t) => k t -> SomeT k
 
-mkSomeFoo :: forall t. (KnownT t) => FooF t -> SomeT Foo
+mkSomeFoo :: forall t. (KnownT t) => FF FooFF t -> SomeT Foo
 mkSomeFoo = SomeT @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
