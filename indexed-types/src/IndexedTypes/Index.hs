@@ -100,19 +100,6 @@ class (Eq t) => Index t where
   -- | From this we derive 'toValue'.
   singletonToValue :: Singleton t i -> t
 
-  withKnown' ::
-    (Forall t c f) =>
-    (Known i) =>
-    Proxy i ->
-    Proxy c ->
-    -- | _
-    Proxy f ->
-    ((c (f i)) => r) ->
-    r
-  withKnown' i c f g =
-    case knowAll' i c f of
-      Dict -> g
-
   -- | Not sure why this requires Proxy arguments
   --
   -- The implementation of @knowAll'@ is implicitly a check that
@@ -125,7 +112,6 @@ class (Eq t) => Index t where
     -- | _
     Proxy f ->
     Dict (c (f i))
-  knowAll' i c f = withKnown' i c f Dict
 
   -- | Take the value level index @i@ (i.e. a value of type @t@) and
   -- return it at the type level as a type of kind @t@.
