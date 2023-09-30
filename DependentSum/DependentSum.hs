@@ -114,11 +114,9 @@ class Index t where
 
   toVal :: Singleton t i -> t
 
-  -- The existence of this method confirms that `instance Known (i ::
-  -- t)` has been implemented for all i.
-  knowns :: Singleton t i -> Dict (Known i)
-
   -- Not sure why this requires Proxy arguments
+  --
+  -- withKnown' is implicitly a check that Forall t is correct
   withKnown' ::
     Proxy i ->
     Proxy c ->
@@ -127,6 +125,8 @@ class Index t where
     ((c (f i)) => r) ->
     r
 
+  -- applyAny' is implicitly a check that all the values of t are
+  -- Known.
   applyAny' ::
     Proxy i ->
     (forall (i' :: t). (Known i') => Proxy i' -> r) ->
@@ -166,10 +166,6 @@ instance Index T where
     A -> r @A Proxy
     B -> r @B Proxy
 
-  knowns = \case
-    SA -> Dict
-    SB -> Dict
-
 instance Known A where
   know = SA
 
@@ -193,19 +189,17 @@ instance (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) => Ord (Knownly 
 data Some k where
   Some :: (Known t) => k t -> Some k
 
-type SomeT = Some
-
 instance
   forall (t :: Type) (k :: t -> Type).
   (Show t, Index t, forall (i :: t). (Known i) => Show (k i)) =>
-  Show (SomeT k)
+  Show (Some k)
   where
   show (Some (v :: k i)) = show (toVal (know @_ @i), v)
 
 instance
   forall (t :: Type) (k :: t -> Type).
   (forall i. (Known i) => Eq (k i), Index t) =>
-  Eq (SomeT k)
+  Eq (Some k)
   where
   Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @_ @t1 @t2 of
     Just Refl -> v1 == v2
@@ -214,7 +208,7 @@ instance
 readSomeTPayload ::
   forall t i (k :: t -> Type).
   (Read (k i), Known i) =>
-  ReadPrec (SomeT k)
+  ReadPrec (Some k)
 readSomeTPayload = Some @i <$> readPrec
 
 applyAny ::
@@ -228,7 +222,7 @@ applyAny = applyAny' Proxy
 instance
   forall (t :: Type) (k :: t -> Type).
   (forall i. (Known i) => Read (k i), Read t, Index t) =>
-  Read (SomeT k)
+  Read (Some k)
   where
   readPrec = wrap_tup $ do
     x <- readPrec
@@ -237,10 +231,10 @@ instance
 
 -- Example to show that it works
 
-mkSomeFoo :: forall t. (Known t) => FooF t -> SomeT Foo
+mkSomeFoo :: forall t. (Known t) => FooF t -> Some Foo
 mkSomeFoo = Some @t . Foo
 
-testCases :: [SomeT Foo]
+testCases :: [Some Foo]
 testCases =
   [ mkSomeFoo @A (FooA1 1),
     mkSomeFoo @A (FooA2 True),
