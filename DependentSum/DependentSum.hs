@@ -59,16 +59,11 @@ newtype Foo t = Foo {getFoo :: FF FooFF t}
 
 -- Lots of boilerplate
 
-eqT :: forall t t'. (KnownT t, KnownT t') => Maybe (t :~: t')
-eqT
-  | SA <- know @_ @t,
-    SA <- know @_ @t' =
-      Just Refl
-  | SB <- know @_ @t,
-    SB <- know @_ @t' =
-      Just Refl
-  | otherwise =
-      Nothing
+eqT ::
+  forall (k :: Type) (i :: k) (i' :: k).
+  (Index k, Known i, Known i') =>
+  Maybe (i :~: i')
+eqT = eqT' Proxy Proxy
 
 withKnown ::
   forall t (i :: t) c f r.
@@ -97,6 +92,13 @@ class Index t where
 
   type Forall t (f :: t -> Type) (c :: Type -> Constraint) :: Constraint
 
+  eqT' ::
+    forall (i :: t) (i' :: t).
+    (Known i, Known i') =>
+    Proxy i ->
+    Proxy i' ->
+    Maybe (i :~: i')
+
   toVal :: Singleton t i -> t
 
   -- The existence of this method confirms that `instance Known (i ::
@@ -118,6 +120,16 @@ instance Index T where
     SB :: Singleton T B
 
   type Forall T f c = (c (f A), c (f B))
+
+  eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
+    | SA <- know @_ @i,
+      SA <- know @_ @i' =
+        Just Refl
+    | SB <- know @_ @i,
+      SB <- know @_ @i' =
+        Just Refl
+    | otherwise =
+        Nothing
 
   toVal = \case
     SA -> A
@@ -185,7 +197,7 @@ instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
   show (Some (v :: k t)) = show (toVal (know @_ @t), v)
 
 instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
-  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @t1 @t2 of
+  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @T @t1 @t2 of
     Just Refl -> v1 == v2
     Nothing -> False
 
