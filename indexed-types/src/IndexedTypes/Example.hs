@@ -16,7 +16,24 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
-module IndexedTypes.Example where
+module IndexedTypes.Example
+  ( -- * The type index
+    T (..),
+
+    -- * Defining @Foo@, a type indexed on @T@
+
+    -- | Definition of type that depends on the index 'T'.
+    FooA (..),
+    FooBC (..),
+    Foo (..),
+
+    -- * Deriving instances for @Foo@
+    FooWrapper (..),
+
+    -- * Example
+    example,
+  )
+where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
@@ -28,41 +45,57 @@ import Type.Reflection ((:~:) (Refl))
 
 -- Index definiton
 
-data T = A | B | C deriving (Eq, Ord, Show, Read)
+-- | @T@ has an 'Index' instance, and its values have 'Known'
+-- instances.
+data T = A | B | C deriving (Eq, Show, Read)
 
--- Definition of type that depends on index.  The most lightweight way
--- is to go via a type family, but that's still quite heavyweight!
+-- The most lightweight way is to go via a type family, but that's
+-- still quite heavyweight!
 
+-- | The payload for when the index is 'A'
 data FooA = FooA1 Int | FooA2 Bool
   deriving (Eq, Ord, Read, Show)
 
-data FooB = FooB1 Char | FooB2 String
+-- | The payload for when the index is 'B' or 'C'. (We're choosing the
+-- payload of @B@ and @C@ to be the same here, just to demonstrate
+-- that that /can/ be done.)
+data FooBC = FooBC1 Char | FooBC2 String
   deriving (Eq, Ord, Read, Show)
 
 type FooF :: T -> Type
 type family FooF t :: Type where
   FooF A = FooA
-  FooF B = FooB
-  FooF C = FooB
+  FooF B = FooBC
+  FooF C = FooBC
 
 newtype Foo t = Foo {getFoo :: FooF t}
 
+-- | A wrapper type, with the contents as @Foo@, purely for the purpose
+-- of deriving instances.
 newtype FooWrapper t = Wrapper {getFooWrapper :: FooF t}
 
+-- | derived as a @newtype@ instance
 deriving newtype instance (Show (FooF t)) => Show (FooWrapper t)
 
+-- | derived as a @newtype@ instance
 deriving newtype instance (Read (FooF t)) => Read (FooWrapper t)
 
+-- | derived as a @stock@ instance
 deriving stock instance (Eq (FooF t)) => Eq (FooWrapper t)
 
+-- | derived as a @stock@ instance
 deriving stock instance (Ord (FooF t)) => Ord (FooWrapper t)
 
+-- | derived via @Knownly (FooWrapper t)@
 deriving via Knownly (FooWrapper t) instance (Known t) => Show (Foo t)
 
+-- | derived via @Knownly (FooWrapper t)@
 deriving via Knownly (FooWrapper t) instance (Known t) => Read (Foo t)
 
+-- | derived via @Knownly (FooWrapper t)@
 deriving via Knownly (FooWrapper t) instance (Known t) => Eq (Foo t)
 
+-- | derived via @Knownly (FooWrapper t)@
 deriving via Knownly (FooWrapper t) instance (Known t) => Ord (Foo t)
 
 mkSomeFoo :: forall t. (Known t) => FooF t -> Some Foo
@@ -72,16 +105,31 @@ testCases :: [Some Foo]
 testCases =
   [ mkSomeFoo @A (FooA1 1),
     mkSomeFoo @A (FooA2 True),
-    mkSomeFoo @B (FooB1 'x'),
-    mkSomeFoo @B (FooB2 "hello"),
-    mkSomeFoo @C (FooB1 'x'),
-    mkSomeFoo @C (FooB2 "hello")
+    mkSomeFoo @B (FooBC1 'x'),
+    mkSomeFoo @B (FooBC2 "hello"),
+    mkSomeFoo @C (FooBC1 'x'),
+    mkSomeFoo @C (FooBC2 "hello")
   ]
 
 roundtrip :: (Read a, Show a) => a -> Maybe a
 roundtrip = readMaybe . show
 
 -- | Example to show that @Show@ and @Read@ instances of @Some@ work.
+--
+-- @
+-- (A,FooA1 1)
+-- Round-tripped successfully
+-- (A,FooA2 True)
+-- Round-tripped successfully
+-- (B,FooBC1 'x')
+-- Round-tripped successfully
+-- (B,FooBC2 "hello")
+-- Round-tripped successfully
+-- (C,FooBC1 'x')
+-- Round-tripped successfully
+-- (C,FooBC2 "hello")
+-- Round-tripped successfully
+-- @
 example :: IO ()
 example = flip mapM_ testCases $ \someT -> do
   print someT
