@@ -81,15 +81,12 @@ instance KnownT A where
 instance KnownT B where
   knownT = SB
 
-type ForallFooF :: (Type -> Constraint) -> Constraint
-type ForallFooF c = (c (FooF A), c (FooF B))
-
-type ForallFooF' :: (T -> Type) -> (Type -> Constraint) -> Constraint
-type ForallFooF' f c = (c (f A), c (f B))
+type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
+type ForallFooF f c = (c (f A), c (f B))
 
 withKnownT ::
   forall t c f r.
-  (KnownT t, ForallFooF' f c) =>
+  (KnownT t, ForallFooF f c) =>
   ((c (f t)) => r) ->
   r
 withKnownT r = case knownT @t of
@@ -99,7 +96,7 @@ withKnownT r = case knownT @t of
 coerceMethod ::
   forall t (c :: Type -> Constraint) f a2 a3.
   (Coercible a2 a3) =>
-  (c (f A), c (f B)) =>
+  (ForallFooF f c) =>
   (KnownT t) =>
   ((c (f t)) => a2) ->
   a3
@@ -116,7 +113,7 @@ deriving newtype instance (Eq (FooF t)) => Eq (FooWrapper t)
 deriving newtype instance (Ord (FooF t)) => Ord (FooWrapper t)
 
 instance (KnownT t) => Show (Foo t) where
-  show = coerceMethod @t @Show @FooWrapper @_ @_ (show @(FooWrapper t))
+  show = coerceMethod @t @Show @FooWrapper (show @(FooWrapper t))
 
 instance (KnownT t) => Read (Foo t) where
   readPrec = coerceMethod @t @Read @FooWrapper (readPrec @(FooWrapper t))
