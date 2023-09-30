@@ -201,23 +201,23 @@ data Some k where
 type SomeT = Some
 
 instance
-  forall (tt :: Type) (k :: tt -> Type).
-  (Show tt, Index tt, forall (t :: tt). (Known t) => Show (k t)) =>
+  forall (t :: Type) (k :: t -> Type).
+  (Show t, Index t, forall (i :: t). (Known i) => Show (k i)) =>
   Show (SomeT k)
   where
-  show (Some (v :: k t)) = show (toVal (know @_ @t), v)
+  show (Some (v :: k i)) = show (toVal (know @_ @i), v)
 
 instance
-  forall (tt :: Type) (k :: tt -> Type).
-  (forall t. (Known t) => Eq (k t), Index tt) =>
+  forall (t :: Type) (k :: t -> Type).
+  (forall i. (Known i) => Eq (k i), Index t) =>
   Eq (SomeT k)
   where
-  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @tt @t1 @t2 of
+  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @_ @t1 @t2 of
     Just Refl -> v1 == v2
     Nothing -> False
 
 readSomeTPayload ::
-  forall tt i (k :: tt -> Type).
+  forall t i (k :: t -> Type).
   (Read (k i), Known i) =>
   ReadPrec (SomeT k)
 readSomeTPayload = Some @i <$> readPrec
