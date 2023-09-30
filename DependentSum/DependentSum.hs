@@ -182,22 +182,24 @@ deriving via Wrapper2 FooWrapper t instance (KnownT t) => Eq (Foo t)
 
 deriving via Wrapper2 FooWrapper t instance (KnownT t) => Ord (Foo t)
 
-data SomeT k where
-  SomeT :: (KnownT t) => k t -> SomeT k
+data Some k where
+  Some :: (Known t) => k t -> Some k
+
+type SomeT = Some
 
 mkSomeFoo :: forall t. (KnownT t) => FF FooFF t -> SomeT Foo
-mkSomeFoo = SomeT @t . Foo
+mkSomeFoo = Some @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
-  show (SomeT (v :: k t)) = show (toVal (knownT @t), v)
+  show (Some (v :: k t)) = show (toVal (knownT @t), v)
 
 instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
-  SomeT (v1 :: k t1) == SomeT (v2 :: k t2) = case eqT @t1 @t2 of
+  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @t1 @t2 of
     Just Refl -> v1 == v2
     Nothing -> False
 
 readSomeTPayload :: forall i k. (Read (k i), KnownT i) => ReadPrec (SomeT k)
-readSomeTPayload = SomeT @i <$> readPrec
+readSomeTPayload = Some @i <$> readPrec
 
 instance (forall t. (KnownT t) => Read (k t)) => Read (SomeT k) where
   readPrec = wrap_tup $ do
