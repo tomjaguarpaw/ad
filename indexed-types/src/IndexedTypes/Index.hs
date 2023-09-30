@@ -12,19 +12,21 @@
 {-# OPTIONS_GHC -Wno-duplicate-exports #-}
 
 module IndexedTypes.Index
-  ( Index (..),
+  ( -- * Converting between value and type level
+
+    -- | An index can be moved between the type level and the value
+    -- level.
+    toValue,
+    toType,
+    TypeOfKind (..),
+
+    -- * Random bits
+    Index (..),
     eqT,
     knowAll,
-    withKnown,
-    coerceMethod,
     Known (..),
     toValue,
     Dict (Dict),
-
-    -- * Converting between value and type level
-    toValue,
-    TypeOfKind (..),
-    toType,
 
     -- ** Consistency check
     roundTripTypeValue,
@@ -32,7 +34,6 @@ module IndexedTypes.Index
   )
 where
 
-import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
 import Type.Reflection ((:~:))
@@ -59,27 +60,6 @@ knowAll ::
   -- | _
   ((Known i) => Dict (c (f i)))
 knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
-
-withKnown ::
-  forall (t :: Type) (i :: t) c f r.
-  (Known i, Index t, Forall t c f) =>
-  -- | _
-  ((c (f i)) => r) ->
-  -- | _
-  r
-withKnown r = case knowAll @t @i @c @f of Dict -> r
-
-coerceMethod ::
-  forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
-  () =>
-  (Index t) =>
-  (Forall t c f) =>
-  (Known i) =>
-  (Coercible a2 a3) =>
-  ((c (f i)) => a2) ->
-  -- | _
-  a3
-coerceMethod a2 = coerce @a2 @a3 (withKnown @t @i @c @f a2)
 
 type Known :: forall t. t -> Constraint
 class Known (i :: t) where
@@ -135,7 +115,7 @@ data Dict c where
 
 -- | Take the type level index @i@ (i.e. a type of kind @t@) and
 -- return it at the value level as a value of type @t@.
-toValue :: forall t (i :: t). (Known i, Index t) => t
+toValue :: forall t (i :: t). (Index t) => (Known i) => t
 toValue = singletonToValue (know @_ @i)
 
 -- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
