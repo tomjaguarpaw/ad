@@ -81,6 +81,7 @@ testCases =
 roundtrip :: (Read a, Show a) => a -> Maybe a
 roundtrip = readMaybe . show
 
+-- | Example to show that @Show@ and @Read@ instances of @Some@ work.
 example :: IO ()
 example = flip mapM_ testCases $ \someT -> do
   print someT

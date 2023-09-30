@@ -59,14 +59,9 @@ instance
     read_comma
     applyAny i (\(Proxy :: Proxy i') -> Some @i' <$> readPrec)
 
--- Example to show that it works
-
 -- These ReadPrec combinators are borrowed from
 --
 -- https://hackage.haskell.org/package/base-4.18.1.0/docs/src/GHC.Read.html#line-681
-
--- * Not for export
-
 wrap_tup :: ReadPrec a -> ReadPrec a
 wrap_tup p = parens (paren p)
 

@@ -11,17 +11,17 @@ import Text.Read (Read (readPrec))
 
 newtype Knownly a = Knownly a
 
-instance (Known i, Forall t Show k, Index t) => Show (Knownly (k i)) where
+instance (Known i, Index t, Forall t Show k) => Show (Knownly (k i)) where
   show = coerceMethod @t @i @Show @k (show @(k i))
 
-instance (Known i, Forall t Read k, Index t) => Read (Knownly (k i)) where
+instance (Known i, Index t, Forall t Read k) => Read (Knownly (k i)) where
   readPrec = coerceMethod @t @i @Read @k (readPrec @(k i))
 
-instance (Known i, Forall t Eq k, Index t) => Eq (Knownly (k i)) where
+instance (Known i, Index t, Forall t Eq k) => Eq (Knownly (k i)) where
   (==) = coerceMethod @t @i @Eq @k ((==) @(k i))
 
 instance
-  (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) =>
+  (Known i, Index t, Eq (Knownly (k i)), Forall t Ord k) =>
   Ord (Knownly (k i))
   where
   compare = coerceMethod @t @i @Ord @k (compare @(k i))
