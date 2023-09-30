@@ -205,15 +205,10 @@ instance Index T where
         SB -> r
         SC -> r
 
-  applyAny' i' r = case i' of
-    A -> r @A Proxy
-    B -> r @B Proxy
-    C -> r @C Proxy
-
   toType = \case
-    A -> TypeIs @_ @A
-    B -> TypeIs @_ @B
-    C -> TypeIs @_ @C
+    A -> TypeIs @_ @A Proxy
+    B -> TypeIs @_ @B Proxy
+    C -> TypeIs @_ @C Proxy
 
 instance Known A where
   know = SA

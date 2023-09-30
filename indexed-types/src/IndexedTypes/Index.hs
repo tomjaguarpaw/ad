@@ -9,8 +9,26 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wno-duplicate-exports #-}
 
-module IndexedTypes.Index where
+module IndexedTypes.Index
+  ( Index (..),
+    eqT,
+    withKnown,
+    coerceMethod,
+    Known (..),
+    toValue,
+
+    -- * Converting between value and type level
+    toValue,
+    TypeOfKind (..),
+    toType,
+
+    -- ** Consistency check
+    roundTripTypeValue,
+    roundTripValueType,
+  )
+where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
@@ -19,8 +37,9 @@ import Type.Reflection ((:~:))
 
 -- Library
 
--- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@ are
--- equal.
+-- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
+-- are equal, and if so returns @(i :~: i')@ which allows you to write
+-- code that depends on them being equal.
 eqT ::
   forall (t :: Type) (i :: t) (i' :: t).
   (Index t, Known i, Known i') =>
@@ -53,6 +72,8 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know :: Singleton t i
 
+-- | All the stuff you need for type @t@ to be an "index type".  For
+-- example @data T = A | B | C@.
 type Index :: Type -> Constraint
 class (Eq t) => Index t where
   data Singleton t :: t -> Type
@@ -82,55 +103,33 @@ class (Eq t) => Index t where
     ((c (f i)) => r) ->
     r
 
-  -- | The definition of @applyAny@ for an indexed type.  For some
-  -- reason making this a type class method seems to require a @Proxy@
-  -- argument.  In practice you should use 'applyAny' instead, which
-  -- doesn't use the @Proxy@ argument.
-  --
-  -- The implementation of @applyAny'@ is implicitly a check that all
-  -- the values of @t@ are 'Known'.
-  applyAny' ::
-    -- | _
-    t ->
-    (forall (i' :: t). (Known i') => Proxy i' -> r) ->
-    r
-
   -- | Take the value level index @i@ (i.e. a value of type @t@) and
   -- return it at the type level as a type of kind @t@.
   toType :: t -> TypeOfKind t
-
--- | Take an index (i.e. a value of type @t@) and pass it as a type
--- level argument to a function which expects an index at the type
--- level.
---
--- In other places this is called "reify", for example in
--- @Data.Reflection.@'Data.Reflection.reifyNat'.
-applyAny ::
-  forall t r.
-  (Index t) =>
-  -- | An index at the value level.
-  t ->
-  -- | Function expecting an index at the type level.
-  (forall (i :: t). (Known i) => Proxy i -> r) ->
-  r
-applyAny = applyAny'
 
 -- | Take the type level index @i@ (i.e. a type of kind @t@) and
 -- return it at the value level as a value of type @t@.
 toValue :: forall t (i :: t). (Known i, Index t) => t
 toValue = singletonToValue (know @_ @i)
 
+-- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
+-- pattern matching, for example
+--
+-- @
+-- \case (TypeIs (Proxy :: Proxy i)) -> ...
+-- @
+--
+-- and then you can proceed to use @i@ as a 'Known' type of kind @t@.
 data TypeOfKind t where
-  TypeIs :: forall t i. (Known (i :: t)) => TypeOfKind t
+  TypeIs :: forall t i. (Known (i :: t)) => Proxy i -> TypeOfKind t
 
-cond1 :: forall t (i :: t). (Index t, Known i) => Bool
-cond1 =
-  applyAny
-    (toValue @_ @i)
-    ( \(Proxy :: Proxy i') -> case eqT @_ @i @i' of
-        Just {} -> True
-        Nothing -> False
-    )
+roundTripTypeValue :: forall t (i :: t). (Index t, Known i) => Bool
+roundTripTypeValue =
+  case toType (toValue @_ @i) of
+    TypeIs (Proxy :: Proxy i') -> case eqT @_ @i @i' of
+      Just {} -> True
+      Nothing -> False
 
-cond2 :: forall t. (Index t) => t -> Bool
-cond2 i = applyAny i (\(Proxy :: Proxy i) -> i == toValue @_ @i)
+roundTripValueType :: forall t. (Index t) => t -> Bool
+roundTripValueType i =
+  case toType i of TypeIs (Proxy :: Proxy i') -> i == toValue @_ @i'

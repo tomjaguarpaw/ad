@@ -13,7 +13,13 @@ module IndexedTypes.Some (Some (Some)) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Read (expectP, paren)
-import IndexedTypes.Index (Index, Known, applyAny, eqT, toValue)
+import IndexedTypes.Index
+  ( Index (toType),
+    Known,
+    TypeOfKind (TypeIs),
+    eqT,
+    toValue,
+  )
 import Text.Read
   ( Lexeme (Punc),
     Read (readPrec),
@@ -57,7 +63,8 @@ instance
   readPrec = wrap_tup $ do
     i <- readPrec
     read_comma
-    applyAny i (\(Proxy :: Proxy i') -> Some @i' <$> readPrec)
+    case toType i of
+      TypeIs (Proxy :: Proxy i') -> Some @i' <$> readPrec
 
 -- These ReadPrec combinators are borrowed from
 --

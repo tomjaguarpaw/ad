@@ -15,6 +15,7 @@ library
     exposed-modules:  IndexedTypes.Index
                       IndexedTypes.Example
                       IndexedTypes.Knownly
+                      IndexedTypes.Reflection
                       IndexedTypes.Some
 
     build-depends:    base >=4.14.3.0
