@@ -7,9 +7,7 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
@@ -22,13 +20,14 @@ module IndexedTypes.Example where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import IndexedTypes.Index (Index (..), Known (know), Knownly (Knownly), Some (Some))
+import IndexedTypes.Index (Index (..), Known (know), Knownly (Knownly))
+import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
 import Type.Reflection ((:~:) (Refl))
 
 -- Index definiton
 
-data T = A | B | C deriving (Show, Read)
+data T = A | B | C deriving (Eq, Ord, Show, Read)
 
 -- Definition of type that depends on index.  The most lightweight way
 -- is to go via a type family, but that's still quite heavyweight!

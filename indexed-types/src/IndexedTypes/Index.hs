@@ -5,13 +5,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -24,14 +21,10 @@ module IndexedTypes.Index where
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
-import GHC.Read (expectP, paren)
 import Text.Read
-  ( Lexeme (Punc),
-    Read (readPrec),
-    ReadPrec,
-    parens,
+  ( Read (readPrec),
   )
-import Type.Reflection ((:~:) (Refl))
+import Type.Reflection ((:~:))
 
 -- Library
 
@@ -70,7 +63,7 @@ class Known (i :: t) where
   know :: Singleton t i
 
 type Index :: Type -> Constraint
-class Index t where
+class (Eq t) => Index t where
   data Singleton t :: t -> Type
 
   type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
@@ -123,31 +116,6 @@ instance
   where
   compare = coerceMethod @t @i @Ord @k (compare @(k i))
 
-data Some k where
-  Some :: (Known t) => k t -> Some k
-
-instance
-  forall (t :: Type) (k :: t -> Type).
-  (Show t, Index t, forall (i :: t). (Known i) => Show (k i)) =>
-  Show (Some k)
-  where
-  -- In later GHCs this is
-  --
-  --   show (Some @i v) = ...
-  show (Some (v :: k i)) = show (toVal (know @_ @i), v)
-
-instance
-  forall (t :: Type) (k :: t -> Type).
-  (forall i. (Known i) => Eq (k i), Index t) =>
-  Eq (Some k)
-  where
-  -- In later GHCs this is
-  --
-  --   Some @i1 v1 == Some @i2 v2 = ...
-  Some (v1 :: k i1) == Some (v2 :: k i2) = case eqT @_ @i1 @i2 of
-    Just Refl -> v1 == v2
-    Nothing -> False
-
 applyAny ::
   forall t r.
   (Index t) =>
@@ -157,34 +125,14 @@ applyAny ::
   r
 applyAny = applyAny' Proxy
 
-instance
-  forall (t :: Type) (k :: t -> Type).
-  (forall i. (Known i) => Read (k i), Read t, Index t) =>
-  Read (Some k)
-  where
-  readPrec = wrap_tup $ do
-    i <- readPrec
-    read_comma
-    applyAny (\(Proxy :: Proxy i') -> Some @i' <$> readPrec) i
+cond1 :: forall t (i :: t). (Index t, Known i) => Bool
+cond1 =
+  applyAny
+    ( \(Proxy :: Proxy i') -> case eqT @_ @i @i' of
+        Just {} -> True
+        Nothing -> False
+    )
+    (toVal (know @_ @i))
 
--- Example to show that it works
-
--- These ReadPrec combinators are borrowed from
---
--- https://hackage.haskell.org/package/base-4.18.1.0/docs/src/GHC.Read.html#line-681
-
--- * Not for export
-
-wrap_tup :: ReadPrec a -> ReadPrec a
-wrap_tup p = parens (paren p)
-
-read_tup2 :: (Read a, Read b) => ReadPrec (a, b)
--- Reads "a , b"  no parens!
-read_tup2 = do
-  x <- readPrec
-  read_comma
-  y <- readPrec
-  return (x, y)
-
-read_comma :: ReadPrec ()
-read_comma = expectP (Punc ",")
+cond2 :: forall t. (Index t) => t -> Bool
+cond2 i = applyAny (\(Proxy :: Proxy i) -> i == toVal (know @_ @i)) i
