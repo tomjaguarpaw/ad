@@ -85,27 +85,29 @@ class (Eq t) => Index t where
   applyAny' ::
     -- | _
     Proxy i ->
-    (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     t ->
+    (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     r
 
+-- | Also known as "reify", for example in
+-- @Data.Reflection.@'Data.Reflection.reifyNat'.
 applyAny ::
   forall t r.
   (Index t) =>
   -- | _
-  (forall (i' :: t). (Known i') => Proxy i' -> r) ->
   t ->
+  (forall (i' :: t). (Known i') => Proxy i' -> r) ->
   r
 applyAny = applyAny' Proxy
 
 cond1 :: forall t (i :: t). (Index t, Known i) => Bool
 cond1 =
   applyAny
+    (toVal (know @_ @i))
     ( \(Proxy :: Proxy i') -> case eqT @_ @i @i' of
         Just {} -> True
         Nothing -> False
     )
-    (toVal (know @_ @i))
 
 cond2 :: forall t. (Index t) => t -> Bool
-cond2 i = applyAny (\(Proxy :: Proxy i) -> i == toVal (know @_ @i)) i
+cond2 i = applyAny i (\(Proxy :: Proxy i) -> i == toVal (know @_ @i))

@@ -57,7 +57,7 @@ instance
   readPrec = wrap_tup $ do
     i <- readPrec
     read_comma
-    applyAny (\(Proxy :: Proxy i') -> Some @i' <$> readPrec) i
+    applyAny i (\(Proxy :: Proxy i') -> Some @i' <$> readPrec)
 
 -- Example to show that it works
 
