@@ -45,17 +45,30 @@ data FooA = FooA1 Int | FooA2 Bool
 data FooB = FooB1 Char | FooB2 String
   deriving (Eq, Ord, Read, Show)
 
-type FF :: forall t. forall (k :: t -> Type) -> t -> Type
-type family FF f a
+type FooF :: T -> Type
+type family FooF t :: Type where
+  FooF A = FooA
+  FooF B = FooB
 
-type FooFF :: T -> Type
-data FooFF t
+newtype Foo t = Foo {getFoo :: FooF t}
 
-type instance FF FooFF A = FooA
+newtype Wrapper t = Wrapper {getFooWrapper :: FooF t}
 
-type instance FF FooFF B = FooB
+deriving newtype instance (Show (FooF t)) => Show (Wrapper t)
 
-newtype Foo t = Foo {getFoo :: FF FooFF t}
+deriving newtype instance (Read (FooF t)) => Read (Wrapper t)
+
+deriving stock instance (Eq (FooF t)) => Eq (Wrapper t)
+
+deriving stock instance (Ord (FooF t)) => Ord (Wrapper t)
+
+deriving via Knownly (Wrapper t) instance (Known t) => Show (Foo t)
+
+deriving via Knownly (Wrapper t) instance (Known t) => Read (Foo t)
+
+deriving via Knownly (Wrapper t) instance (Known t) => Eq (Foo t)
+
+deriving via Knownly (Wrapper t) instance (Known t) => Ord (Foo t)
 
 -- Lots of boilerplate
 
@@ -163,37 +176,19 @@ instance Known A where
 instance Known B where
   know = SB
 
-newtype Wrapper k t = Wrapper {getFooWrapper :: FF k t}
+newtype Knownly a = Knownly a
 
-deriving newtype instance (Show (FF FooFF t)) => Show (Wrapper FooFF t)
+instance (Known i, Forall t Show k, Index t) => Show (Knownly (k i)) where
+  show = coerceMethod @t @i @Show @k (show @(k i))
 
-deriving newtype instance (Read (FF FooFF t)) => Read (Wrapper FooFF t)
+instance (Known i, Forall t Read k, Index t) => Read (Knownly (k i)) where
+  readPrec = coerceMethod @t @i @Read @k (readPrec @(k i))
 
-deriving newtype instance (Eq (FF FooFF t)) => Eq (Wrapper FooFF t)
+instance (Known i, Forall t Eq k, Index t) => Eq (Knownly (k i)) where
+  (==) = coerceMethod @t @i @Eq @k ((==) @(k i))
 
-deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
-
-newtype Wrapper2 a = Wrapper2 a
-
-instance (Known t, Forall T Show (Wrapper FooFF)) => Show (Wrapper2 (Wrapper FooFF t)) where
-  show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
-
-instance (Known t, Forall T Read (Wrapper FooFF)) => Read (Wrapper2 (Wrapper FooFF t)) where
-  readPrec = coerceMethod @T @t @Read @(Wrapper FooFF) (readPrec @(Wrapper FooFF t))
-
-instance (Known t, Forall T Eq (Wrapper FooFF)) => Eq (Wrapper2 (Wrapper FooFF t)) where
-  (==) = coerceMethod @T @t @Eq @(Wrapper FooFF) ((==) @(Wrapper FooFF t))
-
-instance (Known t, Forall T Ord (Wrapper FooFF)) => Ord (Wrapper2 (Wrapper FooFF t)) where
-  compare = coerceMethod @T @t @Ord @(Wrapper FooFF) (compare @(Wrapper FooFF t))
-
-deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Show (Foo t)
-
-deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Read (Foo t)
-
-deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Eq (Foo t)
-
-deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Ord (Foo t)
+instance (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) => Ord (Knownly (k i)) where
+  compare = coerceMethod @t @i @Ord @k (compare @(k i))
 
 data Some k where
   Some :: (Known t) => k t -> Some k
@@ -242,7 +237,7 @@ instance
 
 -- Example to show that it works
 
-mkSomeFoo :: forall t. (Known t) => FF FooFF t -> SomeT Foo
+mkSomeFoo :: forall t. (Known t) => FooF t -> SomeT Foo
 mkSomeFoo = Some @t . Foo
 
 testCases :: [SomeT Foo]
