@@ -1,7 +1,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE DerivingVia #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
@@ -112,17 +113,27 @@ deriving newtype instance (Eq (FooF t)) => Eq (FooWrapper t)
 
 deriving newtype instance (Ord (FooF t)) => Ord (FooWrapper t)
 
-instance (KnownT t) => Show (Foo t) where
+newtype Wrapper2 f t = Worapper2 (f t)
+
+instance (KnownT t) => Show (Wrapper2 FooWrapper t) where
   show = coerceMethod @t @Show @FooWrapper (show @(FooWrapper t))
 
-instance (KnownT t) => Read (Foo t) where
+instance (KnownT t) => Read (Wrapper2 FooWrapper t) where
   readPrec = coerceMethod @t @Read @FooWrapper (readPrec @(FooWrapper t))
 
-instance (KnownT t) => Eq (Foo t) where
+instance (KnownT t) => Eq (Wrapper2 FooWrapper t) where
   (==) = coerceMethod @t @Eq @FooWrapper ((==) @(FooWrapper t))
 
-instance (KnownT t) => Ord (Foo t) where
+instance (KnownT t) => Ord (Wrapper2 FooWrapper t) where
   compare = coerceMethod @t @Ord @FooWrapper (compare @(FooWrapper t))
+
+deriving via Wrapper2 FooWrapper t instance (KnownT t) => Show (Foo t)
+
+deriving via Wrapper2 FooWrapper t instance (KnownT t) => Read (Foo t)
+
+deriving via Wrapper2 FooWrapper t instance (KnownT t) => Eq (Foo t)
+
+deriving via Wrapper2 FooWrapper t instance (KnownT t) => Ord (Foo t)
 
 data SomeT k where
   SomeT :: (KnownT t) => k t -> SomeT k
