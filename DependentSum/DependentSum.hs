@@ -70,11 +70,6 @@ eqT
   | otherwise =
       Nothing
 
-stTot :: ST t -> T
-stTot = \case
-  SA -> A
-  SB -> B
-
 withKnown ::
   forall t (i :: t) c f r.
   (Known i, Index t, Forall t f c) =>
@@ -102,6 +97,8 @@ class Index t where
 
   type Forall t (f :: t -> Type) (c :: Type -> Constraint) :: Constraint
 
+  toVal :: Singleton t i -> t
+
   -- The existence of this method confirms that `instance Known (i ::
   -- t)` has been implemented for all i.
   knowns :: Singleton t i -> Dict (Known i)
@@ -121,6 +118,10 @@ instance Index T where
     SB :: Singleton T B
 
   type Forall T f c = (c (f A), c (f B))
+
+  toVal = \case
+    SA -> A
+    SB -> B
 
   withKnown' =
     \(Proxy :: Proxy i)
@@ -188,7 +189,7 @@ mkSomeFoo :: forall t. (KnownT t) => FF FooFF t -> SomeT Foo
 mkSomeFoo = SomeT @t . Foo
 
 instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
-  show (SomeT (v :: k t)) = show (stTot (knownT @t), v)
+  show (SomeT (v :: k t)) = show (toVal (knownT @t), v)
 
 instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
   SomeT (v1 :: k t1) == SomeT (v2 :: k t2) = case eqT @t1 @t2 of
