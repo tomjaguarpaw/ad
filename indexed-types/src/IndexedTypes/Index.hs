@@ -11,11 +11,17 @@
 {-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wno-duplicate-exports #-}
 
+-- | All the stuff you need for a type @t@ to be an "index type".  For
+-- example @data T = A | B | C@.
 module IndexedTypes.Index
   ( -- * Converting between value and type level
 
     -- | An index can be moved between the type level and the value
-    -- level.
+    -- level.  You might expect that @toValue@ and @toType@ should be
+    -- inverses, and indeed they should!
+    -- 'IndexedTypes.Consistency.roundTripTypeValue' and
+    -- 'IndexedTypes.Consistency.roundTripValueType' are automated
+    -- checks of that property.
     toValue,
     toType,
     TypeOfKind (..),
@@ -23,16 +29,17 @@ module IndexedTypes.Index
     -- * Type equality
     eqT,
 
-    -- * Random bits
+    -- * @Index@ class
     Index (..),
-    knowAll,
-    Known (..),
-    toValue,
-    Dict (Dict),
 
-    -- ** Consistency check
-    roundTripTypeValue,
-    roundTripValueType,
+    -- * @Known@ class
+    Known (..),
+
+    -- * @knowAll@: converting separate constraints to a 'Known' constraint
+    knowAll,
+
+    -- * Dict
+    Dict (Dict),
   )
 where
 
@@ -40,17 +47,19 @@ import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
 import Type.Reflection ((:~:))
 
--- Library
-
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
--- are equal, and if so returns @(i :~: i')@ which allows you to write
+-- are equal, and if so returns @(i :~: i')@, which allows you to write
 -- code that depends on them being equal.
 --
 -- @
 -- case eqT @i @i' of
 --    Nothing -> ... not equal ...
---    Just Refl -> ... use i and i' as though they were equal ...
+--    Just Refl -> ... use i and i' knowing that they are equal ...
 -- @
+--
+-- Indices should be equal at the type level if and only if they are
+-- equal at the value level.  'IndexedTypes.Consistency.eqEquality'
+-- checks that propery.
 eqT ::
   forall (t :: Type) (i :: t) (i' :: t).
   (Index t, Known i, Known i') =>
@@ -73,8 +82,6 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know :: Singleton t i
 
--- | All the stuff you need for type @t@ to be an "index type".  For
--- example @data T = A | B | C@.
 type Index :: Type -> Constraint
 class (Eq t) => Index t where
   -- | @
@@ -94,7 +101,13 @@ class (Eq t) => Index t where
   -- @
   type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
 
-  -- | Use 'eqT' instead, except when defining this class.
+  -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
+  -- instead, except when defining this class.
+  --
+  -- (@eqT'@ only has @Proxy@ arguments because it seems to be hard to
+  -- bind the type arguments @i@ and @i'@ without them.  Future
+  -- versions of GHC will allow to bind type variables in function
+  -- definitions, making the @Proxy@s redundant.)
   eqT' ::
     forall (i :: t) (i' :: t).
     (Known i, Known i') =>
@@ -103,13 +116,23 @@ class (Eq t) => Index t where
     Proxy i' ->
     Maybe (i :~: i')
 
-  -- | From this we derive 'toValue'.
+  -- | This is rarely used directly, but from it we derive 'toValue'.
+  --
+  -- @
+  -- singletonToValue = \\case SA -> A; SB -> B; SC -> C
+  -- @
   singletonToValue :: Singleton t i -> t
 
-  -- | Not sure why this requires Proxy arguments
+  -- | The class method version of 'knowAll'.  Always prefer to use
+  -- 'knowAll' instead, except when defining this class.
   --
   -- The implementation of @knowAll'@ is implicitly a check that
-  -- @'Forall' t@ is correct
+  -- @'Forall' t@ is correct.
+  --
+  -- (@knowAll'@ only has @Proxy@ arguments because it seems to be
+  -- hard to bind the type arguments @t@, @c@ and @f@ without them.
+  -- Future versions of GHC will allow to bind type variables in
+  -- function definitions, making the @Proxy@s redundant.)
   knowAll' ::
     (Forall t c f) =>
     Proxy i ->
@@ -126,7 +149,7 @@ class (Eq t) => Index t where
   toType ::
     -- | Take a value level index (i.e. a value of type @t@)
     t ->
-    -- | return it at the type level as a type of kind @t@
+    -- | return it at the type level (i.e. as a type of kind @t@)
     TypeOfKind t
 
 data Dict c where
@@ -142,28 +165,19 @@ toValue ::
   forall t (i :: t).
   (Index t) =>
   (Known i) =>
-  -- | ... return it at the value level as a value of type @t@
+  -- | ... return it at the value level (i.e. as a value of type @t@)
   t
 toValue = singletonToValue (know @_ @i)
 
 -- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
--- pattern matching, for example
+-- pattern matching and proceed to use it as a 'Known' type of kind
+-- @t@.
 --
 -- @
--- \case (TypeIs (Proxy :: Proxy i)) -> ...
+-- \\case (TypeIs (Proxy :: Proxy i)) -> ...
 -- @
 --
--- and then you can proceed to use @i@ as a 'Known' type of kind @t@.
+-- (We only need the @Proxy@ field because older versions of GHC can't
+-- bind type variables in patterns.)
 data TypeOfKind t where
   TypeIs :: forall t i. (Known (i :: t)) => Proxy i -> TypeOfKind t
-
-roundTripTypeValue :: forall t (i :: t). (Index t, Known i) => Bool
-roundTripTypeValue =
-  case toType (toValue @_ @i) of
-    TypeIs (Proxy :: Proxy i') -> case eqT @_ @i @i' of
-      Just {} -> True
-      Nothing -> False
-
-roundTripValueType :: forall t. (Index t) => t -> Bool
-roundTripValueType i =
-  case toType i of TypeIs (Proxy :: Proxy i') -> i == toValue @_ @i'

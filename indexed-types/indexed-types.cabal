@@ -12,8 +12,9 @@ common warnings
 library
     import:           warnings
 
-    exposed-modules:  IndexedTypes.Index
+    exposed-modules:  IndexedTypes.Consistency
                       IndexedTypes.Example
+                      IndexedTypes.Index
                       IndexedTypes.Knownly
                       IndexedTypes.Reflection
                       IndexedTypes.Some
