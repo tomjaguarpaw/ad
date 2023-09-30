@@ -60,13 +60,13 @@ newtype Foo t = Foo {getFoo :: FF FooFF t}
 -- Lots of boilerplate
 
 eqT ::
-  forall (k :: Type) (i :: k) (i' :: k).
-  (Index k, Known i, Known i') =>
+  forall (t :: Type) (i :: t) (i' :: t).
+  (Index t, Known i, Known i') =>
   Maybe (i :~: i')
 eqT = eqT' Proxy Proxy
 
 withKnown ::
-  forall t (i :: t) c f r.
+  forall (t :: Type) (i :: t) c f r.
   (Known i, Index t, Forall t f c) =>
   ((c (f i)) => r) ->
   r
@@ -175,16 +175,16 @@ deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
 
 newtype Wrapper2 a = Worapper2 a
 
-instance (Known t) => Show (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T (Wrapper FooFF) Show) => Show (Wrapper2 (Wrapper FooFF t)) where
   show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
 
-instance (Known t) => Read (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T (Wrapper FooFF) Read) => Read (Wrapper2 (Wrapper FooFF t)) where
   readPrec = coerceMethod @T @t @Read @(Wrapper FooFF) (readPrec @(Wrapper FooFF t))
 
-instance (Known t) => Eq (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T (Wrapper FooFF) Eq) => Eq (Wrapper2 (Wrapper FooFF t)) where
   (==) = coerceMethod @T @t @Eq @(Wrapper FooFF) ((==) @(Wrapper FooFF t))
 
-instance (Known t) => Ord (Wrapper2 (Wrapper FooFF t)) where
+instance (Known t, Forall T (Wrapper FooFF) Ord) => Ord (Wrapper2 (Wrapper FooFF t)) where
   compare = coerceMethod @T @t @Ord @(Wrapper FooFF) (compare @(Wrapper FooFF t))
 
 deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Show (Foo t)
