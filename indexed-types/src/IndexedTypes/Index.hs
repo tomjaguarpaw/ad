@@ -96,6 +96,10 @@ class (Eq t) => Index t where
     (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     r
 
+  -- | Take the value level index @i@ (i.e. a value of type @t@) and
+  -- return it at the type level as a type of kind @t@.
+  toType :: t -> TypeOfKind t
+
 -- | Take an index (i.e. a value of type @t@) and pass it as a type
 -- level argument to a function which expects an index at the type
 -- level.
@@ -116,11 +120,6 @@ applyAny = applyAny' Proxy
 -- return it at the value level as a value of type @t@.
 toValue :: forall t (i :: t). (Known i, Index t) => t
 toValue = singletonToValue (know @_ @i)
-
--- | Take the value level index @i@ (i.e. a value of type @t@) and
--- return it at the type level as a type of kind @t@.
-toType :: forall t. (Index t) => t -> TypeOfKind t
-toType t = applyAny t (\(Proxy :: Proxy i) -> TypeIs @_ @i)
 
 data TypeOfKind t where
   TypeIs :: forall t i. (Known (i :: t)) => TypeOfKind t

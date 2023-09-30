@@ -39,7 +39,7 @@ where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import IndexedTypes.Index (Index (..), Known (know))
+import IndexedTypes.Index (Index (..), Known (know), TypeOfKind (TypeIs))
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
@@ -209,6 +209,11 @@ instance Index T where
     A -> r @A Proxy
     B -> r @B Proxy
     C -> r @C Proxy
+
+  toType = \case
+    A -> TypeIs @_ @A
+    B -> TypeIs @_ @B
+    C -> TypeIs @_ @C
 
 instance Known A where
   know = SA
