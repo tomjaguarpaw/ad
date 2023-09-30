@@ -13,7 +13,7 @@ module IndexedTypes.Some (Some (Some)) where
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Read (expectP, paren)
-import IndexedTypes.Index (Index (toVal), Known (know), applyAny, eqT)
+import IndexedTypes.Index (Index, Known, applyAny, eqT, toValue)
 import Text.Read
   ( Lexeme (Punc),
     Read (readPrec),
@@ -34,7 +34,7 @@ instance
   -- In later GHCs this is
   --
   --   show (Some @i v) = ...
-  show (Some (v :: k i)) = show (toVal (know @_ @i), v)
+  show (Some (v :: k i)) = show (toValue @_ @i, v)
 
 instance
   forall (t :: Type) (k :: t -> Type).

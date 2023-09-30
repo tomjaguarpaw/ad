@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -66,11 +67,12 @@ class (Eq t) => Index t where
     Proxy i' ->
     Maybe (i :~: i')
 
-  toVal :: Singleton t i -> t
+  singletonToValue :: Singleton t i -> t
 
-  -- Not sure why this requires Proxy arguments
+  -- | Not sure why this requires Proxy arguments
   --
-  -- withKnown' is implicitly a check that Forall t is correct
+  -- The implementation of @withKnown'@ is implicitly a check that
+  -- @'Forall' t@ is correct
   withKnown' ::
     Proxy i ->
     Proxy c ->
@@ -80,8 +82,13 @@ class (Eq t) => Index t where
     ((c (f i)) => r) ->
     r
 
-  -- applyAny' is implicitly a check that all the values of t are
-  -- Known.
+  -- | The definition of @applyAny@ for an indexed type.  For some
+  -- reason making this a type class method seems to require a @Proxy@
+  -- argument.  In practice you should use 'applyAny' instead, which
+  -- doesn't use the @Proxy@ argument.
+  --
+  -- The implementation of @applyAny'@ is implicitly a check that all
+  -- the values of @t@ are 'Known'.
   applyAny' ::
     -- | _
     Proxy i ->
@@ -89,25 +96,43 @@ class (Eq t) => Index t where
     (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     r
 
--- | Also known as "reify", for example in
+-- | Take an index (i.e. a value of type @t@) and pass it as a type
+-- level argument to a function which expects an index at the type
+-- level.
+--
+-- In other places this is called "reify", for example in
 -- @Data.Reflection.@'Data.Reflection.reifyNat'.
 applyAny ::
   forall t r.
   (Index t) =>
-  -- | _
+  -- | An index at the value level.
   t ->
+  -- | Function expecting an index at the type level.
   (forall (i :: t). (Known i) => Proxy i -> r) ->
   r
 applyAny = applyAny' Proxy
 
+-- | Take the type level index @i@ (i.e. a type of kind @t@) and
+-- return it at the value level as a value of type @t@.
+toValue :: forall t (i :: t). (Known i, Index t) => t
+toValue = singletonToValue (know @_ @i)
+
+-- | Take the value level index @i@ (i.e. a value of type @t@) and
+-- return it at the type level as a type of kind @t@.
+toType :: forall t. (Index t) => t -> TypeOfKind t
+toType t = applyAny t (\(Proxy :: Proxy i) -> TypeIs @_ @i)
+
+data TypeOfKind t where
+  TypeIs :: forall t i. (Known (i :: t)) => TypeOfKind t
+
 cond1 :: forall t (i :: t). (Index t, Known i) => Bool
 cond1 =
   applyAny
-    (toVal (know @_ @i))
+    (toValue @_ @i)
     ( \(Proxy :: Proxy i') -> case eqT @_ @i @i' of
         Just {} -> True
         Nothing -> False
     )
 
 cond2 :: forall t. (Index t) => t -> Bool
-cond2 i = applyAny i (\(Proxy :: Proxy i) -> i == toVal (know @_ @i))
+cond2 i = applyAny i (\(Proxy :: Proxy i) -> i == toValue @_ @i)
