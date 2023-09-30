@@ -150,37 +150,37 @@ instance Known B where
 -- FIXME: Eventually remove this
 type ST = Singleton T
 
-newtype FooWrapper t = FooWrapper {getFooWrapper :: FF FooFF t}
+newtype Wrapper k t = Wrapper {getFooWrapper :: FF k t}
 
-deriving newtype instance (Show (FF FooFF t)) => Show (FooWrapper t)
+deriving newtype instance (Show (FF FooFF t)) => Show (Wrapper FooFF t)
 
-deriving newtype instance (Read (FF FooFF t)) => Read (FooWrapper t)
+deriving newtype instance (Read (FF FooFF t)) => Read (Wrapper FooFF t)
 
-deriving newtype instance (Eq (FF FooFF t)) => Eq (FooWrapper t)
+deriving newtype instance (Eq (FF FooFF t)) => Eq (Wrapper FooFF t)
 
-deriving newtype instance (Ord (FF FooFF t)) => Ord (FooWrapper t)
+deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
 
-newtype Wrapper2 f t = Worapper2 (f t)
+newtype Wrapper2 a = Worapper2 a
 
-instance (KnownT t) => Show (Wrapper2 FooWrapper t) where
-  show = coerceMethod @T @t @Show @FooWrapper (show @(FooWrapper t))
+instance (KnownT t) => Show (Wrapper2 (Wrapper FooFF t)) where
+  show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
 
-instance (KnownT t) => Read (Wrapper2 FooWrapper t) where
-  readPrec = coerceMethod @T @t @Read @FooWrapper (readPrec @(FooWrapper t))
+instance (KnownT t) => Read (Wrapper2 (Wrapper FooFF t)) where
+  readPrec = coerceMethod @T @t @Read @(Wrapper FooFF) (readPrec @(Wrapper FooFF t))
 
-instance (KnownT t) => Eq (Wrapper2 FooWrapper t) where
-  (==) = coerceMethod @T @t @Eq @FooWrapper ((==) @(FooWrapper t))
+instance (KnownT t) => Eq (Wrapper2 (Wrapper FooFF t)) where
+  (==) = coerceMethod @T @t @Eq @(Wrapper FooFF) ((==) @(Wrapper FooFF t))
 
-instance (KnownT t) => Ord (Wrapper2 FooWrapper t) where
-  compare = coerceMethod @T @t @Ord @FooWrapper (compare @(FooWrapper t))
+instance (KnownT t) => Ord (Wrapper2 (Wrapper FooFF t)) where
+  compare = coerceMethod @T @t @Ord @(Wrapper FooFF) (compare @(Wrapper FooFF t))
 
-deriving via Wrapper2 FooWrapper t instance (KnownT t) => Show (Foo t)
+deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Show (Foo t)
 
-deriving via Wrapper2 FooWrapper t instance (KnownT t) => Read (Foo t)
+deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Read (Foo t)
 
-deriving via Wrapper2 FooWrapper t instance (KnownT t) => Eq (Foo t)
+deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Eq (Foo t)
 
-deriving via Wrapper2 FooWrapper t instance (KnownT t) => Ord (Foo t)
+deriving via Wrapper2 (Wrapper FooFF t) instance (Known t) => Ord (Foo t)
 
 data Some k where
   Some :: (Known t) => k t -> Some k
