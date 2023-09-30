@@ -231,8 +231,8 @@ applyAny ::
 applyAny = applyAny' Proxy
 
 instance
-  forall (tt :: Type) (k :: tt -> Type).
-  (forall t. (Known t) => Read (k t), Read tt, Index tt) =>
+  forall (t :: Type) (k :: t -> Type).
+  (forall i. (Known i) => Read (k i), Read t, Index t) =>
   Read (SomeT k)
   where
   readPrec = wrap_tup $ do
