@@ -5,7 +5,6 @@ license:            MIT
 author:             Tom Ellis
 maintainer:         Tom Ellis
 build-type:         Simple
-extra-doc-files:    CHANGELOG.md
 
 common warnings
     ghc-options: -Wall
@@ -14,6 +13,7 @@ library
     import:           warnings
 
     exposed-modules:  IndexedTypes.Index
+                      IndexedTypes.Example
 
     build-depends:    base >=4.14.3.0
 
