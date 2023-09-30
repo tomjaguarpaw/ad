@@ -114,6 +114,12 @@ class Index t where
     ((c (f i)) => r) ->
     r
 
+  applyAny' ::
+    Proxy i ->
+    (forall (i' :: t). (Known i') => Proxy i' -> r) ->
+    t ->
+    r
+
 instance Index T where
   data Singleton T t where
     SA :: Singleton T A
@@ -142,6 +148,10 @@ instance Index T where
      r -> case know @_ @i of
         SA -> r
         SB -> r
+
+  applyAny' (Proxy :: i) r = \case
+    A -> r @A (Proxy)
+    B -> r @B (Proxy)
 
   knowns = \case
     SA -> Dict
@@ -214,13 +224,11 @@ readSomeTPayload ::
 readSomeTPayload Proxy = Some @i <$> readPrec
 
 applyAny ::
-  forall (i :: T) (k :: T -> Type) r.
+  forall (i :: T) r.
   (forall (i' :: T). (Known i') => Proxy i' -> r) ->
   T ->
   r
-applyAny r = \case
-  A -> r @A Proxy
-  B -> r @B Proxy
+applyAny = applyAny' Proxy
 
 instance
   forall (tt :: Type) (k :: tt -> Type).
@@ -230,7 +238,7 @@ instance
   readPrec = wrap_tup $ do
     x <- readPrec
     read_comma
-    applyAny (readSomeTPayload @tt @_) x
+    applyAny (readSomeTPayload @tt) x
 
 -- Example to show that it works
 
