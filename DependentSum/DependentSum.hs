@@ -44,10 +44,18 @@ data FooA = FooA1 Int | FooA2 Bool
 data FooB = FooB1 Char | FooB2 String
   deriving (Eq, Ord, Read, Show)
 
+type FF :: forall t. forall (k :: t -> Type) -> t -> Type
+type family FF f a
+
+type FooFF :: T -> Type
+data FooFF t
+
+type instance FF FooFF A = FooA
+
+type instance FF FooFF B = FooB
+
 type FooF :: T -> Type
-type family FooF a where
-  FooF A = FooA
-  FooF B = FooB
+type FooF t = FF FooFF t
 
 newtype Foo t = Foo {getFoo :: FooF t}
 
