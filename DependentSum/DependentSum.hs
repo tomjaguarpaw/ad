@@ -173,7 +173,7 @@ deriving newtype instance (Eq (FF FooFF t)) => Eq (Wrapper FooFF t)
 
 deriving newtype instance (Ord (FF FooFF t)) => Ord (Wrapper FooFF t)
 
-newtype Wrapper2 a = Worapper2 a
+newtype Wrapper2 a = Wrapper2 a
 
 instance (Known t, Forall T Show (Wrapper FooFF)) => Show (Wrapper2 (Wrapper FooFF t)) where
   show = coerceMethod @T @t @Show @(Wrapper FooFF) (show @(Wrapper FooFF t))
