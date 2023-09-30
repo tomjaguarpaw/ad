@@ -97,8 +97,6 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know :: Singleton t i
 
-data Dict c where Dict :: (c) => Dict c
-
 type Index :: Type -> Constraint
 class Index t where
   data Singleton t :: t -> Type
