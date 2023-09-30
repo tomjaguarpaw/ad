@@ -91,7 +91,6 @@ class (Eq t) => Index t where
   -- the values of @t@ are 'Known'.
   applyAny' ::
     -- | _
-    Proxy i ->
     t ->
     (forall (i' :: t). (Known i') => Proxy i' -> r) ->
     r
@@ -114,7 +113,7 @@ applyAny ::
   -- | Function expecting an index at the type level.
   (forall (i :: t). (Known i) => Proxy i -> r) ->
   r
-applyAny = applyAny' Proxy
+applyAny = applyAny'
 
 -- | Take the type level index @i@ (i.e. a type of kind @t@) and
 -- return it at the value level as a value of type @t@.

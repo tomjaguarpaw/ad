@@ -205,7 +205,7 @@ instance Index T where
         SB -> r
         SC -> r
 
-  applyAny' (Proxy :: i) i' r = case i' of
+  applyAny' i' r = case i' of
     A -> r @A Proxy
     B -> r @B Proxy
     C -> r @C Proxy
