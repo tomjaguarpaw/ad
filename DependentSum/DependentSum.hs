@@ -54,16 +54,13 @@ type instance FF FooFF A = FooA
 
 type instance FF FooFF B = FooB
 
+-- FIXME: Eventually remove this
 type FooF :: T -> Type
 type FooF t = FF FooFF t
 
 newtype Foo t = Foo {getFoo :: FooF t}
 
 -- Lots of boilerplate
-
-data ST :: T -> Type where
-  SA :: ST A
-  SB :: ST B
 
 eqT :: forall t t'. (KnownT t, KnownT t') => Maybe (t :~: t')
 eqT
@@ -80,15 +77,6 @@ stTot :: ST t -> T
 stTot = \case
   SA -> A
   SB -> B
-
-class KnownT a where
-  knownT :: ST a
-
-instance KnownT A where
-  knownT = SA
-
-instance KnownT B where
-  knownT = SB
 
 type ForallFooF :: (T -> Type) -> (Type -> Constraint) -> Constraint
 type ForallFooF f c = (c (f A), c (f B))
@@ -110,6 +98,34 @@ coerceMethod ::
   ((c (f t)) => a2) ->
   a3
 coerceMethod a2 = coerce @a2 @a3 (withKnownT @t @c @f a2)
+
+type Known :: forall t. t -> Constraint
+class Known (i :: t) where
+  know :: Singleton t i
+
+type Index :: Type -> Constraint
+class Index t where
+  data Singleton t :: t -> Type
+
+instance Index T where
+  data Singleton T t where
+    SA :: Singleton T A
+    SB :: Singleton T B
+
+type KnownT :: T -> Constraint
+type KnownT = Known
+
+knownT :: forall (t :: T). (Known t) => Singleton T t
+knownT = know
+
+instance Known A where
+  know = SA
+
+instance Known B where
+  know = SB
+
+-- FIXME: Eventually remove this
+type ST = Singleton T
 
 newtype FooWrapper t = FooWrapper {getFooWrapper :: FooF t}
 
