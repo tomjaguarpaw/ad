@@ -147,9 +147,6 @@ instance Index T where
     SA -> Dict
     SB -> Dict
 
-type KnownT :: T -> Constraint
-type KnownT = Known
-
 instance Known A where
   know = SA
 
@@ -193,24 +190,39 @@ data Some k where
 
 type SomeT = Some
 
-instance (forall t. (KnownT t) => Show (k t)) => Show (SomeT k) where
+instance
+  forall (tt :: Type) (k :: tt -> Type).
+  (Show tt, Index tt, forall (t :: tt). (Known t) => Show (k t)) =>
+  Show (SomeT k)
+  where
   show (Some (v :: k t)) = show (toVal (know @_ @t), v)
 
-instance (forall t. (KnownT t) => Eq (k t)) => Eq (SomeT k) where
-  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @T @t1 @t2 of
+instance
+  forall (tt :: Type) (k :: tt -> Type).
+  (forall t. (Known t) => Eq (k t), Index tt) =>
+  Eq (SomeT k)
+  where
+  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @tt @t1 @t2 of
     Just Refl -> v1 == v2
     Nothing -> False
 
-readSomeTPayload :: forall i k. (Read (k i), KnownT i) => ReadPrec (SomeT k)
+readSomeTPayload ::
+  forall tt i (k :: tt -> Type).
+  (Read (k i), Known i) =>
+  ReadPrec (SomeT k)
 readSomeTPayload = Some @i <$> readPrec
 
-instance (forall t. (KnownT t) => Read (k t)) => Read (SomeT k) where
+instance
+  forall (tt :: Type) (k :: tt -> Type).
+  (tt ~ T, forall t. (Known t) => Read (k t)) =>
+  Read (SomeT k)
+  where
   readPrec = wrap_tup $ do
     x <- readPrec
     read_comma
     case x of
-      A -> readSomeTPayload @A
-      B -> readSomeTPayload @B
+      A -> readSomeTPayload @_ @A
+      B -> readSomeTPayload @_ @B
 
 -- Example to show that it works
 
