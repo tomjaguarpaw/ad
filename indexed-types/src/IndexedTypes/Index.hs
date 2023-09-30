@@ -18,6 +18,7 @@ module IndexedTypes.Index
     coerceMethod,
     Known (..),
     toValue,
+    Dict (..),
 
     -- * Converting between value and type level
     toValue,
@@ -54,7 +55,8 @@ withKnown ::
   ((c (f i)) => r) ->
   -- | _
   r
-withKnown = withKnown' @t (Proxy @i) (Proxy @c) (Proxy @f)
+withKnown r = case knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f) of
+  Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
@@ -98,23 +100,39 @@ class (Eq t) => Index t where
   -- | From this we derive 'toValue'.
   singletonToValue :: Singleton t i -> t
 
-  -- | Not sure why this requires Proxy arguments
-  --
-  -- The implementation of @withKnown'@ is implicitly a check that
-  -- @'Forall' t@ is correct
   withKnown' ::
+    (Forall t c f) =>
+    (Known i) =>
     Proxy i ->
     Proxy c ->
     -- | _
     Proxy f ->
-    (Forall t c f) =>
-    (Known i) =>
     ((c (f i)) => r) ->
     r
+  withKnown' i c f g =
+    case knowAll' i c f of
+      Dict -> g
+
+  -- | Not sure why this requires Proxy arguments
+  --
+  -- The implementation of @knowAll'@ is implicitly a check that
+  -- @'Forall' t@ is correct
+  knowAll' ::
+    (Forall t c f) =>
+    (Known i) =>
+    Proxy i ->
+    Proxy c ->
+    -- | _
+    Proxy f ->
+    Dict (c (f i))
+  knowAll' i c f = withKnown' i c f Dict
 
   -- | Take the value level index @i@ (i.e. a value of type @t@) and
   -- return it at the type level as a type of kind @t@.
   toType :: t -> TypeOfKind t
+
+data Dict c where
+  Dict :: (c) => Dict c
 
 -- | Take the type level index @i@ (i.e. a type of kind @t@) and
 -- return it at the value level as a value of type @t@.

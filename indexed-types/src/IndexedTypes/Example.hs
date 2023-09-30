@@ -39,7 +39,7 @@ where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
-import IndexedTypes.Index (Index (..), Known (know), TypeOfKind (TypeIs))
+import IndexedTypes.Index (Dict (Dict), Index (..), Known (know), TypeOfKind (TypeIs))
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
@@ -196,14 +196,12 @@ instance Index T where
     SB -> B
     SC -> C
 
-  withKnown' =
-    \(Proxy :: Proxy i)
-     (Proxy :: Proxy c)
-     (Proxy :: Proxy f)
-     r -> case know @_ @i of
-        SA -> r
-        SB -> r
-        SC -> r
+  knowAll' =
+    \(Proxy :: Proxy i) _ _ ->
+      case know @_ @i of
+        SA -> Dict
+        SB -> Dict
+        SC -> Dict
 
   toType = \case
     A -> TypeIs @_ @A Proxy
