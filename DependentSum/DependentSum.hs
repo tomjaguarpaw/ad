@@ -83,13 +83,12 @@ withKnown ::
 withKnown = withKnown' @t (Proxy @i) (Proxy @c) (Proxy @f)
 
 coerceMethod ::
-  forall t (c :: Type -> Constraint) f a2 a3.
-  (Coercible a2 a3) =>
-  (ForallFooF f c) =>
-  (KnownT t) =>
-  ((c (f t)) => a2) ->
+  forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
+  (Coercible a2 a3, Index t, Forall t f c) =>
+  (Known i) =>
+  ((c (f i)) => a2) ->
   a3
-coerceMethod a2 = coerce @a2 @a3 (withKnown @T @t @c @f a2)
+coerceMethod a2 = coerce @a2 @a3 (withKnown @t @i @c @f a2)
 
 type Known :: forall t. t -> Constraint
 class Known (i :: t) where
@@ -167,16 +166,16 @@ deriving newtype instance (Ord (FF FooFF t)) => Ord (FooWrapper t)
 newtype Wrapper2 f t = Worapper2 (f t)
 
 instance (KnownT t) => Show (Wrapper2 FooWrapper t) where
-  show = coerceMethod @t @Show @FooWrapper (show @(FooWrapper t))
+  show = coerceMethod @T @t @Show @FooWrapper (show @(FooWrapper t))
 
 instance (KnownT t) => Read (Wrapper2 FooWrapper t) where
-  readPrec = coerceMethod @t @Read @FooWrapper (readPrec @(FooWrapper t))
+  readPrec = coerceMethod @T @t @Read @FooWrapper (readPrec @(FooWrapper t))
 
 instance (KnownT t) => Eq (Wrapper2 FooWrapper t) where
-  (==) = coerceMethod @t @Eq @FooWrapper ((==) @(FooWrapper t))
+  (==) = coerceMethod @T @t @Eq @FooWrapper ((==) @(FooWrapper t))
 
 instance (KnownT t) => Ord (Wrapper2 FooWrapper t) where
-  compare = coerceMethod @t @Ord @FooWrapper (compare @(FooWrapper t))
+  compare = coerceMethod @T @t @Ord @FooWrapper (compare @(FooWrapper t))
 
 deriving via Wrapper2 FooWrapper t instance (KnownT t) => Show (Foo t)
 
