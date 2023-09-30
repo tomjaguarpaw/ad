@@ -53,23 +53,23 @@ type family FooF t :: Type where
 
 newtype Foo t = Foo {getFoo :: FooF t}
 
-newtype Wrapper t = Wrapper {getFooWrapper :: FooF t}
+newtype FooWrapper t = Wrapper {getFooWrapper :: FooF t}
 
-deriving newtype instance (Show (FooF t)) => Show (Wrapper t)
+deriving newtype instance (Show (FooF t)) => Show (FooWrapper t)
 
-deriving newtype instance (Read (FooF t)) => Read (Wrapper t)
+deriving newtype instance (Read (FooF t)) => Read (FooWrapper t)
 
-deriving stock instance (Eq (FooF t)) => Eq (Wrapper t)
+deriving stock instance (Eq (FooF t)) => Eq (FooWrapper t)
 
-deriving stock instance (Ord (FooF t)) => Ord (Wrapper t)
+deriving stock instance (Ord (FooF t)) => Ord (FooWrapper t)
 
-deriving via Knownly (Wrapper t) instance (Known t) => Show (Foo t)
+deriving via Knownly (FooWrapper t) instance (Known t) => Show (Foo t)
 
-deriving via Knownly (Wrapper t) instance (Known t) => Read (Foo t)
+deriving via Knownly (FooWrapper t) instance (Known t) => Read (Foo t)
 
-deriving via Knownly (Wrapper t) instance (Known t) => Eq (Foo t)
+deriving via Knownly (FooWrapper t) instance (Known t) => Eq (Foo t)
 
-deriving via Knownly (Wrapper t) instance (Known t) => Ord (Foo t)
+deriving via Knownly (FooWrapper t) instance (Known t) => Ord (Foo t)
 
 -- Library
 
@@ -143,7 +143,10 @@ instance (Known i, Forall t Read k, Index t) => Read (Knownly (k i)) where
 instance (Known i, Forall t Eq k, Index t) => Eq (Knownly (k i)) where
   (==) = coerceMethod @t @i @Eq @k ((==) @(k i))
 
-instance (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) => Ord (Knownly (k i)) where
+instance
+  (Known i, Forall t Ord k, Index t, Eq (Knownly (k i))) =>
+  Ord (Knownly (k i))
+  where
   compare = coerceMethod @t @i @Ord @k (compare @(k i))
 
 data Some k where
@@ -154,6 +157,9 @@ instance
   (Show t, Index t, forall (i :: t). (Known i) => Show (k i)) =>
   Show (Some k)
   where
+  -- In later GHCs this is
+  --
+  --   show (Some @i v) = ...
   show (Some (v :: k i)) = show (toVal (know @_ @i), v)
 
 instance
@@ -161,15 +167,12 @@ instance
   (forall i. (Known i) => Eq (k i), Index t) =>
   Eq (Some k)
   where
-  Some (v1 :: k t1) == Some (v2 :: k t2) = case eqT @_ @t1 @t2 of
+  -- In later GHCs this is
+  --
+  --   Some @i1 v1 == Some @i2 v2 = ...
+  Some (v1 :: k i1) == Some (v2 :: k i2) = case eqT @_ @i1 @i2 of
     Just Refl -> v1 == v2
     Nothing -> False
-
-readSomeTPayload ::
-  forall t i (k :: t -> Type).
-  (Read (k i), Known i) =>
-  ReadPrec (Some k)
-readSomeTPayload = Some @i <$> readPrec
 
 applyAny ::
   forall t (i :: t) r.
@@ -185,9 +188,9 @@ instance
   Read (Some k)
   where
   readPrec = wrap_tup $ do
-    x <- readPrec
+    i <- readPrec
     read_comma
-    applyAny (\(Proxy :: Proxy i) -> readSomeTPayload @_ @i) x
+    applyAny (\(Proxy :: Proxy i') -> Some @i' <$> readPrec) i
 
 -- Lots of boilerplate.  This is all derivable, in principle.
 
@@ -202,15 +205,15 @@ instance Index T where
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- know @_ @i,
       SA <- know @_ @i' =
-        Just Refl
+      Just Refl
     | SB <- know @_ @i,
       SB <- know @_ @i' =
-        Just Refl
+      Just Refl
     | SC <- know @_ @i,
       SC <- know @_ @i' =
-        Just Refl
+      Just Refl
     | otherwise =
-        Nothing
+      Nothing
 
   toVal = \case
     SA -> A
