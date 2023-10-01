@@ -47,6 +47,17 @@ module IndexedTypes.Index
 
     -- * Dict
     Dict (Dict),
+
+    -- * @TypeOf@
+
+    -- | Using @TypeOf@ is a hack to make the type arguments to
+    -- several functions simpler.  @t ~ TypeOf i@ just means @t :: i@.
+    -- Using @TypeOf@ allows us to make the kind of @i@ an invisible
+    -- type argument so we don't have to explicitly avoid specifying
+    -- it with @\@_@, the omitted type argument.  Future versions of
+    -- GHC will allow explicitly marking type arguments as "invisible"
+    -- and this hack won't be needed under those GHCs.
+    TypeOf,
   )
 where
 
@@ -62,9 +73,7 @@ import Type.Reflection ((:~:))
 -- @
 toValue ::
   forall i t.
-  (t ~ TypeOf i) =>
-  (Index t) =>
-  (Known i) =>
+  (t ~ TypeOf i, Index t, Known i) =>
   -- | ... return it at the value level (i.e. as a value of type @t@)
   t
 toValue = singletonToValue (know @i)
@@ -187,11 +196,6 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know' :: Singleton i
 
--- Using TypeOf is a hack that allows us to make the kind of i an
--- invisible type argument to know.  That way we don't have to bother
--- specifying it (even as @_) when we call know.
-
--- | @t ~ TypeOf i@ just means @t :: i@.
 type TypeOf :: k -> Type
 type TypeOf (i :: t) = t
 
