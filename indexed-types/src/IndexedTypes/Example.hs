@@ -27,6 +27,7 @@ module IndexedTypes.Example
     -- | Definition of type that depends on the index 'T'.
     FooA (..),
     FooBC (..),
+    FooF,
     Foo (..),
 
     -- * Deriving instances for @Foo@
@@ -42,8 +43,9 @@ import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
   ( Dict (Dict),
     Index (..),
-    Known (know),
+    Known (know'),
     TypeOfKind (TypeIs),
+    know,
   )
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
@@ -70,12 +72,15 @@ data FooA = FooA1 Int | FooA2 Bool
 data FooBC = FooBC1 Char | FooBC2 String
   deriving (Eq, Ord, Read, Show)
 
+-- | The type family that maps each index (i.e. value of type 'T') to
+-- the payload for that index.
 type FooF :: T -> Type
 type family FooF i :: Type where
   FooF A = FooA
   FooF B = FooBC
   FooF C = FooBC
 
+-- | Finally we define @Foo@, the indexed type itself.
 newtype Foo i = Foo (FooF i)
 
 -- | A wrapper type, with the same contents as @Foo@, purely for the
@@ -184,14 +189,14 @@ instance Index T where
   type Forall T c f = (c (f A), c (f B), c (f C))
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
-    | SA <- know @_ @i,
-      SA <- know @_ @i' =
+    | SA <- know @i,
+      SA <- know @i' =
         Just Refl
-    | SB <- know @_ @i,
-      SB <- know @_ @i' =
+    | SB <- know @i,
+      SB <- know @i' =
         Just Refl
-    | SC <- know @_ @i,
-      SC <- know @_ @i' =
+    | SC <- know @i,
+      SC <- know @i' =
         Just Refl
     | otherwise =
         Nothing
@@ -203,7 +208,7 @@ instance Index T where
 
   knowAll' =
     \(Proxy :: Proxy i) _ _ ->
-      case know @_ @i of
+      case know @i of
         SA -> Dict
         SB -> Dict
         SC -> Dict
@@ -214,10 +219,10 @@ instance Index T where
     C -> TypeIs @_ @C Proxy
 
 instance Known A where
-  know = SA
+  know' = SA
 
 instance Known B where
-  know = SB
+  know' = SB
 
 instance Known C where
-  know = SC
+  know' = SC

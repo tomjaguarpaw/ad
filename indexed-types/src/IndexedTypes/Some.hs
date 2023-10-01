@@ -28,7 +28,8 @@ import Text.Read
   )
 import Type.Reflection ((:~:) (Refl))
 
--- | Sometimes known as a "sigma" type.
+-- | Sometimes known as a "sigma" type, a dependent sum or a dependent
+-- pair.
 data Some k where
   Some :: (Known t) => k t -> Some k
 
