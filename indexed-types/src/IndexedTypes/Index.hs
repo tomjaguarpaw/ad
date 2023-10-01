@@ -180,6 +180,8 @@ class (Eq t) => Index t where
   --
   -- @
   -- toType A = AsType (Proxy :: Proxy A)
+  -- toType B = AsType (Proxy :: Proxy B)
+  -- toType C = AsType (Proxy :: Proxy C)
   -- @
   toType :: t -> AsKind t
 
