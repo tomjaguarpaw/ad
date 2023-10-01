@@ -41,7 +41,7 @@ instance
   -- In later GHCs this is
   --
   --   show (Some @i v) = ...
-  show (Some (v :: k i)) = show (toValue @_ @i, v)
+  show (Some (v :: k i)) = show (toValue @i, v)
 
 instance
   forall (t :: Type) (k :: t -> Type).
@@ -51,7 +51,7 @@ instance
   -- In later GHCs this is
   --
   --   Some @i1 v1 == Some @i2 v2 = ...
-  Some (v1 :: k i1) == Some (v2 :: k i2) = case eqT @_ @i1 @i2 of
+  Some (v1 :: k i1) == Some (v2 :: k i2) = case eqT @i1 @i2 of
     Just Refl -> v1 == v2
     Nothing -> False
 

@@ -61,7 +61,8 @@ import Type.Reflection ((:~:))
 -- toValue @A = A
 -- @
 toValue ::
-  forall t (i :: t).
+  forall i t.
+  (t ~ TypeOf i) =>
   (Index t) =>
   (Known i) =>
   -- | ... return it at the value level (i.e. as a value of type @t@)
@@ -95,8 +96,8 @@ data TypeOfKind t where
 -- equal at the value level.  'IndexedTypes.Consistency.eqEquality'
 -- checks that propery.
 eqT ::
-  forall (t :: Type) (i :: t) (i' :: t).
-  (Index t, Known i, Known i') =>
+  forall i i' t.
+  (Index t, Known i, Known i', t ~ TypeOf i, t ~ TypeOf i') =>
   -- | _
   Maybe (i :~: i')
 eqT = eqT' Proxy Proxy
@@ -109,7 +110,7 @@ class (Eq t) => Index t where
   --   SB :: SB B
   --   SC :: SC C
   -- @
-  data Singleton t :: t -> Type
+  data Singleton :: t -> Type
 
   -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
   -- kind @t@ separately.  'knowAll' allows us to know them all at
@@ -140,7 +141,7 @@ class (Eq t) => Index t where
   -- @
   -- singletonToValue = \\case SA -> A; SB -> B; SC -> C
   -- @
-  singletonToValue :: Singleton t i -> t
+  singletonToValue :: Singleton (i :: t) -> t
 
   -- | The class method version of 'knowAll'.  Always prefer to use
   -- 'knowAll' instead, except when defining this class.
@@ -184,15 +185,17 @@ knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
 
 type Known :: forall t. t -> Constraint
 class Known (i :: t) where
-  know' :: Singleton t i
-
-type TypeOf :: k -> Type
-type TypeOf (i :: t) = t
+  know' :: Singleton i
 
 -- Using TypeOf is a hack that allows us to make the kind of i an
 -- invisible type argument to know.  That way we don't have to bother
 -- specifying it (even as @_) when we call know.
-know :: forall i. (Known i) => Singleton (TypeOf i) i
+
+-- | @t ~ TypeOf i@ just means @t :: i@.
+type TypeOf :: k -> Type
+type TypeOf (i :: t) = t
+
+know :: forall i. (Known i) => Singleton i
 know = know'
 
 data Dict c where

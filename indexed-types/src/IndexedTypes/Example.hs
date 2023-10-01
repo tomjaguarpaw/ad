@@ -181,10 +181,10 @@ example = flip mapM_ testCases $ \someT -> do
 -- Lots of boilerplate.  This is all derivable, in principle.
 
 instance Index T where
-  data Singleton T i where
-    SA :: Singleton T A
-    SB :: Singleton T B
-    SC :: Singleton T C
+  data Singleton i where
+    SA :: Singleton A
+    SB :: Singleton B
+    SC :: Singleton C
 
   type Forall T c f = (c (f A), c (f B), c (f C))
 

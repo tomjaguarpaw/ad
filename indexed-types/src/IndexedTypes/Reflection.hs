@@ -37,4 +37,4 @@ reflect ::
   (Known i, Index t) =>
   -- | @i@ as a value of type @t@
   t
-reflect = toValue @_ @i
+reflect = toValue @i
