@@ -17,7 +17,7 @@ module IndexedTypes.Reflection
 where
 
 import Data.Proxy (Proxy)
-import IndexedTypes.Index (Index (toType), Known, TypeOfKind (TypeIs), toValue)
+import IndexedTypes.Index (AsKind (AsType), Index (toType), Known, toValue)
 
 -- | See also e.g.
 -- @Data.Reflection.@'Data.Reflection.reifyNat'.
@@ -29,12 +29,12 @@ reify ::
   (forall (i :: t). (Known i) => Proxy i -> r) ->
   r
 reify t f = case toType t of
-  TypeIs i -> f i
+  AsType i -> f i
 
 -- | Take a type argument @i@ of kind @t@ and return ...
 reflect ::
   forall t (i :: t).
-  (Known i, Index t) =>
+  (Known i) =>
   -- | @i@ as a value of type @t@
   t
 reflect = toValue @i

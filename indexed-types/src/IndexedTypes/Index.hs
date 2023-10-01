@@ -28,10 +28,14 @@ module IndexedTypes.Index
     -- 'IndexedTypes.Consistency.roundTripTypeValue' and
     -- 'IndexedTypes.Consistency.roundTripValueType' are automated
     -- checks of that property.
+
+    -- * Type level to value level
     toValue,
     know,
+
+    -- * Value level to type level
     toType,
-    TypeOfKind (..),
+    AsKind (AsType),
 
     -- * Type equality
     eqT,
@@ -66,30 +70,29 @@ import Data.Proxy (Proxy (Proxy))
 import Type.Reflection ((:~:))
 
 -- | Convert a type level index to a value level index. Take the type
--- level index @i@ (i.e. a type of kind @t@) and ...
+-- level index @i@ (i.e. a type of kind @t@) and return it at the
+-- value level (i.e. as a value of type @t@).
 --
 -- @
--- toValue @A = A
+-- toValue \@A = A
+-- toValue \@B = B
+-- toValue \@C = C
 -- @
-toValue ::
-  forall i t.
-  (t ~ TypeOf i, Index t, Known i) =>
-  -- | ... return it at the value level (i.e. as a value of type @t@)
-  t
+toValue :: forall i. (Known i) => TypeOf i
 toValue = singletonToValue (know @i)
 
 -- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
--- pattern matching and proceed to use it as a 'Known' type of kind
--- @t@.
+-- pattern matching:
 --
 -- @
--- \\case (TypeIs (Proxy :: Proxy i)) -> ...
+-- case toType t of
+--   AsType (_ :: Proxy i) -> ...
 -- @
 --
--- (We only need the @Proxy@ field because older versions of GHC can't
+-- (We need the @Proxy@ field only because older versions of GHC can't
 -- bind type variables in patterns.)
-data TypeOfKind t where
-  TypeIs :: forall t i. (Known (i :: t)) => Proxy i -> TypeOfKind t
+data AsKind t where
+  AsType :: forall t i. (Known (i :: t)) => Proxy i -> AsKind t
 
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
 -- are equal, and if so returns @(i :~: i')@, which allows you to write
@@ -97,16 +100,16 @@ data TypeOfKind t where
 --
 -- @
 -- case eqT @i @i' of
---    Nothing -> ... not equal ...
---    Just Refl -> ... use i and i' knowing that they are equal ...
+--    Nothing -> ... i and i' are not equal ...
+--    Just Refl -> ... here we can use that i ~ i' ...
 -- @
 --
 -- Indices should be equal at the type level if and only if they are
 -- equal at the value level.  'IndexedTypes.Consistency.eqEquality'
 -- checks that propery.
 eqT ::
-  forall i i' t.
-  (Index t, Known i, Known i', t ~ TypeOf i, t ~ TypeOf i') =>
+  forall i i'.
+  (Known i, Known i', TypeOf i ~ TypeOf i') =>
   -- | _
   Maybe (i :~: i')
 eqT = eqT' Proxy Proxy
@@ -150,6 +153,8 @@ class (Eq t) => Index t where
   -- @
   -- singletonToValue = \\case SA -> A; SB -> B; SC -> C
   -- @
+  --
+  -- See 'Singleton' for the definition of @SA@, @SB@, @SC@.
   singletonToValue :: Singleton (i :: t) -> t
 
   -- | The class method version of 'knowAll'.  Always prefer to use
@@ -170,35 +175,57 @@ class (Eq t) => Index t where
     Proxy f ->
     ((Known i) => Dict (c (f i)))
 
-  -- | Convert a value level index to a type level index.
+  -- | Take a value level index (i.e. a value of type @t@) and return
+  -- it at the type level (i.e. as a type of kind @t@)
   --
   -- @
-  -- toType A = TypeIs (Proxy :: Proxy @A)
+  -- toType A = AsType (Proxy :: Proxy A)
   -- @
-  toType ::
-    -- | Take a value level index (i.e. a value of type @t@)
-    t ->
-    -- | return it at the type level (i.e. as a type of kind @t@)
-    TypeOfKind t
+  toType :: t -> AsKind t
 
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
 -- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
 knowAll ::
   forall (t :: Type) (i :: t) c f.
-  (Index t) =>
   (Forall t c f) =>
   -- | _
   ((Known i) => Dict (c (f i)))
 knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
 
 type Known :: forall t. t -> Constraint
-class Known (i :: t) where
+class (Index t) => Known (i :: t) where
   know' :: Singleton i
 
 type TypeOf :: k -> Type
 type TypeOf (i :: t) = t
 
+-- | Convert a type level index to a value.  This is more powerful
+-- than 'toValue' because when we pattern match on the result we can
+-- use use the value of the type level index in body of the @case@
+-- branch.
+--
+-- @
+-- know \@A = SA
+-- know \@B = SB
+-- know \@B = SC
+-- @
+--
+-- @
+-- case know @i of
+--   SA -> ... here we can use that i ~ A ...
+--   SB -> ...                      i ~ B ...
+--   SC -> ...                      i ~ C ...
+-- @
+--
+-- @
+-- case 'toValue' @i of
+--   A -> ... here i ~ A but we can't use that fact ...
+--   B -> ...      i ~ B                            ...
+--   C -> ...      i ~ C                            ...
+-- @
+--
+-- See 'Singleton' for the definition of @SA@, @SB@, @SC@.
 know :: forall i. (Known i) => Singleton i
 know = know'
 

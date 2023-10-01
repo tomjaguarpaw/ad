@@ -41,10 +41,10 @@ where
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
-  ( Dict (Dict),
+  ( AsKind (AsType),
+    Dict (Dict),
     Index (..),
     Known (know'),
-    TypeOfKind (TypeIs),
     know,
   )
 import IndexedTypes.Knownly (Knownly (Knownly))
@@ -214,9 +214,9 @@ instance Index T where
         SC -> Dict
 
   toType = \case
-    A -> TypeIs @_ @A Proxy
-    B -> TypeIs @_ @B Proxy
-    C -> TypeIs @_ @C Proxy
+    A -> AsType @_ @A Proxy
+    B -> AsType @_ @B Proxy
+    C -> AsType @_ @C Proxy
 
 instance Known A where
   know' = SA

@@ -19,24 +19,24 @@ import Text.Read (Read (readPrec))
 -- for indexed types.  See "IndexedTypes.Example" for an example.
 newtype Knownly a = Knownly a
 
-instance (Known i, Index t, Forall t Show k) => Show (Knownly (k i)) where
+instance (Known i, Forall t Show k) => Show (Knownly (k i)) where
   show = coerceMethod @t @i @Show @k (show @(k i))
 
-instance (Known i, Index t, Forall t Read k) => Read (Knownly (k i)) where
+instance (Known i, Forall t Read k) => Read (Knownly (k i)) where
   readPrec = coerceMethod @t @i @Read @k (readPrec @(k i))
 
-instance (Known i, Index t, Forall t Eq k) => Eq (Knownly (k i)) where
+instance (Known i, Forall t Eq k) => Eq (Knownly (k i)) where
   (==) = coerceMethod @t @i @Eq @k ((==) @(k i))
 
 instance
-  (Known i, Index t, Eq (Knownly (k i)), Forall t Ord k) =>
+  (Known i, Eq (Knownly (k i)), Forall t Ord k) =>
   Ord (Knownly (k i))
   where
   compare = coerceMethod @t @i @Ord @k (compare @(k i))
 
 withKnown ::
   forall (t :: Type) (i :: t) c f r.
-  (Known i, Index t, Forall t c f) =>
+  (Known i, Forall t c f) =>
   -- | _
   ((c (f i)) => r) ->
   -- | _
@@ -46,7 +46,6 @@ withKnown r = case knowAll @t @i @c @f of Dict -> r
 coerceMethod ::
   forall (t :: Type) (i :: t) (c :: Type -> Constraint) f a2 a3.
   () =>
-  (Index t) =>
   (Forall t c f) =>
   (Known i) =>
   (Coercible a2 a3) =>

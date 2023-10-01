@@ -14,9 +14,9 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import GHC.Read (expectP, paren)
 import IndexedTypes.Index
-  ( Index (toType),
+  ( AsKind (AsType),
+    Index (toType),
     Known,
-    TypeOfKind (TypeIs),
     eqT,
     toValue,
   )
@@ -65,7 +65,7 @@ instance
     i <- readPrec
     read_comma
     case toType i of
-      TypeIs (Proxy :: Proxy i') -> Some @i' <$> readPrec
+      AsType (Proxy :: Proxy i') -> Some @i' <$> readPrec
 
 -- These ReadPrec combinators are borrowed from
 --
