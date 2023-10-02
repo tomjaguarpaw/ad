@@ -4,12 +4,14 @@
 {-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
+{-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-duplicate-exports #-}
 
 -- | This module contains everything you need to define an index type.
@@ -204,8 +206,7 @@ type family For t c is where
 
 data Contains t i where
   Contains ::
-    (forall c. (Forall t c) => Dict (c i)) ->
-    Dict (Index t) ->
+    (forall c. (Forall t c) => c i, Index t) =>
     Contains t i
 
 -- | @knowAll@ says that we can convert code depending on a class
@@ -241,7 +242,7 @@ knowAll :: forall (t :: Type) (i :: t). (Known i) => Contains t i
 knowAll = knowAll' @t Proxy
 
 nwAll :: forall (t :: Type) (i :: t). Contains t i -> Singleton i
-nwAll (Contains f Dict) = case forallKnown @t of Dict -> case f @Known of Dict -> know @i
+nwAll Contains = case forallKnown @t of Dict -> know @i
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where
