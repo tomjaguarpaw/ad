@@ -45,7 +45,7 @@ import IndexedTypes.Index
     Dict (Dict),
     Index (..),
     Known (know'),
-    know,
+    know, Contains (Contains)
   )
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
@@ -209,9 +209,9 @@ instance Index T where
   knowAll' =
     \(Proxy :: Proxy i) ->
       case know @i of
-        SA -> Dict
-        SB -> Dict
-        SC -> Dict
+        SA -> Contains Dict Dict
+        SB -> Contains Dict Dict
+        SC -> Contains Dict Dict
 
   toType = \case
     A -> AsType @_ @A Proxy

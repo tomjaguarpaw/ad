@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DefaultSignatures #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
@@ -51,6 +52,7 @@ module IndexedTypes.Index
 
     -- * @knowAll@: converting separate constraints to a 'Known' constraint
     knowAll,
+    nwAll,
 
     -- * Dict
     Dict (Dict),
@@ -65,6 +67,7 @@ module IndexedTypes.Index
     -- GHC will allow explicitly marking type arguments as "invisible"
     -- and this hack won't be needed under those GHCs.
     TypeOf,
+    Contains (..),
   )
 where
 
@@ -134,6 +137,10 @@ class (Eq t) => Index t where
   -- @
   type All t :: [t]
 
+  forallKnown :: Dict (Forall t Known)
+  default forallKnown :: (For t Known (All t)) => Dict (Forall t Known)
+  forallKnown = Dict
+
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
   --
@@ -168,11 +175,7 @@ class (Eq t) => Index t where
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
-  knowAll' ::
-    (Forall t c) =>
-    Proxy i ->
-    -- | _
-    ((Known i) => Dict (c i))
+  knowAll' :: (Known (i :: t)) => Proxy i -> Contains t i
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -199,15 +202,20 @@ type family For t c is where
   For _ _ '[] = ()
   For t c (i : is) = (c i, For t c is)
 
+data Contains t i where
+  Contains ::
+    (forall c. (Forall t c) => Dict (c i)) ->
+    Dict (Index t) ->
+    Contains t i
+
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
 -- separately (@Forall t c@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
-knowAll ::
-  forall (t :: Type) (i :: t) c.
-  (Forall t c) =>
-  -- | _
-  ((Known i) => Dict (c i))
-knowAll = knowAll' @t (Proxy @i)
+knowAll :: forall (t :: Type) (i :: t). (Known i) => Contains t i
+knowAll = knowAll' @t Proxy
+
+nwAll :: forall (t :: Type) (i :: t). Contains t i -> Singleton i
+nwAll (Contains f Dict) = case forallKnown @t of Dict -> case f @Known of Dict -> know @i
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where

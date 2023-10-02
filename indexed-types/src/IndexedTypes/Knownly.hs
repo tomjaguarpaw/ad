@@ -9,12 +9,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
+{-# LANGUAGE TypeFamilies #-}
 
 module IndexedTypes.Knownly (Knownly (Knownly)) where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
-import IndexedTypes.Index (Dict (Dict), Forall, Known, knowAll)
+import IndexedTypes.Index (Dict (Dict), Forall, Known, knowAll, Contains (Contains))
 import Text.Read (Read (readPrec))
 
 -- | Knownly is a @newtype@ that exists to allow deriving of instances
@@ -53,7 +54,7 @@ withKnown ::
   ((c i) => r) ->
   -- | _
   r
-withKnown r = case knowAll @t @i @c of Dict -> r
+withKnown r = case knowAll @t @i of Contains f Dict  -> case f @c of Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) c a2 a3.
