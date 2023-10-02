@@ -42,7 +42,7 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
   ( AsKind (AsType),
-    Contains (Contains),
+    Dict (Dict),
     Index (..),
     Known (know'),
     know,
@@ -209,9 +209,9 @@ instance Index T where
   knowAll' =
     \(Proxy :: Proxy i) ->
       case know @i of
-        SA -> Contains
-        SB -> Contains
-        SC -> Contains
+        SA -> Dict
+        SB -> Dict
+        SC -> Dict
 
   toType = \case
     A -> AsType @_ @A Proxy

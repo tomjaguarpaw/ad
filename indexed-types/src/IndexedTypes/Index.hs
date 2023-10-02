@@ -2,7 +2,9 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE DefaultSignatures #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
@@ -69,7 +71,7 @@ module IndexedTypes.Index
     -- GHC will allow explicitly marking type arguments as "invisible"
     -- and this hack won't be needed under those GHCs.
     TypeOf,
-    Contains (..),
+    Contains,
   )
 where
 
@@ -177,7 +179,7 @@ class (Eq t) => Index t where
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
-  knowAll' :: (Known (i :: t)) => Proxy i -> Contains t i
+  knowAll' :: (Known (i :: t)) => Proxy i -> Dict (Contains t i)
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -204,10 +206,13 @@ type family For t c is where
   For _ _ '[] = ()
   For t c (i : is) = (c i, For t c is)
 
-data Contains t i where
-  Contains ::
-    (forall c. (Forall t c) => c i, Index t) =>
-    Contains t i
+class
+  (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
+  Contains t i
+
+instance
+  (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
+  Contains t i
 
 -- | @knowAll@ says that we can convert code depending on a class
 -- instance for @T@ into code that depends on 'Known'.  @T@.  That is,
@@ -238,11 +243,11 @@ data Contains t i where
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
 -- @
-knowAll :: forall (t :: Type) (i :: t). (Known i) => Contains t i
+knowAll :: forall (t :: Type) (i :: t). (Known i) => Dict (Contains t i)
 knowAll = knowAll' @t Proxy
 
-nwAll :: forall (t :: Type) (i :: t). Contains t i -> Singleton i
-nwAll Contains = case forallKnown @t of Dict -> know @i
+nwAll :: forall (t :: Type) (i :: t). (Contains t i) => Dict (Known i)
+nwAll = case forallKnown @t of Dict -> Dict
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where
