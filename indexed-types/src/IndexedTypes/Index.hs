@@ -81,8 +81,8 @@ module IndexedTypes.Index
     -- (forall (c :: t -> Constraint). Forall t c => c i, Index t)
     -- @
     --
-    -- which holds exactly when @i@ occurs among the elements of
-    -- @'All' t@.
+    -- which holds exactly when @t@ is an 'Index' type and @i@ occurs
+    -- among the elements of @'All' t@.
     InAll,
   )
 where
