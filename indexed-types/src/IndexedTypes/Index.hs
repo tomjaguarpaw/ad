@@ -190,7 +190,7 @@ class (Eq t) => Index t where
 -- once.
 --
 -- @
--- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+-- Forall T c = (c A, c B, c C)
 -- @
 type Forall :: forall (t :: Type) -> (t -> Constraint) -> Constraint
 type Forall t c = For t c (All t)
