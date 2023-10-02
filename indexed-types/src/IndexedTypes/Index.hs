@@ -71,6 +71,17 @@ module IndexedTypes.Index
     -- GHC will allow explicitly marking type arguments as "invisible"
     -- and this hack won't be needed under those GHCs.
     TypeOf,
+
+    -- * @InAll@
+
+    -- | @InAll (i :: t)@ is defined to be the constraint
+    --
+    -- @
+    -- (forall (c :: t -> Constraint). Forall t c => c i, Index t)
+    -- @
+    --
+    -- which holds exactly when @i@ occurs among the elements of
+    -- @'All' t@.
     InAll,
   )
 where
@@ -102,7 +113,7 @@ toValue = singletonToValue (know @i)
 -- (We need the @Proxy@ field only because older versions of GHC can't
 -- bind type variables in patterns.)
 data AsKind t where
-  AsType :: forall t i. (Known (i :: t)) => Proxy i -> AsKind t
+  AsType :: forall t (i :: t). (Known i) => Proxy i -> AsKind t
 
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
 -- are equal, and if so returns @(i :~: i')@, which allows you to write
@@ -236,9 +247,9 @@ instance
 --
 -- @
 -- f :: Known i => ftype
--- f = case knownInAll @i of
+-- f = case knownInAll \@i of
 --       Dict ->
---         case known @i of
+--         case known \@i of
 --           SA -> case c @A of Dict -> f @A
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
