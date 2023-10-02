@@ -55,7 +55,12 @@ module IndexedTypes.Index
     -- * @Matchable@ class
     Matchable (constructor'),
 
-    -- * @matchableInAll@: converting separate constraints to a 'Matchable' constraint
+    -- * Equivalence between @Matchable@ and @InAll@
+
+    -- | We can freely convert between 'Matchable' and 'InAll'.  In
+    -- other words we can freely convert between a @Matchable@
+    -- constraint and a collection of constraints, one for each
+    -- element of @t@.
     matchableInAll,
     allMatchable,
 
@@ -273,8 +278,8 @@ instance
 matchableInAll :: forall i. (Matchable i) => Dict (InAll i)
 matchableInAll = matchableInAll' @(TypeOf i) Proxy
 
-allMatchable :: forall (t :: Type) (i :: t). (InAll i) => Dict (Matchable i)
-allMatchable = case forallMatchable @t of Dict -> Dict
+allMatchable :: forall i. (InAll i) => Dict (Matchable i)
+allMatchable = case forallMatchable @(TypeOf i) of Dict -> Dict
 
 type Matchable :: forall t. t -> Constraint
 class (Index t) => Matchable (i :: t) where
