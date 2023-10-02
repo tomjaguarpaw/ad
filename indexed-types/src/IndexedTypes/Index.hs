@@ -41,6 +41,7 @@ module IndexedTypes.Index
     -- * Value level to type level
     toType,
     AsKind (AsType),
+    asType,
 
     -- * Type equality
     eqT,
@@ -114,6 +115,9 @@ toValue = singletonToValue (know @i)
 -- bind type variables in patterns.)
 data AsKind t where
   AsType :: forall t (i :: t). (Known i) => Proxy i -> AsKind t
+
+asType :: forall i. (Known i) => AsKind (TypeOf i)
+asType = AsType @_ @i Proxy
 
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
 -- are equal, and if so returns @(i :~: i')@, which allows you to write
