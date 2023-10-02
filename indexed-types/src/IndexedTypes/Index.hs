@@ -179,7 +179,7 @@ class (Eq t) => Index t where
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
-  knowAll' :: (Known (i :: t)) => Proxy i -> Dict (Contains t i)
+  knowAll' :: (Known (i :: t)) => Proxy i -> Dict (Contains i)
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -208,11 +208,11 @@ type family For t c is where
 
 class
   (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
-  Contains t i
+  Contains (i :: t)
 
 instance
   (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
-  Contains t i
+  Contains (i :: t)
 
 -- | @knowAll@ says that we can convert code depending on a class
 -- instance for @T@ into code that depends on 'Known'.  @T@.  That is,
@@ -243,10 +243,10 @@ instance
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
 -- @
-knowAll :: forall (t :: Type) (i :: t). (Known i) => Dict (Contains t i)
+knowAll :: forall (t :: Type) (i :: t). (Known i) => Dict (Contains i)
 knowAll = knowAll' @t Proxy
 
-nwAll :: forall (t :: Type) (i :: t). (Contains t i) => Dict (Known i)
+nwAll :: forall (t :: Type) (i :: t). (Contains i) => Dict (Known i)
 nwAll = case forallKnown @t of Dict -> Dict
 
 type Known :: forall t. t -> Constraint
