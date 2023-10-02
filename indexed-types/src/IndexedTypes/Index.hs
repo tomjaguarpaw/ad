@@ -36,7 +36,7 @@ module IndexedTypes.Index
     -- * Value level to type level
     toType,
     AsKind (AsType),
-    Forall',
+    Forall,
 
     -- * Type equality
     eqT,
@@ -125,14 +125,14 @@ class (Eq t) => Index t where
   -- @
   data Singleton :: t -> Type
 
-  -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
+  -- | @Forall' t c f@ says that we know @c (f i)@ for all types @i@ of
   -- kind @t@ separately.  'knowAll' allows us to know them all at
   -- once.
   --
   -- @
-  -- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+  -- Forall' T Eq f = (Eq (f A), Eq (f B), Eq (f C))
   -- @
-  type Forall t k (c :: k -> Constraint) (f :: t -> k) :: Constraint
+  type Forall' t k (c :: k -> Constraint) (f :: t -> k) :: Constraint
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -162,14 +162,14 @@ class (Eq t) => Index t where
   -- 'knowAll' instead, except when defining this class.
   --
   -- The implementation of @knowAll'@ is implicitly a check that
-  -- @'Forall' t@ is correct.
+  -- @'Forall t@ is correct.
   --
   -- (@knowAll'@ only has @Proxy@ arguments because it seems to be
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
   knowAll' ::
-    (Forall' t c f) =>
+    (Forall t c f) =>
     Proxy i ->
     Proxy c ->
     -- | _
@@ -186,14 +186,14 @@ class (Eq t) => Index t where
   -- @
   toType :: t -> AsKind t
 
-type Forall' t (c :: k -> Constraint) f = Forall t k c f
+type Forall t (c :: k -> Constraint) f = Forall' t k c f
 
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
 -- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
 knowAll ::
   forall (t :: Type) (i :: t) c f.
-  (Forall' t c f) =>
+  (Forall t c f) =>
   -- | _
   ((Known i) => Dict (c (f i)))
 knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
