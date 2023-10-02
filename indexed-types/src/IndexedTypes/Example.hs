@@ -206,7 +206,7 @@ instance Index T where
     SB -> B
     SC -> C
 
-  knowAll' =
+  knownInAll' =
     \(Proxy :: Proxy i) ->
       case know @i of
         SA -> Dict

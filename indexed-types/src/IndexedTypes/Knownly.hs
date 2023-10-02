@@ -15,7 +15,7 @@ module IndexedTypes.Knownly (Knownly (Knownly)) where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
-import IndexedTypes.Index (Dict (Dict), Forall, Known, knowAll)
+import IndexedTypes.Index (Dict (Dict), Forall, Known, knownInAll)
 import Text.Read (Read (readPrec))
 
 -- | Knownly is a @newtype@ that exists to allow deriving of instances
@@ -54,7 +54,7 @@ withKnown ::
   ((c i) => r) ->
   -- | _
   r
-withKnown r = case knowAll @t @i of Dict -> r
+withKnown r = case knownInAll @t @i of Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) c a2 a3.

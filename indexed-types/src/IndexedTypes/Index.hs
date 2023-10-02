@@ -54,9 +54,9 @@ module IndexedTypes.Index
     -- * @Known@ class
     Known (know'),
 
-    -- * @knowAll@: converting separate constraints to a 'Known' constraint
-    knowAll,
-    nwAll,
+    -- * @knownInAll@: converting separate constraints to a 'Known' constraint
+    knownInAll,
+    allKnown,
 
     -- * Dict
     Dict (Dict),
@@ -71,7 +71,7 @@ module IndexedTypes.Index
     -- GHC will allow explicitly marking type arguments as "invisible"
     -- and this hack won't be needed under those GHCs.
     TypeOf,
-    Contains,
+    InAll,
   )
 where
 
@@ -169,17 +169,17 @@ class (Eq t) => Index t where
   -- See 'Singleton' for the definition of @SA@, @SB@, @SC@.
   singletonToValue :: Singleton (i :: t) -> t
 
-  -- | The class method version of 'knowAll'.  Always prefer to use
-  -- 'knowAll' instead, except when defining this class.
+  -- | The class method version of 'knownInAll'.  Always prefer to use
+  -- 'knownInAll' instead, except when defining this class.
   --
-  -- The implementation of @knowAll'@ is implicitly a check that
+  -- The implementation of @knownInAll'@ is implicitly a check that
   -- @'Forall t@ is correct.
   --
-  -- (@knowAll'@ only has @Proxy@ arguments because it seems to be
+  -- (@knownInAll'@ only has @Proxy@ arguments because it seems to be
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
-  knowAll' :: (Known (i :: t)) => Proxy i -> Dict (Contains i)
+  knownInAll' :: (Known (i :: t)) => Proxy i -> Dict (InAll i)
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -192,7 +192,7 @@ class (Eq t) => Index t where
   toType :: t -> AsKind t
 
 -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
--- kind @t@ separately.  'knowAll' allows us to know them all at
+-- kind @t@ separately.  'knownInAll' allows us to know them all at
 -- once.
 --
 -- @
@@ -208,13 +208,13 @@ type family For t c is where
 
 class
   (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
-  Contains (i :: t)
+  InAll (i :: t)
 
 instance
   (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
-  Contains (i :: t)
+  InAll (i :: t)
 
--- | @knowAll@ says that we can convert code depending on a class
+-- | @knownInAll@ says that we can convert code depending on a class
 -- instance for @T@ into code that depends on 'Known'.  @T@.  That is,
 -- code like
 --
@@ -236,18 +236,18 @@ instance
 --
 -- @
 -- f :: Known i => ftype
--- f = case knowAll @i of
---       Contains c Dict ->
+-- f = case knownInAll @i of
+--       Dict ->
 --         case known @i of
 --           SA -> case c @A of Dict -> f @A
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
 -- @
-knowAll :: forall (t :: Type) (i :: t). (Known i) => Dict (Contains i)
-knowAll = knowAll' @t Proxy
+knownInAll :: forall (t :: Type) (i :: t). (Known i) => Dict (InAll i)
+knownInAll = knownInAll' @t Proxy
 
-nwAll :: forall (t :: Type) (i :: t). (Contains i) => Dict (Known i)
-nwAll = case forallKnown @t of Dict -> Dict
+allKnown :: forall (t :: Type) (i :: t). (InAll i) => Dict (Known i)
+allKnown = case forallKnown @t of Dict -> Dict
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where
