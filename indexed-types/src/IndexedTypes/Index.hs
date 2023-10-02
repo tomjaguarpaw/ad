@@ -125,14 +125,12 @@ class (Eq t) => Index t where
   -- @
   data Singleton :: t -> Type
 
-  -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
-  -- kind @t@ separately.  'knowAll' allows us to know them all at
-  -- once.
+  -- | All the elements of @t@, at the type level.
   --
   -- @
-  -- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+  -- All T = [A, B, C]
   -- @
-  type Forall t (c :: t -> Constraint) :: Constraint
+  type All t :: [t]
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -184,6 +182,21 @@ class (Eq t) => Index t where
   -- toType C = AsType (Proxy :: Proxy C)
   -- @
   toType :: t -> AsKind t
+
+-- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
+-- kind @t@ separately.  'knowAll' allows us to know them all at
+-- once.
+--
+-- @
+-- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+-- @
+type Forall :: forall (t :: Type) -> (t -> Constraint) -> Constraint
+type Forall t c = For t c (All t)
+
+type For :: forall (t :: Type) -> (t -> Constraint) -> [t] -> Constraint
+type family For t c is where
+  For _ _ '[] = ()
+  For t c (i : is) = (c i, For t c is)
 
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
 -- separately (@Forall t c@) then we know @c (f i)@ for all @i@ at

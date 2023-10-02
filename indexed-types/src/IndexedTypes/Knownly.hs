@@ -14,7 +14,7 @@ module IndexedTypes.Knownly (Knownly (Knownly)) where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
-import IndexedTypes.Index (Dict (Dict), Forall, Index (Forall), Known, knowAll)
+import IndexedTypes.Index (Dict (Dict), Forall, Known, knowAll)
 import Text.Read (Read (readPrec))
 
 -- | Knownly is a @newtype@ that exists to allow deriving of instances

@@ -186,7 +186,7 @@ instance Index T where
     SB :: Singleton B
     SC :: Singleton C
 
-  type Forall T c = (c A, c B, c C)
+  type All T = [A, B, C]
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- know @i,
