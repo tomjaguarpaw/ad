@@ -186,7 +186,7 @@ instance Index T where
     SB :: Singleton B
     SC :: Singleton C
 
-  type Forall' T k c f = (c (f A), c (f B), c (f C))
+  type Forall T c = (c A, c B, c C)
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- know @i,
@@ -207,7 +207,7 @@ instance Index T where
     SC -> C
 
   knowAll' =
-    \(Proxy :: Proxy i) _ _ ->
+    \(Proxy :: Proxy i) _ ->
       case know @i of
         SA -> Dict
         SB -> Dict

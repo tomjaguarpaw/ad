@@ -125,14 +125,14 @@ class (Eq t) => Index t where
   -- @
   data Singleton :: t -> Type
 
-  -- | @Forall' t c f@ says that we know @c (f i)@ for all types @i@ of
+  -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
   -- kind @t@ separately.  'knowAll' allows us to know them all at
   -- once.
   --
   -- @
-  -- Forall' T Eq f = (Eq (f A), Eq (f B), Eq (f C))
+  -- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
   -- @
-  type Forall' t k (c :: k -> Constraint) (f :: t -> k) :: Constraint
+  type Forall t (c :: t -> Constraint) :: Constraint
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -169,12 +169,11 @@ class (Eq t) => Index t where
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
   knowAll' ::
-    (Forall t c f) =>
+    (Forall t c) =>
     Proxy i ->
     Proxy c ->
     -- | _
-    Proxy f ->
-    ((Known i) => Dict (c (f i)))
+    ((Known i) => Dict (c i))
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -186,17 +185,15 @@ class (Eq t) => Index t where
   -- @
   toType :: t -> AsKind t
 
-type Forall t (c :: k -> Constraint) f = Forall' t k c f
-
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
--- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
+-- separately (@Forall t c@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
 knowAll ::
-  forall (t :: Type) (i :: t) c f.
-  (Forall t c f) =>
+  forall (t :: Type) (i :: t) c.
+  (Forall t c) =>
   -- | _
-  ((Known i) => Dict (c (f i)))
-knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
+  ((Known i) => Dict (c i))
+knowAll = knowAll' @t (Proxy @i) (Proxy @c)
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where
