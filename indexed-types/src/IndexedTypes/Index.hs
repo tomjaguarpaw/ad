@@ -138,10 +138,10 @@ eqT = eqT' Proxy Proxy
 type Index :: Type -> Constraint
 class (Eq t) => Index t where
   -- | @
-  -- data Singleton T i where
-  --   SA :: Singleton T A
-  --   SB :: Singleton T B
-  --   SC :: Singleton T C
+  -- data Singleton i where
+  --   SA :: Singleton A
+  --   SB :: Singleton B
+  --   SC :: Singleton C
   -- @
   data Singleton :: t -> Type
 
