@@ -34,11 +34,11 @@ module IndexedTypes.Index
     -- 'IndexedTypes.Consistency.roundTripValueType' are automated
     -- checks of that property.
 
-    -- * Type level to value level
+    -- ** Type level to value level
     toValue,
     constructor,
 
-    -- * Value level to type level
+    -- ** Value level to type level
     toType,
     AsKind (AsType),
     asType,
@@ -162,10 +162,6 @@ class (Eq t) => Index t where
   -- @
   type All t :: [t]
 
-  forallMatchable :: Dict (Forall t Matchable)
-  default forallMatchable :: (For t Matchable (All t)) => Dict (Forall t Matchable)
-  forallMatchable = Dict
-
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
   --
@@ -211,6 +207,13 @@ class (Eq t) => Index t where
   -- toType C = AsType (Proxy :: Proxy C) = asType \@C
   -- @
   toType :: t -> AsKind t
+
+  -- | You will almost certainly never have to use or even be aware of
+  -- the existence of this method.  It says that every element of
+  -- @'All' t@ has a 'Matchable' instance.
+  forallMatchable :: Dict (Forall t Matchable)
+  default forallMatchable :: (For t Matchable (All t)) => Dict (Forall t Matchable)
+  forallMatchable = Dict
 
 -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
 -- kind @t@ separately.  'matchableInAll' allows us to know them all at
