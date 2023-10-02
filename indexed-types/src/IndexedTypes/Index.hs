@@ -131,7 +131,7 @@ class (Eq t) => Index t where
   -- @
   -- Forall T Eq f = (Eq (f A), Eq (f B), Eq (f C))
   -- @
-  type Forall t (c :: Type -> Constraint) (f :: t -> Type) :: Constraint
+  type Forall t k (c :: k -> Constraint) (f :: t -> k) :: Constraint
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -168,7 +168,7 @@ class (Eq t) => Index t where
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
   knowAll' ::
-    (Forall t c f) =>
+    (Forall t k c f) =>
     Proxy i ->
     Proxy c ->
     -- | _
@@ -189,8 +189,8 @@ class (Eq t) => Index t where
 -- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
 knowAll ::
-  forall (t :: Type) (i :: t) c f.
-  (Forall t c f) =>
+  forall (t :: Type) (i :: t) k c f.
+  (Forall t k c f) =>
   -- | _
   ((Known i) => Dict (c (f i)))
 knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
