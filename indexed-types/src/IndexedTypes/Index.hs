@@ -36,6 +36,7 @@ module IndexedTypes.Index
     -- * Value level to type level
     toType,
     AsKind (AsType),
+    Forall',
 
     -- * Type equality
     eqT,
@@ -168,7 +169,7 @@ class (Eq t) => Index t where
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
   knowAll' ::
-    (Forall t k c f) =>
+    (Forall' t c f) =>
     Proxy i ->
     Proxy c ->
     -- | _
@@ -185,12 +186,14 @@ class (Eq t) => Index t where
   -- @
   toType :: t -> AsKind t
 
+type Forall' t (c :: k -> Constraint) f = Forall t k c f
+
 -- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
 -- separately (@Forall t c f@) then we know @c (f i)@ for all @i@ at
 -- once (@Known i => Dict (c (f i))@).
 knowAll ::
-  forall (t :: Type) (i :: t) k c f.
-  (Forall t k c f) =>
+  forall (t :: Type) (i :: t) c f.
+  (Forall' t c f) =>
   -- | _
   ((Known i) => Dict (c (f i)))
 knowAll = knowAll' @t (Proxy @i) (Proxy @c) (Proxy @f)
