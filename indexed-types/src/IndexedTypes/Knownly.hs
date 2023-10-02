@@ -2,35 +2,35 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableSuperClasses #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 
 module IndexedTypes.Knownly (Knownly (Knownly)) where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
-import IndexedTypes.Index (Forall, Known, knowAll, Contains (Contains))
+import IndexedTypes.Index (Contains (Contains), Forall, Known, knowAll)
 import Text.Read (Read (readPrec))
 
 -- | Knownly is a @newtype@ that exists to allow deriving of instances
 -- for indexed types.  See "IndexedTypes.Example" for an example.
 newtype Knownly a = Knownly a
 
-class c (f i) => Compose c f i where
+class (c (f i)) => Compose c f i
 
-instance Show (f i) => Compose Show f i where
+instance (Show (f i)) => Compose Show f i
 
-instance Read (f i) => Compose Read f i where
+instance (Read (f i)) => Compose Read f i
 
-instance Eq (f i) => Compose Eq f i where
+instance (Eq (f i)) => Compose Eq f i
 
-instance Ord (f i) => Compose Ord f i where
+instance (Ord (f i)) => Compose Ord f i
 
 instance (Known i, Forall t (Compose Show k)) => Show (Knownly (k i)) where
   show = coerceMethod @t @i @(Compose Show k) (show @(k i))

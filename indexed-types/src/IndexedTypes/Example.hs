@@ -42,9 +42,10 @@ import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
   ( AsKind (AsType),
+    Contains (Contains),
     Index (..),
     Known (know'),
-    know, Contains (Contains)
+    know,
   )
 import IndexedTypes.Knownly (Knownly (Knownly))
 import IndexedTypes.Some (Some (Some))
