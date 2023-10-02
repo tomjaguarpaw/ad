@@ -190,12 +190,12 @@ class (Eq t) => Index t where
   -- 'matchableInAll' instead, except when defining this class.
   --
   -- The implementation of @matchableInAll'@ is implicitly a check that
-  -- @'Forall t@ is correct.
+  -- @'All' t@ is correct.
   --
-  -- (@matchableInAll'@ only has @Proxy@ arguments because it seems to be
-  -- hard to bind the type arguments @t@, @c@ and @f@ without them.
-  -- Future versions of GHC will allow to bind type variables in
-  -- function definitions, making the @Proxy@s redundant.)
+  -- (@matchableInAll'@ only has a @Proxy@ argument because it seems
+  -- to be hard to bind the type @i@ without it.  Future versions of
+  -- GHC will allow to bind type variables in function definitions,
+  -- making the @Proxy@ redundant.)
   matchableInAll' :: (Matchable (i :: t)) => Proxy i -> Dict (InAll i)
 
   -- | Take a value level index (i.e. a value of type @t@) and return
@@ -270,8 +270,8 @@ instance
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
 -- @
-matchableInAll :: forall (t :: Type) (i :: t). (Matchable i) => Dict (InAll i)
-matchableInAll = matchableInAll' @t Proxy
+matchableInAll :: forall i. (Matchable i) => Dict (InAll i)
+matchableInAll = matchableInAll' @(TypeOf i) Proxy
 
 allMatchable :: forall (t :: Type) (i :: t). (InAll i) => Dict (Matchable i)
 allMatchable = case forallMatchable @t of Dict -> Dict
