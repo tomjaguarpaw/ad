@@ -208,9 +208,35 @@ data Contains t i where
     Dict (Index t) ->
     Contains t i
 
--- | @knowAll@ says that if we know @c (f i)@ for each @i :: t@
--- separately (@Forall t c@) then we know @c (f i)@ for all @i@ at
--- once (@Known i => Dict (c (f i))@).
+-- | @knowAll@ says that we can convert code depending on a class
+-- instance for @T@ into code that depends on 'Known'.  @T@.  That is,
+-- code like
+--
+-- @
+-- class K (i :: T) where
+--   f :: ftype
+--
+-- instance K A where
+--   f = fbodyA
+--
+-- instance K B where
+--   f = fbodyB
+--
+-- instance K C where
+--   f = fbodyC
+-- @
+--
+-- can be converted to a function with a 'Known' constraint.
+--
+-- @
+-- f :: Known i => ftype
+-- f = case knowAll @i of
+--       Contains c Dict ->
+--         case known @i of
+--           SA -> case c @A of Dict -> f @A
+--           SB -> case c @B of Dict -> f @B
+--           SC -> case c @C of Dict -> f @C
+-- @
 knowAll :: forall (t :: Type) (i :: t). (Known i) => Contains t i
 knowAll = knowAll' @t Proxy
 
