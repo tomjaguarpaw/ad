@@ -36,13 +36,15 @@ module IndexedTypes.Index
     -- * Value level to type level
     toType,
     AsKind (AsType),
-    Forall,
 
     -- * Type equality
     eqT,
 
     -- * @Index@ class
     Index (..),
+
+    -- * @Forall@
+    Forall,
 
     -- * @Known@ class
     Known (know'),
