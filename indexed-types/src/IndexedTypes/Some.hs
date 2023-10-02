@@ -16,7 +16,7 @@ import GHC.Read (expectP, paren)
 import IndexedTypes.Index
   ( AsKind (AsType),
     Index (toType),
-    Known,
+    Matchable,
     eqT,
     toValue,
   )
@@ -31,11 +31,11 @@ import Type.Reflection ((:~:) (Refl))
 -- | Sometimes known as a "sigma" type, a dependent sum or a dependent
 -- pair.
 data Some k where
-  Some :: (Known t) => k t -> Some k
+  Some :: (Matchable t) => k t -> Some k
 
 instance
   forall (t :: Type) (k :: t -> Type).
-  (Show t, forall (i :: t). (Known i) => Show (k i), Index t) =>
+  (Show t, forall (i :: t). (Matchable i) => Show (k i), Index t) =>
   Show (Some k)
   where
   -- In later GHCs this is
@@ -45,7 +45,7 @@ instance
 
 instance
   forall (t :: Type) (k :: t -> Type).
-  (forall i. (Known i) => Eq (k i), Index t) =>
+  (forall i. (Matchable i) => Eq (k i), Index t) =>
   Eq (Some k)
   where
   -- In later GHCs this is
@@ -57,7 +57,7 @@ instance
 
 instance
   forall (t :: Type) (k :: t -> Type).
-  (Read t, forall i. (Known i) => Read (k i), Index t) =>
+  (Read t, forall i. (Matchable i) => Read (k i), Index t) =>
   Read (Some k)
   where
   -- Copied from read_tup2

@@ -19,7 +19,7 @@ import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
   ( AsKind (AsType),
     Index,
-    Known,
+    Matchable,
     eqT,
     toType,
     toValue,
@@ -27,7 +27,7 @@ import IndexedTypes.Index
 
 -- | Check that converting a type to a value and back again gives you
 -- the same type that you started with.
-roundTripTypeValue :: forall t (i :: t). (Known i) => Bool
+roundTripTypeValue :: forall t (i :: t). (Matchable i) => Bool
 roundTripTypeValue =
   case toType (toValue @i) of
     AsType (Proxy :: Proxy i') -> case eqT @i @i' of
@@ -40,5 +40,5 @@ roundTripValueType :: forall t. (Index t) => t -> Bool
 roundTripValueType i =
   case toType i of AsType (Proxy :: Proxy i') -> i == toValue @i'
 
-eqEquality :: forall t (i :: t) (i' :: t). (Known i, Known i') => Bool
+eqEquality :: forall t (i :: t) (i' :: t). (Matchable i, Matchable i') => Bool
 eqEquality = isJust (eqT @i @i') == (toValue @i == toValue @i')

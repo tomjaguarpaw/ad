@@ -36,7 +36,7 @@ module IndexedTypes.Index
 
     -- * Type level to value level
     toValue,
-    know,
+    constructor,
 
     -- * Value level to type level
     toType,
@@ -52,12 +52,12 @@ module IndexedTypes.Index
     -- * @Forall@
     Forall,
 
-    -- * @Known@ class
-    Known (know'),
+    -- * @Matchable@ class
+    Matchable (constructor'),
 
-    -- * @knownInAll@: converting separate constraints to a 'Known' constraint
-    knownInAll,
-    allKnown,
+    -- * @matchableInAll@: converting separate constraints to a 'Matchable' constraint
+    matchableInAll,
+    allMatchable,
 
     -- * Dict
     Dict (Dict),
@@ -100,10 +100,10 @@ import Type.Reflection ((:~:))
 -- toValue \@B = B
 -- toValue \@C = C
 -- @
-toValue :: forall i. (Known i) => TypeOf i
-toValue = singletonToValue (know @i)
+toValue :: forall i. (Matchable i) => TypeOf i
+toValue = singletonToValue (constructor @i)
 
--- | One of the 'Known' types, @i@, of kind @t@.  You can get @i@ by
+-- | One of the 'Matchable' types, @i@, of kind @t@.  You can get @i@ by
 -- pattern matching:
 --
 -- @
@@ -114,7 +114,7 @@ toValue = singletonToValue (know @i)
 -- (We need the @Proxy@ field only because older versions of GHC can't
 -- bind type variables in patterns.)
 data AsKind t where
-  AsType :: forall t (i :: t). (Known i) => Proxy i -> AsKind t
+  AsType :: forall t (i :: t). (Matchable i) => Proxy i -> AsKind t
 
 -- | Construct an 'AsKind'.  Simpler alternative to 'AsType'.
 --
@@ -122,7 +122,7 @@ data AsKind t where
 -- case (asType @A) of
 --   AsType (_ :: Proxy i) -> ... i ~ A here ...
 -- @
-asType :: forall i. (Known i) => AsKind (TypeOf i)
+asType :: forall i. (Matchable i) => AsKind (TypeOf i)
 asType = AsType @_ @i Proxy
 
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
@@ -140,7 +140,7 @@ asType = AsType @_ @i Proxy
 -- checks that propery.
 eqT ::
   forall i i'.
-  (Known i, Known i', TypeOf i ~ TypeOf i') =>
+  (Matchable i, Matchable i', TypeOf i ~ TypeOf i') =>
   -- | _
   Maybe (i :~: i')
 eqT = eqT' Proxy Proxy
@@ -148,12 +148,12 @@ eqT = eqT' Proxy Proxy
 type Index :: Type -> Constraint
 class (Eq t) => Index t where
   -- | @
-  -- data Singleton i where
-  --   SA :: Singleton A
-  --   SB :: Singleton B
-  --   SC :: Singleton C
+  -- data Constructor i where
+  --   SA :: Constructor A
+  --   SB :: Constructor B
+  --   SC :: Constructor C
   -- @
-  data Singleton :: t -> Type
+  data Constructor :: t -> Type
 
   -- | All the elements of @t@, at the type level.
   --
@@ -162,9 +162,9 @@ class (Eq t) => Index t where
   -- @
   type All t :: [t]
 
-  forallKnown :: Dict (Forall t Known)
-  default forallKnown :: (For t Known (All t)) => Dict (Forall t Known)
-  forallKnown = Dict
+  forallMatchable :: Dict (Forall t Matchable)
+  default forallMatchable :: (For t Matchable (All t)) => Dict (Forall t Matchable)
+  forallMatchable = Dict
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -175,7 +175,7 @@ class (Eq t) => Index t where
   -- definitions, making the @Proxy@s redundant.)
   eqT' ::
     forall (i :: t) (i' :: t).
-    (Known i, Known i') =>
+    (Matchable i, Matchable i') =>
     -- | _
     Proxy i ->
     Proxy i' ->
@@ -187,20 +187,20 @@ class (Eq t) => Index t where
   -- singletonToValue = \\case SA -> A; SB -> B; SC -> C
   -- @
   --
-  -- See 'Singleton' for the definition of @SA@, @SB@, @SC@.
-  singletonToValue :: Singleton (i :: t) -> t
+  -- See 'Constructor' for the definition of @SA@, @SB@, @SC@.
+  singletonToValue :: Constructor (i :: t) -> t
 
-  -- | The class method version of 'knownInAll'.  Always prefer to use
-  -- 'knownInAll' instead, except when defining this class.
+  -- | The class method version of 'matchableInAll'.  Always prefer to use
+  -- 'matchableInAll' instead, except when defining this class.
   --
-  -- The implementation of @knownInAll'@ is implicitly a check that
+  -- The implementation of @matchableInAll'@ is implicitly a check that
   -- @'Forall t@ is correct.
   --
-  -- (@knownInAll'@ only has @Proxy@ arguments because it seems to be
+  -- (@matchableInAll'@ only has @Proxy@ arguments because it seems to be
   -- hard to bind the type arguments @t@, @c@ and @f@ without them.
   -- Future versions of GHC will allow to bind type variables in
   -- function definitions, making the @Proxy@s redundant.)
-  knownInAll' :: (Known (i :: t)) => Proxy i -> Dict (InAll i)
+  matchableInAll' :: (Matchable (i :: t)) => Proxy i -> Dict (InAll i)
 
   -- | Take a value level index (i.e. a value of type @t@) and return
   -- it at the type level (i.e. as a type of kind @t@)
@@ -213,7 +213,7 @@ class (Eq t) => Index t where
   toType :: t -> AsKind t
 
 -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
--- kind @t@ separately.  'knownInAll' allows us to know them all at
+-- kind @t@ separately.  'matchableInAll' allows us to know them all at
 -- once.
 --
 -- @
@@ -235,8 +235,8 @@ instance
   (forall (c :: t -> Constraint). (Forall t c) => c i, Index t) =>
   InAll (i :: t)
 
--- | @knownInAll@ says that we can convert code depending on a class
--- instance for @T@ into code that depends on 'Known'.  @T@.  That is,
+-- | @matchableInAll@ says that we can convert code depending on a class
+-- instance for @T@ into code that depends on 'Matchable'.  @T@.  That is,
 -- code like
 --
 -- @
@@ -253,26 +253,26 @@ instance
 --   f = fbodyC
 -- @
 --
--- can be converted to a function with a 'Known' constraint.
+-- can be converted to a function with a 'Matchable' constraint.
 --
 -- @
--- f :: Known i => ftype
--- f = case knownInAll \@i of
+-- f :: Matchable i => ftype
+-- f = case matchableInAll \@i of
 --       Dict ->
---         case known \@i of
+--         case constructor \@i of
 --           SA -> case c @A of Dict -> f @A
 --           SB -> case c @B of Dict -> f @B
 --           SC -> case c @C of Dict -> f @C
 -- @
-knownInAll :: forall (t :: Type) (i :: t). (Known i) => Dict (InAll i)
-knownInAll = knownInAll' @t Proxy
+matchableInAll :: forall (t :: Type) (i :: t). (Matchable i) => Dict (InAll i)
+matchableInAll = matchableInAll' @t Proxy
 
-allKnown :: forall (t :: Type) (i :: t). (InAll i) => Dict (Known i)
-allKnown = case forallKnown @t of Dict -> Dict
+allMatchable :: forall (t :: Type) (i :: t). (InAll i) => Dict (Matchable i)
+allMatchable = case forallMatchable @t of Dict -> Dict
 
-type Known :: forall t. t -> Constraint
-class (Index t) => Known (i :: t) where
-  know' :: Singleton i
+type Matchable :: forall t. t -> Constraint
+class (Index t) => Matchable (i :: t) where
+  constructor' :: Constructor i
 
 type TypeOf :: k -> Type
 type TypeOf (i :: t) = t
@@ -283,13 +283,13 @@ type TypeOf (i :: t) = t
 -- branch.
 --
 -- @
--- know \@A = SA
--- know \@B = SB
--- know \@B = SC
+-- constructor \@A = SA
+-- constructor \@B = SB
+-- constructor \@B = SC
 -- @
 --
 -- @
--- case know @i of
+-- case constructor @i of
 --   SA -> ... here we can use that i ~ A ...
 --   SB -> ...                      i ~ B ...
 --   SC -> ...                      i ~ C ...
@@ -302,9 +302,9 @@ type TypeOf (i :: t) = t
 --   C -> ...      i ~ C                            ...
 -- @
 --
--- See 'Singleton' for the definition of @SA@, @SB@, @SC@.
-know :: forall i. (Known i) => Singleton i
-know = know'
+-- See 'Constructor' for the definition of @SA@, @SB@, @SC@.
+constructor :: forall i. (Matchable i) => Constructor i
+constructor = constructor'
 
 data Dict c where
   Dict :: (c) => Dict c

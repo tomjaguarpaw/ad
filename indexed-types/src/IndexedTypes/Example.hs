@@ -43,11 +43,11 @@ import Data.Proxy (Proxy (Proxy))
 import IndexedTypes.Index
   ( Dict (Dict),
     Index (..),
-    Known (know'),
+    Matchable (constructor'),
     asType,
-    know,
+    constructor,
   )
-import IndexedTypes.Knownly (Knownly (Knownly))
+import IndexedTypes.Knownly (Matchably (Matchably))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
 import Type.Reflection ((:~:) (Refl))
@@ -55,7 +55,7 @@ import Type.Reflection ((:~:) (Refl))
 -- Index definiton
 
 -- | To make @T@ an index type we have to define an 'Index' instance
--- for it, and 'Known' instances for all of its values ('A', 'B' and
+-- for it, and 'Matchable' instances for all of its values ('A', 'B' and
 -- 'C').
 data T = A | B | C deriving (Eq, Show, Read)
 
@@ -95,7 +95,7 @@ newtype Foo i = Foo (FooF i)
 -- The technical reason that we need to do this is that we want
 -- the instance
 --
--- * @Known i => Show (Foo i)@
+-- * @Matchable i => Show (Foo i)@
 --
 -- However, GHC's @deriving@ only allows us to directly derive
 --
@@ -104,10 +104,10 @@ newtype Foo i = Foo (FooF i)
 -- * @Show (FooF C) => Show (Foo C)@
 --
 -- so instead we derive those instances for the @newtype@ @FooWrapper@
--- instead, and then use @deriving via@ with 'Knownly', to derive the
--- instances for @Foo@.  'Knownly'\'s purpose is to convert the
+-- instead, and then use @deriving via@ with 'Matchablely', to derive the
+-- instances for @Foo@.  'Matchablely'\'s purpose is to convert the
 -- constraint @(Show (FooF A), Show (FooF B), Show (FooF C))@ into
--- @Known i@.
+-- @Matchable i@.
 --
 -- If GHC's deriving mechanism were more flexible perhaps we wouldn't
 -- have to go all round the houses like this.
@@ -125,19 +125,19 @@ deriving stock instance (Eq (FooF i)) => Eq (FooWrapper i)
 -- | derived as a @stock@ instance
 deriving stock instance (Ord (FooF i)) => Ord (FooWrapper i)
 
--- | derived via @Knownly (FooWrapper i)@
-deriving via Knownly (FooWrapper i) instance (Known i) => Show (Foo i)
+-- | derived via @Matchablely (FooWrapper i)@
+deriving via Matchably (FooWrapper i) instance (Matchable i) => Show (Foo i)
 
--- | derived via @Knownly (FooWrapper i)@
-deriving via Knownly (FooWrapper i) instance (Known i) => Read (Foo i)
+-- | derived via @Matchably (FooWrapper i)@
+deriving via Matchably (FooWrapper i) instance (Matchable i) => Read (Foo i)
 
--- | derived via @Knownly (FooWrapper i)@
-deriving via Knownly (FooWrapper i) instance (Known i) => Eq (Foo i)
+-- | derived via @Matchably (FooWrapper i)@
+deriving via Matchably (FooWrapper i) instance (Matchable i) => Eq (Foo i)
 
--- | derived via @Knownly (FooWrapper i)@
-deriving via Knownly (FooWrapper i) instance (Known i) => Ord (Foo i)
+-- | derived via @Matchably (FooWrapper i)@
+deriving via Matchably (FooWrapper i) instance (Matchable i) => Ord (Foo i)
 
-mkSomeFoo :: forall i. (Known i) => FooF i -> Some Foo
+mkSomeFoo :: forall i. (Matchable i) => FooF i -> Some Foo
 mkSomeFoo = Some @i . Foo
 
 testCases :: [Some Foo]
@@ -181,22 +181,22 @@ example = flip mapM_ testCases $ \someT -> do
 -- Lots of boilerplate.  This is all derivable, in principle.
 
 instance Index T where
-  data Singleton i where
-    SA :: Singleton A
-    SB :: Singleton B
-    SC :: Singleton C
+  data Constructor i where
+    SA :: Constructor A
+    SB :: Constructor B
+    SC :: Constructor C
 
   type All T = [A, B, C]
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
-    | SA <- know @i,
-      SA <- know @i' =
+    | SA <- constructor @i,
+      SA <- constructor @i' =
         Just Refl
-    | SB <- know @i,
-      SB <- know @i' =
+    | SB <- constructor @i,
+      SB <- constructor @i' =
         Just Refl
-    | SC <- know @i,
-      SC <- know @i' =
+    | SC <- constructor @i,
+      SC <- constructor @i' =
         Just Refl
     | otherwise =
         Nothing
@@ -206,9 +206,9 @@ instance Index T where
     SB -> B
     SC -> C
 
-  knownInAll' =
+  matchableInAll' =
     \(Proxy :: Proxy i) ->
-      case know @i of
+      case constructor @i of
         SA -> Dict
         SB -> Dict
         SC -> Dict
@@ -218,11 +218,11 @@ instance Index T where
     B -> asType @B
     C -> asType @C
 
-instance Known A where
-  know' = SA
+instance Matchable A where
+  constructor' = SA
 
-instance Known B where
-  know' = SB
+instance Matchable B where
+  constructor' = SB
 
-instance Known C where
-  know' = SC
+instance Matchable C where
+  constructor' = SC

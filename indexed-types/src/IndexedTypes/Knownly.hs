@@ -11,16 +11,16 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE UndecidableSuperClasses #-}
 
-module IndexedTypes.Knownly (Knownly (Knownly)) where
+module IndexedTypes.Knownly (Matchably (Matchably)) where
 
 import Data.Coerce (Coercible, coerce)
 import Data.Kind (Type)
-import IndexedTypes.Index (Dict (Dict), Forall, Known, knownInAll)
+import IndexedTypes.Index (Dict (Dict), Forall, Matchable, matchableInAll)
 import Text.Read (Read (readPrec))
 
--- | Knownly is a @newtype@ that exists to allow deriving of instances
+-- | Matchably is a @newtype@ that exists to allow deriving of instances
 -- for indexed types.  See "IndexedTypes.Example" for an example.
-newtype Knownly a = Knownly a
+newtype Matchably a = Matchably a
 
 class (c (f i)) => Compose c f i
 
@@ -32,37 +32,37 @@ instance (Eq (f i)) => Compose Eq f i
 
 instance (Ord (f i)) => Compose Ord f i
 
-instance (Known i, Forall t (Compose Show k)) => Show (Knownly (k i)) where
+instance (Matchable i, Forall t (Compose Show k)) => Show (Matchably (k i)) where
   show = coerceMethod @t @i @(Compose Show k) (show @(k i))
 
-instance (Known i, Forall t (Compose Read k)) => Read (Knownly (k i)) where
+instance (Matchable i, Forall t (Compose Read k)) => Read (Matchably (k i)) where
   readPrec = coerceMethod @t @i @(Compose Read k) (readPrec @(k i))
 
-instance (Known i, Forall t (Compose Eq k)) => Eq (Knownly (k i)) where
+instance (Matchable i, Forall t (Compose Eq k)) => Eq (Matchably (k i)) where
   (==) = coerceMethod @t @i @(Compose Eq k) ((==) @(k i))
 
 instance
-  (Known i, Eq (Knownly (k i)), Forall t (Compose Ord k)) =>
-  Ord (Knownly (k i))
+  (Matchable i, Eq (Matchably (k i)), Forall t (Compose Ord k)) =>
+  Ord (Matchably (k i))
   where
   compare = coerceMethod @t @i @(Compose Ord k) (compare @(k i))
 
-withKnown ::
+withMatchable ::
   forall (t :: Type) (i :: t) c r.
-  (Known i, Forall t c) =>
+  (Matchable i, Forall t c) =>
   -- | _
   ((c i) => r) ->
   -- | _
   r
-withKnown r = case knownInAll @t @i of Dict -> r
+withMatchable r = case matchableInAll @t @i of Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) c a2 a3.
   () =>
   (Forall t c) =>
-  (Known i) =>
+  (Matchable i) =>
   (Coercible a2 a3) =>
   ((c i) => a2) ->
   -- | _
   a3
-coerceMethod a2 = coerce @a2 @a3 (withKnown @t @i @c a2)
+coerceMethod a2 = coerce @a2 @a3 (withMatchable @t @i @c a2)
