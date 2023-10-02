@@ -116,6 +116,12 @@ toValue = singletonToValue (know @i)
 data AsKind t where
   AsType :: forall t (i :: t). (Known i) => Proxy i -> AsKind t
 
+-- | Construct an 'AsKind'.  Simpler alternative to 'AsType'.
+--
+-- @
+-- case (asType @A) of
+--   AsType (_ :: Proxy i) -> ... i ~ A here ...
+-- @
 asType :: forall i. (Known i) => AsKind (TypeOf i)
 asType = AsType @_ @i Proxy
 
@@ -200,9 +206,9 @@ class (Eq t) => Index t where
   -- it at the type level (i.e. as a type of kind @t@)
   --
   -- @
-  -- toType A = AsType (Proxy :: Proxy A)
-  -- toType B = AsType (Proxy :: Proxy B)
-  -- toType C = AsType (Proxy :: Proxy C)
+  -- toType A = 'AsType' (Proxy :: Proxy A) = 'asType' \@A
+  -- toType B = AsType (Proxy :: Proxy B) = asType \@B
+  -- toType C = AsType (Proxy :: Proxy C) = asType \@C
   -- @
   toType :: t -> AsKind t
 
