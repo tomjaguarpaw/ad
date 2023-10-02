@@ -201,7 +201,7 @@ instance Index T where
     | otherwise =
         Nothing
 
-  singletonToValue = \case
+  constructorToValue = \case
     SA -> A
     SB -> B
     SC -> C

@@ -47,7 +47,7 @@ module IndexedTypes.Index
     eqT,
 
     -- * @Index@ class
-    Index (..),
+    Index (Constructor, All, eqT', constructorToValue, matchableInAll', toType),
 
     -- * @Forall@
     Forall,
@@ -101,7 +101,7 @@ import Type.Reflection ((:~:))
 -- toValue \@C = C
 -- @
 toValue :: forall i. (Matchable i) => TypeOf i
-toValue = singletonToValue (constructor @i)
+toValue = constructorToValue (constructor @i)
 
 -- | One of the 'Matchable' types, @i@, of kind @t@.  You can get @i@ by
 -- pattern matching:
@@ -180,11 +180,11 @@ class (Eq t) => Index t where
   -- | This is rarely used directly, but from it we derive 'toValue'.
   --
   -- @
-  -- singletonToValue = \\case SA -> A; SB -> B; SC -> C
+  -- constructorToValue = \\case SA -> A; SB -> B; SC -> C
   -- @
   --
   -- See 'Constructor' for the definition of @SA@, @SB@, @SC@.
-  singletonToValue :: Constructor (i :: t) -> t
+  constructorToValue :: Constructor (i :: t) -> t
 
   -- | The class method version of 'matchableInAll'.  Always prefer to use
   -- 'matchableInAll' instead, except when defining this class.
@@ -210,7 +210,10 @@ class (Eq t) => Index t where
 
   -- | You will almost certainly never have to use or even be aware of
   -- the existence of this method.  It says that every element of
-  -- @'All' t@ has a 'Matchable' instance.
+  -- @'All' t@ has a 'Matchable' instance.  It should only ever need
+  -- to be defined through its default implementation.  I'm not sure
+  -- why it's needed, actually, except that 'allMatchable' seems to
+  -- rely on it.
   forallMatchable :: Dict (Forall t Matchable)
   default forallMatchable :: (For t Matchable (All t)) => Dict (Forall t Matchable)
   forallMatchable = Dict
