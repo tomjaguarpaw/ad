@@ -171,7 +171,6 @@ class (Eq t) => Index t where
   knowAll' ::
     (Forall t c) =>
     Proxy i ->
-    Proxy c ->
     -- | _
     ((Known i) => Dict (c i))
 
@@ -208,7 +207,7 @@ knowAll ::
   (Forall t c) =>
   -- | _
   ((Known i) => Dict (c i))
-knowAll = knowAll' @t (Proxy @i) (Proxy @c)
+knowAll = knowAll' @t (Proxy @i)
 
 type Known :: forall t. t -> Constraint
 class (Index t) => Known (i :: t) where

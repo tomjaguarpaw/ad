@@ -207,7 +207,7 @@ instance Index T where
     SC -> C
 
   knowAll' =
-    \(Proxy :: Proxy i) _ ->
+    \(Proxy :: Proxy i) ->
       case know @i of
         SA -> Dict
         SB -> Dict
