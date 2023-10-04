@@ -293,13 +293,13 @@ showField ::
 showField t = provideConstraint @Show @_ @f t show . getNewtyped
 
 genericShowSum' ::
-  forall t x (f :: FunctionSymbol t).
+  forall t (f :: FunctionSymbol t).
   (Tag t, ForeachField f Show) =>
-  Pi t (Const String) ->
-  (x -> Sigma t (Newtyped f)) ->
-  x ->
+  Pi t (Const String) -> -- Has a payload, just a String, for each tag t;
+  -- the constructor name
+  Sigma t (Newtyped f) -> -- The argment in Sum form
   String
-genericShowSum' pi f x = mashPiSigma pi (f x) $ \(Const conName) field ->
+genericShowSum' pi f = mashPiSigma pi f $ \(Const conName) field ->
   conName ++ " " ++ showField know field
 
 genericShowSum ::
@@ -307,8 +307,7 @@ genericShowSum ::
   (Tag t, IsSum sum f, ForeachField f Show) =>
   sum ->
   String
-genericShowSum =
-  genericShowSum' @_ @sum (sumConNames @_ @sum) sumToSigma
+genericShowSum x = genericShowSum' @_ (sumConNames @_ @sum) (sumToSigma x)
 
 genericShowProduct' ::
   forall t x (f :: FunctionSymbol t).
