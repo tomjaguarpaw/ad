@@ -394,7 +394,7 @@ instance Tag SumTag where
     SDTag -> \r -> r
     SETag -> \r -> r
 
--- | A symbol used so that we can defunctionalize the mapping
+-- | A empty data type, used so that we can defunctionalize the mapping
 -- @SumFamily@
 data SumF (a :: Type) (b :: Type) (t :: Proxy SumTag)
 
