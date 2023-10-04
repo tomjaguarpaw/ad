@@ -410,7 +410,7 @@ type family SumFamily (a :: Type) (b :: Type) (t :: SumTag) :: Type where
   SumFamily a _ DTag = a
   SumFamily _ b ETag = b
 
-instance IsSum @SumTag (Sum a b) (SumF a b) where
+instance IsSum @SumTag (Sum a b) (SumF a b :: FunctionSymbol SumTag) where
   sumConNames =
     makePi' $
       Const . \case
