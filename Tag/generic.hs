@@ -203,12 +203,7 @@ type FunctionSymbol t = Proxy t -> Type
 -- @Type@, represented by the function symbol @f@.  We need this
 -- defunctionalized version because we can't partially apply type
 -- synonyms.
-class FieldTypes (f :: FunctionSymbol t) where
-  type FieldType' t f (i :: t) :: Type
-
--- Useful for passing @t@ implicitly, without bringing it into scope.
-type FieldType :: FunctionSymbol t -> t -> Type
-type FieldType (f :: FunctionSymbol t) i = FieldType' t f i
+type family FieldType (f :: FunctionSymbol t) (i :: t) :: Type
 
 -- | @ForEachField f c@ means that for each @i@ of kind @t@,
 -- @FieldType f i@ has an instance for @c@.
@@ -222,7 +217,7 @@ type family
   where
   ForeachField' _ _ _ '[] = ()
   ForeachField' t f c (i : is) =
-    (c (FieldType' t f i), ForeachField' t f c is)
+    (c (FieldType f i), ForeachField' t f c is)
 
 -- | Witness to the property of @ForEachField@
 provideConstraint ::
@@ -398,17 +393,18 @@ instance Tag SumTag where
 
 -- | A empty data type, used so that we can defunctionalize the mapping
 -- @SumFamily@
-data SumF (a :: Type) (b :: Type) (t :: Proxy SumTag)
+-- ToDo: use data kind?
+data SumF :: Type -> Type -> FunctionSymbol SumTag
 
-instance FieldTypes (SumF a b) where
-  type FieldType' _ (SumF a b) t = SumFamily a b t
+type instance FieldType (SumF a b) ATag = Int
 
-type family SumFamily (a :: Type) (b :: Type) (t :: SumTag) :: Type where
-  SumFamily _ _ ATag = Int
-  SumFamily _ _ BTag = Bool
-  SumFamily a _ CTag = a
-  SumFamily a _ DTag = a
-  SumFamily _ b ETag = b
+type instance FieldType (SumF a b) BTag = Bool
+
+type instance FieldType (SumF a b) CTag = a
+
+type instance FieldType (SumF a b) DTag = a
+
+type instance FieldType (SumF a b) ETag = b
 
 instance IsSum @SumTag (Sum a b) (SumF a b :: FunctionSymbol SumTag) where
   sumConNames =
@@ -478,8 +474,7 @@ instance Tag ProductTag where
 -- @ProductFamily@
 data ProductF (a :: Type) (t :: Proxy ProductTag)
 
-instance FieldTypes (ProductF a) where
-  type FieldType' _ (ProductF a) t = ProductFamily a t
+type instance FieldType (ProductF a) t = ProductFamily a t
 
 type family ProductFamily (a :: Type) (t :: ProductTag) :: Type where
   ProductFamily _ Field1 = Int
@@ -680,8 +675,7 @@ foo =
 data SumOfProductsF (a :: Type) (b :: Type) (s :: SumTag) (t :: Proxy (NestedProductTag s))
 
 -- Do I need to generalise this?
-instance FieldTypes (SumOfProductsF a b s) where
-  type FieldType' _ (SumOfProductsF a b s) t = SumOfProductsFamily a b s t
+type instance FieldType (SumOfProductsF a b s) t = SumOfProductsFamily a b s t
 
 type SumOfProductsFamily :: Type -> Type -> forall (s :: SumTag) -> NestedProductTag s -> Type
 type family SumOfProductsFamily (a :: Type) (b :: Type) (s :: SumTag) (t :: NestedProductTag s) :: Type where
