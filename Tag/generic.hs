@@ -34,7 +34,7 @@ The idea of this library is to take a sum type like
 
     data Sum arg1 ... argn = C1 t1 | ... | Cm tm
 
-and generate a Sigma type that is isomorphic to it
+and systematically generate (e.g. via TH) a Sigma type that is isomorphic to it
 
     data SumTag = C1 | ... | Cm
 
@@ -62,9 +62,38 @@ types than arbitrary Haskell data definitions.  Of course, to code up
 Sigma and Pi types in Haskell requires a fair bit of machinery, and
 that's the bulk of this library!
 
+Overall goal.  Write this generically
+   showSum :: (Show a, Show b) => Sum a b -> String
+
+Converting to generic rep
+  class IsSum @t (sum :: Type) (sumf :: FunctionSymbol t)
+        | sum -> sumf, sumf -> sum
+    where
+      sumConNames :: Pi t (Const String)
+      sumToSigma :: sum -> Sigma t (Newtyped sumf)
+      sigmaToSum :: Sigma t (Newtyped sumf) -> sum
+
+  data Sigma t f where
+    Sigma :: forall t i k. (Known t i)    -- Tag
+                        => k i            -- Payload, often essentially (FieldType t i)
+                                          --   wrapped in a newtype
+                        -> Sigma t k
+
+In the case of (Sum a b), t will be SumTag.
+(Known t i) is an implicitly-passed value i::t; a singleton type
+In our case,
+   t=SumTag.
+   i::t, say ATag or BTag
+
+eg.   sumToSigma (A 3 :: Sum t1 t2)
+         = Sigma @SumTag @ATag @_ (dict :: Known SumTag ATag)
+                                  (MkNewtyped @(SumF t1 t2) @ATag
+                                              (3 :: FieldType (SumF t1 t2) ATag))
 -}
 
+----------------------------------------------------------------------------
 -- Section: User code
+----------------------------------------------------------------------------
 
 -- Currently this library works for types with multiple constructors
 -- each with a single field ...
@@ -163,7 +192,10 @@ getPi pi = getPi' pi know
 type FunctionSymbol :: Type -> Type
 type FunctionSymbol t = Proxy t -> Type
 
--- This is a defunctionalized mapping from @t@ to @Type@, represented
+-- (FieldType f i) is the type of the argument to
+--    the data constructor (corresponding to) `i`
+--    in the data type (corresponding to) `f`.
+-- `f` is a defunctionalized mapping from @t@ to @Type@, represented
 -- by the function symbol @f@.  We need this defunctionalized version
 -- because we can't partially apply type synonyms.
 class FieldTypes (f :: FunctionSymbol t) where
