@@ -74,19 +74,19 @@ Converting to generic rep
       sigmaToSum :: Sigma t (Newtyped sumf) -> sum
 
   data Sigma t f where
-    Sigma :: forall t i k. (Known t i)    -- Tag
+    Sigma :: forall t i k. (Known @t i)   -- Tag
                         => k i            -- Payload, often essentially (FieldType t i)
                                           --   wrapped in a newtype
                         -> Sigma t k
 
 In the case of (Sum a b), t will be SumTag.
-(Known t i) is an implicitly-passed value i::t; a singleton type
+(Known @t i) is an implicitly-passed value i::t; a singleton type
 In our case,
    t=SumTag.
    i::t, say ATag or BTag
 
 eg.   sumToSigma (A 3 :: Sum t1 t2)
-         = Sigma @SumTag @ATag @_ (dict :: Known SumTag ATag)
+         = Sigma @SumTag @ATag @_ (dict :: Known @SumTag ATag)
                                   (MkNewtyped @(SumF t1 t2) @ATag
                                               (3 :: FieldType (SumF t1 t2) ATag))
 -}
@@ -140,7 +140,7 @@ main = do
 ----------------------------------------------------------------------------
 
 data Sigma t f where
-  MkSigma :: forall t i f. (Known i) => f i -> Sigma t f
+  MkSigma :: forall t i f. (Known @t i) => f i -> Sigma t f
 
 data Dict c where Dict :: (c) => Dict c
 
@@ -148,7 +148,7 @@ type Known :: forall t. t -> Constraint
 class Known (i :: t) where
   know :: Singleton t i
 
-knowProxy :: forall t i f. (Known i) => f i -> Singleton t i
+knowProxy :: forall t i f. (Known @t i) => f i -> Singleton t i
 knowProxy _ = know @_ @i
 
 -- | @Singleton t@ is the "singleton type" version of @t@
@@ -161,9 +161,9 @@ class Tag t where
   data Pi t :: (t -> Type) -> Type
 
   getPi' :: forall (i :: t) (f :: t -> Type). Pi t f -> Singleton t i -> f i
-  makePi :: (forall (i :: t). (Known i) => f i) -> Pi t f
+  makePi :: (forall (i :: t). (Known @t i) => f i) -> Pi t f
 
-  knowns :: Singleton t i -> Dict (Known i)
+  knowns :: Singleton t i -> Dict (Known @t i)
 
   traversePi ::
     forall (f :: t -> Type) (g :: t -> Type) m.
@@ -184,11 +184,11 @@ makePi' :: (Tag t) => (forall (i :: t). Singleton t i -> f i) -> Pi t f
 makePi' f = makePi (f know)
 
 makePiProxy ::
-  (Tag t) => (forall (i :: t). (Known i) => Proxy i -> f i) -> Pi t f
+  (Tag t) => (forall (i :: t). (Known @t i) => Proxy i -> f i) -> Pi t f
 makePiProxy f = makePi (f Proxy)
 
 getPi ::
-  forall t (i :: t) (f :: t -> Type). (Known i, Tag t) => Pi t f -> f i
+  forall t (i :: t) (f :: t -> Type). (Known @t i, Tag t) => Pi t f -> f i
 getPi pi = getPi' pi know
 
 -- Useful for obtaining @t@ without making it visible in signatures.
@@ -242,7 +242,7 @@ mashPiSigma ::
   (Tag t) =>
   Pi t f1 ->
   Sigma t f2 ->
-  (forall i. (Known i) => f1 i -> f2 i -> r) ->
+  (forall i. (Known @t i) => f1 i -> f2 i -> r) ->
   r
 mashPiSigma pi (MkSigma f) k = k (getPi' pi know) f
 
@@ -349,15 +349,15 @@ we generate
 -- | One value for each constructor of the sum type
 data SumTag = ATag | BTag | CTag | DTag | ETag
 
-instance Known ATag where know = SATag
+instance Known @SumTag ATag where know = SATag
 
-instance Known BTag where know = SBTag
+instance Known @SumTag BTag where know = SBTag
 
-instance Known CTag where know = SCTag
+instance Known @SumTag CTag where know = SCTag
 
-instance Known DTag where know = SDTag
+instance Known @SumTag DTag where know = SDTag
 
-instance Known ETag where know = SETag
+instance Known @SumTag ETag where know = SETag
 
 instance Tag SumTag where
   data Singleton SumTag t where
