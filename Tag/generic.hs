@@ -233,7 +233,7 @@ provideConstraint = provideConstraint' (Proxy @c) (Proxy @f)
 -- defunctionalize them to a symbol @f@ and then wrap them up in a
 -- newtype for use when we do need to partially apply them.
 type Newtyped :: forall t. FunctionSymbol t -> t -> Type
-newtype Newtyped f i = Newtyped {getNewtyped :: FieldType f i}
+newtype Newtyped f i = MkNewtyped {getNewtyped :: FieldType f i}
 
 mashPiSigma ::
   (Tag t) =>
@@ -402,11 +402,11 @@ instance IsSum (Sum a b) (SumF a b) where
         SETag -> "E"
 
   sumToSigma = \case
-    A p -> MkSigma @_ @ATag (Newtyped p)
-    B p -> MkSigma @_ @BTag (Newtyped p)
-    C p -> MkSigma @_ @CTag (Newtyped p)
-    D p -> MkSigma @_ @DTag (Newtyped p)
-    E p -> MkSigma @_ @ETag (Newtyped p)
+    A p -> MkSigma @_ @ATag (MkNewtyped p)
+    B p -> MkSigma @_ @BTag (MkNewtyped p)
+    C p -> MkSigma @_ @CTag (MkNewtyped p)
+    D p -> MkSigma @_ @DTag (MkNewtyped p)
+    E p -> MkSigma @_ @ETag (MkNewtyped p)
 
   sigmaToSum = \case
     MkSigma (f@(getNewtyped -> p)) -> case knowProxy f of
@@ -471,7 +471,7 @@ instance IsProduct (Product a) (ProductF a) where
   productConName = "Product"
   productToPi (Product f1 f2 f3) =
     makePi'
-      ( Newtyped . \case
+      ( MkNewtyped . \case
           SField1 -> f1
           SField2 -> f2
           SField3 -> f3
