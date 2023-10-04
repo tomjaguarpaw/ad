@@ -137,7 +137,7 @@ main = do
 
 -- Section: Generics library
 data Sigma t f where
-  Sigma :: forall t i f. (Known i) => f i -> Sigma t f
+  MkSigma :: forall t i f. (Known i) => f i -> Sigma t f
 
 data Dict c where Dict :: (c) => Dict c
 
@@ -241,7 +241,7 @@ mashPiSigma ::
   Sigma t f2 ->
   (forall i. (Known i) => f1 i -> f2 i -> r) ->
   r
-mashPiSigma pi (Sigma f) k = k (getPi' pi know) f
+mashPiSigma pi (MkSigma f) k = k (getPi' pi know) f
 
 traversePi_ ::
   (Applicative m, Tag t) =>
@@ -402,14 +402,14 @@ instance IsSum (Sum a b) (SumF a b) where
         SETag -> "E"
 
   sumToSigma = \case
-    A p -> Sigma @_ @ATag (Newtyped p)
-    B p -> Sigma @_ @BTag (Newtyped p)
-    C p -> Sigma @_ @CTag (Newtyped p)
-    D p -> Sigma @_ @DTag (Newtyped p)
-    E p -> Sigma @_ @ETag (Newtyped p)
+    A p -> MkSigma @_ @ATag (Newtyped p)
+    B p -> MkSigma @_ @BTag (Newtyped p)
+    C p -> MkSigma @_ @CTag (Newtyped p)
+    D p -> MkSigma @_ @DTag (Newtyped p)
+    E p -> MkSigma @_ @ETag (Newtyped p)
 
   sigmaToSum = \case
-    Sigma (f@(getNewtyped -> p)) -> case knowProxy f of
+    MkSigma (f@(getNewtyped -> p)) -> case knowProxy f of
       SATag -> A p
       SBTag -> B p
       SCTag -> C p
@@ -643,7 +643,7 @@ newtype BetterConst t x = BetterConst t
 
 foo :: Sigma SumTag (WrapPi NestedProductTag (BetterConst String))
 foo =
-  Sigma @_ @ATag
+  MkSigma @_ @ATag
     ( WrapPi
         ( makePi'
             ( \(st :: Singleton (NestedProductTag ATag) i) ->
@@ -784,4 +784,4 @@ sumOfProductsToSigmaOfPi = \case
         SumOfProductsFamily a b s i'
       ) ->
       Sigma SumTag (WrapPi NestedProductTag (Newtyped2 a b))
-    k g = Sigma @_ @s (WrapPi (makePi (f g)))
+    k g = MkSigma @_ @s (WrapPi (makePi (f g)))
