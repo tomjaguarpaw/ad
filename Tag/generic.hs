@@ -438,11 +438,11 @@ instance IsSum @SumTag (Sum a b) (SumF a b) where
 -- One value for each constructor of the product type
 data ProductTag = Field1 | Field2 | Field3
 
-instance Known Field1 where know = SField1
+instance Known @ProductTag Field1 where know = SField1
 
-instance Known Field2 where know = SField2
+instance Known @ProductTag Field2 where know = SField2
 
-instance Known Field3 where know = SField3
+instance Known @ProductTag Field3 where know = SField3
 
 instance Tag ProductTag where
   data Singleton ProductTag t where
@@ -497,7 +497,7 @@ instance IsProduct (Product a) (ProductF a) where
   piToProduct pi =
     Product (getField @Field1) (getField @Field2) (getField @Field3)
     where
-      getField :: forall i. (Known i) => ProductFamily a i
+      getField :: forall i. (Known @ProductTag i) => ProductFamily a i
       getField = getNewtyped (getPi @_ @i pi)
 
 -- Attempt at a nested version
@@ -557,19 +557,19 @@ type family SNestedProductTagF a where
   SNestedProductTagF DTag = SNestedProductDTag
   SNestedProductTagF ETag = SNestedProductETag
 
-instance Known ('NestedProductTag NA1 :: NestedProductTag ATag) where
+instance Known @(NestedProductTag ATag) ('NestedProductTag NA1) where
   know = SNestedProductTag SNA1
 
-instance Known ('NestedProductTag NA2 :: NestedProductTag ATag) where
+instance Known @(NestedProductTag ATag) ('NestedProductTag NA2) where
   know = SNestedProductTag SNA2
 
-instance Known ('NestedProductTag NC1 :: NestedProductTag CTag) where
+instance Known @(NestedProductTag CTag) ('NestedProductTag NC1) where
   know = SNestedProductTag SNC1
 
-instance Known ('NestedProductTag ND1 :: NestedProductTag DTag) where
+instance Known @(NestedProductTag DTag) ('NestedProductTag ND1) where
   know = SNestedProductTag SND1
 
-instance Known ('NestedProductTag NE1 :: NestedProductTag ETag) where
+instance Known @(NestedProductTag ETag) ('NestedProductTag NE1) where
   know = SNestedProductTag SNE1
 
 type TheTags :: forall (a :: SumTag) -> [NestedProductTag a]
@@ -588,7 +588,7 @@ type family ThePi a b where
   ThePi DTag f = f ('NestedProductTag ND1)
   ThePi ETag f = f ('NestedProductTag NE1)
 
-instance (Known a) => Tag (NestedProductTag a) where
+instance (Known @SumTag a) => Tag (NestedProductTag a) where
   newtype Singleton (NestedProductTag a) i = SNestedProductTag {unSNestedProductTag :: SNestedProductTagF a i}
 
   type Tags (NestedProductTag a) = TheTags a
@@ -718,7 +718,7 @@ type family ForeachNestedField' a b c s ns where
 
 provideConstraintNested ::
   forall a b c (s :: SumTag) (n :: NestedProductTag s) r.
-  (Known s) =>
+  (Known @SumTag s) =>
   (ForeachTopField a b c) =>
   Singleton (NestedProductTag s) n ->
   ((c (SumOfProductsFamily a b s n)) => r) ->
@@ -785,7 +785,7 @@ sumOfProductsToSigmaOfPi = \case
   where
     f ::
       forall s i.
-      (Known i) =>
+      (Known @(NestedProductTag s) i) =>
       ( SNestedProductTagF s i ->
         SumOfProductsFamily a b s i
       ) ->
@@ -794,9 +794,9 @@ sumOfProductsToSigmaOfPi = \case
 
     k ::
       forall s.
-      (Known s) =>
+      (Known @SumTag s) =>
       ( forall i'.
-        (Known i') =>
+        (Known @(NestedProductTag s) i') =>
         SNestedProductTagF s i' ->
         SumOfProductsFamily a b s i'
       ) ->
