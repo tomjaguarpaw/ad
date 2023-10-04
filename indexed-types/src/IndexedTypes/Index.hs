@@ -70,7 +70,7 @@ module IndexedTypes.Index
     -- * @TypeOf@
 
     -- | Using @TypeOf@ is a hack to make the type arguments to
-    -- several functions simpler.  @t ~ TypeOf i@ just means @t :: i@.
+    -- several functions simpler.  @TypeOf i ~ t@ just means @i :: t@.
     -- Using @TypeOf@ allows us to make the kind of @i@ an invisible
     -- type argument so we don't have to explicitly avoid specifying
     -- it with @\@_@, the omitted type argument.  Future versions of
