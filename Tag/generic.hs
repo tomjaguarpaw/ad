@@ -259,6 +259,7 @@ toListPi f = getConst . traversePi_ (\st x -> Const [f st x])
 
 -- Sum types will (or could -- that isn't implemented yet) have an
 -- instance of this class generated for them
+type IsSum :: forall t. Type -> FunctionSymbol t -> Constraint
 class
   IsSum (sum :: Type) (sumf :: FunctionSymbol t)
     | sum -> sumf,
