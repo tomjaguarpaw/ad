@@ -198,9 +198,11 @@ type FunctionSymbol t = Proxy t -> Type
 -- (FieldType f i) is the type of the argument to
 --    the data constructor (corresponding to) `i`
 --    in the data type (corresponding to) `f`.
--- This is a defunctionalized mapping from @t@ to @Type@, represented
--- by the function symbol @f@.  We need this defunctionalized version
--- because we can't partially apply type synonyms.
+--
+-- This is the "apply" of a defunctionalized mapping from @t@ to
+-- @Type@, represented by the function symbol @f@.  We need this
+-- defunctionalized version because we can't partially apply type
+-- synonyms.
 class FieldTypes (f :: FunctionSymbol t) where
   type FieldType' t f (i :: t) :: Type
 
