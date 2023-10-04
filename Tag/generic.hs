@@ -135,7 +135,10 @@ main = do
   putStrLn (showSumOfProducts @() @() SP2)
   putStrLn (showSumOfProducts @() @() (SP5 'y'))
 
+----------------------------------------------------------------------------
 -- Section: Generics library
+----------------------------------------------------------------------------
+
 data Sigma t f where
   MkSigma :: forall t i f. (Known i) => f i -> Sigma t f
 
@@ -324,8 +327,22 @@ genericShowProduct ::
 genericShowProduct =
   genericShowProduct' @t (productConName @_ @product) productToPi
 
--- Section: Generated code.  The generics library could in principle
+{- --------------------------------------------------------------------------
+-- Section: Generated code
+-- The generics library could in principle
 -- generate this, but that isn't implemented yet.
+--
+From data Sum a b = A Int | B Bool | ...
+we generate
+\* The data type SumTag = ATag | BTag | ...
+\* An instance of the class Tag: instance Tag SumTag
+\* An instance of the class Known for each data constructor.
+\* An empty data type SumF
+\* A type family SumFamily
+\* An instance FieldTypes (SumF a b)
+\* An instance for IsSum (Sum a b) (SumF a b)
+
+-------------------------------------------------------------------------- -}
 
 -- For data Sum
 
