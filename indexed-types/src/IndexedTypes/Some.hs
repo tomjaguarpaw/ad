@@ -15,6 +15,7 @@ import Data.Proxy (Proxy (Proxy))
 import GHC.Read (expectP, paren)
 import IndexedTypes.Index
   ( AsKind (AsType),
+    Dict (Dict),
     Index (toType),
     Matchable,
     eqT,
@@ -26,7 +27,6 @@ import Text.Read
     ReadPrec,
     parens,
   )
-import Type.Reflection ((:~:) (Refl))
 
 -- | Sometimes known as a "sigma" type, a dependent sum or a dependent
 -- pair.
@@ -52,7 +52,7 @@ instance
   --
   --   Some @i1 v1 == Some @i2 v2 = ...
   Some (v1 :: k i1) == Some (v2 :: k i2) = case eqT @i1 @i2 of
-    Just Refl -> v1 == v2
+    Just Dict -> v1 == v2
     Nothing -> False
 
 instance

@@ -94,7 +94,6 @@ where
 
 import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy (Proxy))
-import Type.Reflection ((:~:))
 
 -- | Convert a type level index to a value level index. Take the type
 -- level index @i@ (i.e. a type of kind @t@) and return it at the
@@ -134,13 +133,13 @@ asType :: forall i. (Matchable i) => AsKind (TypeOf i)
 asType = AsType @_ @i Proxy
 
 -- | @eq \@i \@i'@ determines whether the type indices @i@ and @i'@
--- are equal, and if so returns @(i :~: i')@, which allows you to write
--- code that depends on them being equal.
+-- are equal, and if so returns @Dict (i ~ i')@, which allows you to
+-- write code that depends on them being equal.
 --
 -- @
--- case eqT @i @i' of
+-- case eqT \@i \@i' of
 --    Nothing -> ... i and i' are not equal ...
---    Just Refl -> ... here we can use that i ~ i' ...
+--    Just Dict -> ... here we can use that i ~ i' ...
 -- @
 --
 -- Indices should be equal at the type level if and only if they are
@@ -150,7 +149,7 @@ eqT ::
   forall i i'.
   (Matchable i, Matchable i', TypeOf i ~ TypeOf i') =>
   -- | _
-  Maybe (i :~: i')
+  Maybe (Dict (i ~ i'))
 eqT = eqT' Proxy Proxy
 
 type Index :: Type -> Constraint
@@ -183,7 +182,7 @@ class (Eq t) => Index t where
     -- | _
     Proxy i ->
     Proxy i' ->
-    Maybe (i :~: i')
+    Maybe (Dict (i ~ i'))
 
   -- | This is rarely used directly, but from it we derive 'toValue'.
   --

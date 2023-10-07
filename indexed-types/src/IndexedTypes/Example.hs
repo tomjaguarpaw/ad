@@ -50,7 +50,6 @@ import IndexedTypes.Index
 import IndexedTypes.Knownly (Matchably (Matchably))
 import IndexedTypes.Some (Some (Some))
 import Text.Read (readMaybe)
-import Type.Reflection ((:~:) (Refl))
 
 -- Index definiton
 
@@ -191,13 +190,13 @@ instance Index T where
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- constructor @i,
       SA <- constructor @i' =
-        Just Refl
+        Just Dict
     | SB <- constructor @i,
       SB <- constructor @i' =
-        Just Refl
+        Just Dict
     | SC <- constructor @i,
       SC <- constructor @i' =
-        Just Refl
+        Just Dict
     | otherwise =
         Nothing
 
