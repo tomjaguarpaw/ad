@@ -209,9 +209,9 @@ class (Eq t) => Index t where
   -- it at the type level (i.e. as a type of kind @t@)
   --
   -- @
-  -- toType A = 'AsType' (Proxy :: Proxy A) = 'asType' \@A
-  -- toType B = AsType (Proxy :: Proxy B) = asType \@B
-  -- toType C = AsType (Proxy :: Proxy C) = asType \@C
+  -- toType A = 'AsType' (_ :: Proxy A) = 'asType' \@A
+  -- toType B = AsType (_ :: Proxy B) = asType \@B
+  -- toType C = AsType (_ :: Proxy C) = asType \@C
   -- @
   toType :: t -> AsKind t
 
