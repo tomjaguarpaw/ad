@@ -116,7 +116,7 @@ toValue = constructorToValue (constructor @i)
 --   AsType (_ :: Proxy i) -> ...
 -- @
 --
--- (We need the @Proxy@ field only because older versions of GHC can't
+-- (We need the @Proxy@ field only because GHC 9.0 and earlier can't
 -- bind type variables in patterns.)
 data AsKind t where
   AsType :: forall t (i :: t). (Matchable i) => Proxy i -> AsKind t
@@ -125,8 +125,11 @@ data AsKind t where
 --
 -- @
 -- case (asType @A) of
---   AsType (_ :: Proxy i) -> ... i ~ A here ...
+--   AsType (_ :: Proxy i) -> ... here i will be A ...
 -- @
+--
+-- >>> case (asType @A) of AsType (_ :: Proxy i) -> toValue @i
+-- A
 asType :: forall i. (Matchable i) => AsKind (TypeOf i)
 asType = AsType @_ @i Proxy
 
