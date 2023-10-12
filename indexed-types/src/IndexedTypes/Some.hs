@@ -1,16 +1,22 @@
+{-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE UndecidableSuperClasses #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
-module IndexedTypes.Some (Some (Some)) where
+module IndexedTypes.Some (Some (Some), ForallMatchable) where
 
-import Data.Kind (Type)
+import Data.Kind (Constraint, Type)
 import Data.Proxy (Proxy)
 import GHC.Read (expectP, paren)
 import IndexedTypes.Index
@@ -33,9 +39,18 @@ import Text.Read
 data Some k where
   Some :: (Matchable t) => k t -> Some k
 
+type ForallMatchable ::
+  forall (t :: Type).
+  (Type -> Constraint) ->
+  (t -> Type) ->
+  Constraint
+class (c t, forall (i :: t). (Matchable i) => c (k i), Index t) => ForallMatchable c (k :: t -> Type)
+
+instance (c t, forall (i :: t). (Matchable i) => c (k i), Index t) => ForallMatchable c k
+
 instance
   forall (t :: Type) (k :: t -> Type).
-  (Show t, forall (i :: t). (Matchable i) => Show (k i), Index t) =>
+  (ForallMatchable Show k) =>
   Show (Some k)
   where
   -- In later GHCs this is
@@ -45,7 +60,7 @@ instance
 
 instance
   forall (t :: Type) (k :: t -> Type).
-  (forall i. (Matchable i) => Eq (k i), Index t) =>
+  (ForallMatchable Eq k) =>
   Eq (Some k)
   where
   -- In later GHCs this is
@@ -57,7 +72,7 @@ instance
 
 instance
   forall (t :: Type) (k :: t -> Type).
-  (Read t, forall i. (Matchable i) => Read (k i), Index t) =>
+  (ForallMatchable Read k) =>
   Read (Some k)
   where
   -- Copied from read_tup2
