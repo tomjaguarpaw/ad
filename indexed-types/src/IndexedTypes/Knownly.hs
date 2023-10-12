@@ -33,19 +33,19 @@ instance (Eq (f i)) => Compose Eq f i
 instance (Ord (f i)) => Compose Ord f i
 
 instance (Matchable i, Forall t (Compose Show k)) => Show (Matchably (k i)) where
-  show = coerceMethod @t @i @(Compose Show k) (show @(k i))
+  show = coerceMethod @_ @i @(Compose Show k) (show @(k i))
 
 instance (Matchable i, Forall t (Compose Read k)) => Read (Matchably (k i)) where
-  readPrec = coerceMethod @t @i @(Compose Read k) (readPrec @(k i))
+  readPrec = coerceMethod @_ @i @(Compose Read k) (readPrec @(k i))
 
 instance (Matchable i, Forall t (Compose Eq k)) => Eq (Matchably (k i)) where
-  (==) = coerceMethod @t @i @(Compose Eq k) ((==) @(k i))
+  (==) = coerceMethod @_ @i @(Compose Eq k) ((==) @(k i))
 
 instance
   (Matchable i, Eq (Matchably (k i)), Forall t (Compose Ord k)) =>
   Ord (Matchably (k i))
   where
-  compare = coerceMethod @t @i @(Compose Ord k) (compare @(k i))
+  compare = coerceMethod @_ @i @(Compose Ord k) (compare @(k i))
 
 withMatchable ::
   forall (t :: Type) (i :: t) c r.
