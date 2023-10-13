@@ -24,13 +24,7 @@ newtype Matchably a = Matchably a
 
 class (c (f i)) => Compose c f i
 
-instance (Show (f i)) => Compose Show f i
-
-instance (Read (f i)) => Compose Read f i
-
-instance (Eq (f i)) => Compose Eq f i
-
-instance (Ord (f i)) => Compose Ord f i
+instance (c (f i)) => Compose c f i
 
 instance (Matchable i, Forall t (Compose Show k)) => Show (Matchably (k i)) where
   show = coerceMethod @_ @i @(Compose Show k) (show @(k i))
