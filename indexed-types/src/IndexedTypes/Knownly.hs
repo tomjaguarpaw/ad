@@ -52,7 +52,6 @@ withMatchable r = case matchableInAll @i of Dict -> r
 
 coerceMethod ::
   forall (t :: Type) (i :: t) c a2 a3.
-  () =>
   (Forall t c) =>
   (Matchable i) =>
   (Coercible a2 a3) =>
