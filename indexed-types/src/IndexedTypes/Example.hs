@@ -1,11 +1,11 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -13,7 +13,6 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 -- | This example shows how to define an index type ('T') and a type
@@ -30,9 +29,6 @@ module IndexedTypes.Example
     FooF,
     Foo (..),
 
-    -- * Deriving instances for @Foo@
-    FooWrapper (..),
-
     -- * Example
     example,
   )
@@ -40,6 +36,7 @@ where
 
 import Data.Kind (Type)
 import Data.Proxy (Proxy (Proxy))
+import GHC.Generics (Generic)
 import IndexedTypes.Index
   ( Dict (Dict),
     Index (..),
@@ -81,60 +78,15 @@ type family FooF i :: Type where
 
 -- | Finally we define @Foo@, the indexed type itself.
 newtype Foo i = Foo (FooF i)
+  deriving (Generic)
 
--- | A wrapper type, with the same contents as @Foo@, purely for the
--- purpose of deriving instances.
---
--- The instances we derive for @FooWrapper@ are only used by the
--- @deriving via@ clauses which derive instances for @Foo@.  If you
--- were defining an indexed type like @Foo@ in your own code you
--- wouldn't export the equivalent of @FooWrapper@.  It wouldn't be
--- needed anywhere else.
---
--- The technical reason that we need to do this is that we want
--- the instance
---
--- * @Matchable i => Show (Foo i)@
---
--- However, GHC's @deriving@ only allows us to directly derive
---
--- * @Show (FooF A) => Show (Foo A)@
--- * @Show (FooF B) => Show (Foo B)@
--- * @Show (FooF C) => Show (Foo C)@
---
--- so instead we derive those instances for the @newtype@ @FooWrapper@
--- instead, and then use @deriving via@ with 'Matchablely', to derive the
--- instances for @Foo@.  'Matchablely'\'s purpose is to convert the
--- constraint @(Show (FooF A), Show (FooF B), Show (FooF C))@ into
--- @Matchable i@.
---
--- If GHC's deriving mechanism were more flexible perhaps we wouldn't
--- have to go all round the houses like this.
-newtype FooWrapper i = Wrapper (FooF i)
+deriving via Matchably (Foo i) instance (Matchable i) => Show (Foo i)
 
--- | derived as a @newtype@ instance
-deriving newtype instance (Show (FooF i)) => Show (FooWrapper i)
+deriving via Matchably (Foo i) instance (Matchable i) => Read (Foo i)
 
--- | derived as a @newtype@ instance
-deriving newtype instance (Read (FooF i)) => Read (FooWrapper i)
+deriving via Matchably (Foo i) instance (Matchable i) => Ord (Foo i)
 
--- | derived as a @stock@ instance
-deriving stock instance (Eq (FooF i)) => Eq (FooWrapper i)
-
--- | derived as a @stock@ instance
-deriving stock instance (Ord (FooF i)) => Ord (FooWrapper i)
-
--- | derived via @Matchablely (FooWrapper i)@
-deriving via Matchably (FooWrapper i) instance (Matchable i) => Show (Foo i)
-
--- | derived via @Matchably (FooWrapper i)@
-deriving via Matchably (FooWrapper i) instance (Matchable i) => Read (Foo i)
-
--- | derived via @Matchably (FooWrapper i)@
-deriving via Matchably (FooWrapper i) instance (Matchable i) => Eq (Foo i)
-
--- | derived via @Matchably (FooWrapper i)@
-deriving via Matchably (FooWrapper i) instance (Matchable i) => Ord (Foo i)
+deriving via Matchably (Foo i) instance (Matchable i) => Eq (Foo i)
 
 mkSomeFoo :: forall i. (Matchable i) => FooF i -> Some Foo
 mkSomeFoo = Some @i . Foo

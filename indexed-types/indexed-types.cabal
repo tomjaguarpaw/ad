@@ -19,7 +19,8 @@ library
                       IndexedTypes.Reflection
                       IndexedTypes.Some
 
-    build-depends:    base >=4.14.3.0
+    build-depends:    base >=4.14.3.0,
+                      generic-data >= 1.1.0.0 && < 1.2
 
     hs-source-dirs:   src
 
