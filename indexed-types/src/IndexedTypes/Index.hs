@@ -49,11 +49,11 @@ module IndexedTypes.Index
     -- * @Index@ class
     Index (Constructor, Forall, eqT', constructorToValue, matchableInAll', toType),
 
-    -- * @For@
-    For,
-
     -- * @Matchable@ class
     Matchable (constructor'),
+
+    -- * @For@
+    For,
 
     -- * Equivalence between @Matchable@ and @InAll@
 
