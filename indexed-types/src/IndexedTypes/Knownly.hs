@@ -61,10 +61,10 @@ instance
   (Generic (k i), Forall t (OnRep GShow0 k), Matchable i) =>
   Show (Matchably (k i))
   where
-  showsPrec p =
+  showsPrec =
     coerce
-      @(k i -> ShowS)
-      (withMatchable @_ @i @(OnRep GShow0 k) gshowsPrec p)
+      @(Int -> k i -> ShowS)
+      (withMatchable @_ @i @(OnRep GShow0 k) gshowsPrec)
 
 instance
   (Generic (k i), Forall t (OnRep GRead0 k), Matchable i) =>
