@@ -123,11 +123,11 @@ data AsKind t where
 -- | Construct an 'AsKind'.  Simpler alternative to 'AsType'.
 --
 -- @
--- case (asType @A) of
+-- case asType @A of
 --   AsType (_ :: Proxy i) -> ... here i will be A ...
 -- @
 --
--- >>> case (asType @A) of AsType (_ :: Proxy i) -> toValue @i
+-- >>> case asType @A of AsType (_ :: Proxy i) -> toValue @i
 -- A
 asType :: forall i. (Matchable i) => AsKind (TypeOf i)
 asType = AsType @_ @i Proxy
