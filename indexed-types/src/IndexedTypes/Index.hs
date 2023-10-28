@@ -47,10 +47,10 @@ module IndexedTypes.Index
     eqT,
 
     -- * @Index@ class
-    Index (Constructor, All, eqT', constructorToValue, matchableInAll', toType),
+    Index (Constructor, Forall, eqT', constructorToValue, matchableInAll', toType),
 
-    -- * @Forall@
-    Forall,
+    -- * @For@
+    For,
 
     -- * @Matchable@ class
     Matchable (constructor'),
@@ -162,12 +162,14 @@ class (Eq t) => Index t where
   -- @
   data Constructor :: t -> Type
 
-  -- | All the elements of @t@, at the type level.
+  -- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
+  -- kind @t@ separately.  'matchableInAll' allows us to know them all at
+  -- once.
   --
   -- @
-  -- All T = [A, B, C]
+  -- Forall T c = (c A, c B, c C)
   -- @
-  type All t :: [t]
+  type Forall t (c :: t -> Constraint) :: Constraint
 
   -- | The class method version of 'eqT'.  Always prefer to use 'eqT'
   -- instead, except when defining this class.
@@ -222,18 +224,8 @@ class (Eq t) => Index t where
   -- why it's needed, actually, except that 'allMatchable' seems to
   -- rely on it.
   forallMatchable :: Dict (Forall t Matchable)
-  default forallMatchable :: (For t Matchable (All t)) => Dict (Forall t Matchable)
+  default forallMatchable :: (Forall t Matchable) => Dict (Forall t Matchable)
   forallMatchable = Dict
-
--- | @Forall t c f@ says that we know @c (f i)@ for all types @i@ of
--- kind @t@ separately.  'matchableInAll' allows us to know them all at
--- once.
---
--- @
--- Forall T c = (c A, c B, c C)
--- @
-type Forall :: forall (t :: Type) -> (t -> Constraint) -> Constraint
-type Forall t c = For t c (All t)
 
 type For :: forall (t :: Type) -> (t -> Constraint) -> [t] -> Constraint
 type family For t c is where

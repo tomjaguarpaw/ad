@@ -13,6 +13,7 @@
 {-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unticked-promoted-constructors #-}
 
 -- | This example shows how to define an index type ('T') and a type
@@ -39,6 +40,7 @@ import Data.Proxy (Proxy (Proxy))
 import GHC.Generics (Generic)
 import IndexedTypes.Index
   ( Dict (Dict),
+    For,
     Index (..),
     Matchable (constructor'),
     asType,
@@ -137,7 +139,7 @@ instance Index T where
     SB :: Constructor B
     SC :: Constructor C
 
-  type All T = [A, B, C]
+  type Forall T c = For T c [A, B, C]
 
   eqT' (Proxy :: Proxy i) (Proxy :: Proxy i')
     | SA <- constructor @i,
