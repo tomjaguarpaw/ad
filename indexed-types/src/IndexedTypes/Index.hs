@@ -293,7 +293,7 @@ type TypeOf (i :: t) = t
 -- @
 -- constructor \@A = SA
 -- constructor \@B = SB
--- constructor \@B = SC
+-- constructor \@C = SC
 -- @
 --
 -- @
