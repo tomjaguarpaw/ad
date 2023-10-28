@@ -18,7 +18,7 @@
 
 -- | This example shows how to define an index type ('T') and a type
 -- index on that index type ('Foo').
-module IndexedTypes.Example
+module IndexedTypes.Example.Finite
   ( -- * The type index
     T (..),
 

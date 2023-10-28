@@ -13,7 +13,7 @@ library
     import:           warnings
 
     exposed-modules:  IndexedTypes.Consistency
-                      IndexedTypes.Example
+                      IndexedTypes.Example.Finite
                       IndexedTypes.Example.Nat
                       IndexedTypes.Index
                       IndexedTypes.Knownly
