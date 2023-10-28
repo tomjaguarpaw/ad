@@ -58,7 +58,10 @@ class (c (Rep (k i) ())) => OnRepUnit c k i
 instance (c (Rep (k i) ())) => OnRepUnit c k i
 
 instance
-  (Generic (k i), Forall t (OnRep GShow0 k), Matchable i) =>
+  ( Generic (k i),
+    Forall t (OnRep GShow0 k),
+    Matchable i
+  ) =>
   Show (Matchably (k i))
   where
   showsPrec =
@@ -67,7 +70,10 @@ instance
       (withMatchable @_ @i @(OnRep GShow0 k) gshowsPrec)
 
 instance
-  (Generic (k i), Forall t (OnRep GRead0 k), Matchable i) =>
+  ( Generic (k i),
+    Forall t (OnRep GRead0 k),
+    Matchable i
+  ) =>
   Read (Matchably (k i))
   where
   readPrec =
@@ -76,7 +82,10 @@ instance
       (withMatchable @_ @i @(OnRep GRead0 k) greadPrec)
 
 instance
-  (Generic (k i), Forall t (OnRepUnit Eq k), Matchable i) =>
+  ( Generic (k i),
+    Forall t (OnRepUnit Eq k),
+    Matchable i
+  ) =>
   Eq (Matchably (k i))
   where
   (==) =
@@ -85,7 +94,11 @@ instance
       (withMatchable @_ @i @(OnRepUnit Eq k) geq)
 
 instance
-  (Generic (k i), Eq (Matchably (k i)), Forall t (OnRepUnit Ord k), Matchable i) =>
+  ( Generic (k i),
+    Eq (Matchably (k i)),
+    Forall t (OnRepUnit Ord k),
+    Matchable i
+  ) =>
   Ord (Matchably (k i))
   where
   compare =
