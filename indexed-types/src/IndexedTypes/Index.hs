@@ -167,7 +167,7 @@ class (Eq t) => Index t where
   -- once.
   --
   -- @
-  -- Forall T c = (c A, c B, c C)
+  -- Forall T c = 'For' T c [A, B, C] = (c A, c B, c C)
   -- @
   type Forall t (c :: t -> Constraint) :: Constraint
 
@@ -227,6 +227,9 @@ class (Eq t) => Index t where
   default forallMatchable :: (Forall t Matchable) => Dict (Forall t Matchable)
   forallMatchable = Dict
 
+-- | @
+-- For T c [A, B, C] = (c A, c B, c C)
+-- @
 type For :: forall (t :: Type) -> (t -> Constraint) -> [t] -> Constraint
 type family For t c is where
   For _ _ '[] = ()
