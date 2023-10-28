@@ -76,17 +76,17 @@ class (c (FooF i)) => CFooF c i
 instance (c (FooF i)) => CFooF c i
 
 deriving via
-  (Matchably' (CFooF Show) (Foo i))
+  Matchably' (CFooF Show) (Foo i)
   instance
     (Matchable i) => Show (Foo i)
 
 deriving via
-  (Matchably' (CFooF Read) (Foo i))
+  Matchably' (CFooF Read) (Foo i)
   instance
     (Matchable i) => Read (Foo i)
 
 deriving via
-  (Matchably' (CFooF Eq) (Foo i))
+  Matchably' (CFooF Eq) (Foo i)
   instance
     (Matchable i) => Eq (Foo i)
 
