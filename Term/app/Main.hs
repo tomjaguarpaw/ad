@@ -21,6 +21,7 @@ main = do
 
   hSetBuffering mi NoBuffering
 
+  -- This won't work if I change "cat" to "dash"
   _ <-
     createProcess (proc "cat" []) { std_in = UseHandle si,
                                      std_out = UseHandle so,
