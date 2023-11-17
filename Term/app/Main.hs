@@ -7,7 +7,7 @@ import System.Posix.Terminal
 import Control.Concurrent
 
 openPty = do
-  (m, s) <- openPseudoTerminal
+  (s, m) <- openPseudoTerminal
   (,) <$> fdToHandle m <*> fdToHandle s
 
 main = do
@@ -15,22 +15,16 @@ main = do
   hSetEcho stdin False
   hSetBuffering stdin NoBuffering
 
-{-
   (si, mi) <- openPty
   (so, mo) <- openPty
   (se, me) <- openPty
+
+  hSetBuffering mi NoBuffering
 
   _ <-
     createProcess (proc "cat" []) { std_in = UseHandle si,
                                      std_out = UseHandle so,
                                      std_err = UseHandle se
-                                   }
--}
-
-  (Just mi, Just mo, Just me, _) <-
-    createProcess (proc "cat" []) { std_in = CreatePipe,
-                                     std_out = CreatePipe,
-                                     std_err = CreatePipe
                                    }
 
   forkIO $ fix $ \again -> do
