@@ -19,7 +19,11 @@ main = do
   hSetEcho stdin False
   hSetBuffering stdin NoBuffering
 
-  (pty, _) <- Pty.spawnWithPty Nothing False "/bin/bash" [] (20, 10)
+  sz <- do
+    Just stdInPty <- Pty.createPty 0
+    Pty.ptyDimensions stdInPty
+
+  (pty, _) <- Pty.spawnWithPty Nothing False "/bin/bash" [] sz
 
   _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
     Pty.writePty pty (pack [3])
