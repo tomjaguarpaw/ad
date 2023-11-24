@@ -1,10 +1,12 @@
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE ViewPatterns #-}
 
 import Control.Concurrent
 import Control.Exception
 import Data.ByteString
+import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
 import System.IO
 import System.Posix (Fd)
@@ -65,7 +67,18 @@ main = do
   _ <- forkIO $
     fix $ \again -> do
       readEither >>= \case
-        StdIn bs -> Pty.writePty pty bs
+        StdIn bs -> do
+          Pty.writePty pty bs
+          hPut stdout (C8.pack "\o33[6n")
+          _ <- flip fix mempty $ \again' sofar -> do
+            b <- hGet stdin 1
+            if b == C8.pack "R"
+              then
+                let (x, Data.ByteString.drop 1 -> y) =
+                      C8.break (== ';') (Data.ByteString.drop 1 sofar)
+                 in pure (read (C8.unpack x) :: Int, read (C8.unpack y) :: Int)
+              else again' (sofar <> b)
+          pure ()
         PtyIn bs -> do
           hPut stdout bs
           hFlush stdout
