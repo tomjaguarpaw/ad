@@ -5,6 +5,7 @@
 
 import Control.Concurrent
 import Control.Exception
+import Control.Monad (when)
 import Data.ByteString
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
@@ -73,18 +74,27 @@ main = do
           hPut stdout bs
           hPut stdout (C8.pack "\o33[6n")
           hFlush stdout
-          (x, y) <- flip fix mempty $ \again' sofar -> do
+
+          fix $ \again' -> do
+            b <- hGet stdin 1
+            when (b /= C8.pack "\o33") again'
+
+          sofar <- flip fix mempty $ \again' sofar -> do
             b <- hGet stdin 1
             if b == C8.pack "R"
-              then -- Drop [ and drop ;
-                let (Data.ByteString.drop 1 -> x, Data.ByteString.drop 1 -> y) =
-                      C8.break (== ';') (Data.ByteString.drop 1 sofar)
-                 in pure (read (C8.unpack x) :: Int, read (C8.unpack y) :: Int)
+              then pure sofar
               else again' (sofar <> b)
+
+          -- Drop ;
+          let (x, Data.ByteString.drop 1 -> y) =
+                C8.break (== ';') (Data.ByteString.drop 1 sofar)
+
+          let x' = read (C8.unpack x) :: Int
+          let y' = read (C8.unpack y) :: Int
           hPut stdout (C8.pack ("\o33[" <> show rows <> ";1H"))
           hPut stdout (C8.pack "\o33[K")
-          hPut stdout (C8.pack ("A status bar: " <> show x <> " and " <> show y))
-          hPut stdout (C8.pack ("\o33[" <> show x <> ";" <> show y <> "H"))
+          hPut stdout (C8.pack ("A status bar: " <> show sofar))
+          hPut stdout (C8.pack ("\o33[" <> show x' <> ";" <> show y' <> "H"))
 
       again
 
