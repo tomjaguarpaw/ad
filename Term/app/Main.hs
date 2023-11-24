@@ -16,6 +16,7 @@ import System.Posix.Signals
 import System.Posix.Terminal
 import System.Process
 
+main :: IO ()
 main = do
   hSetEcho stdin False
   hSetBuffering stdin NoBuffering
