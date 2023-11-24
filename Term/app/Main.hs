@@ -36,6 +36,11 @@ main = do
   let forkFinally' :: (Either SomeException () -> IO ()) -> IO () -> IO ThreadId
       forkFinally' = flip forkFinally
 
+  let readPty = do
+        try (Pty.readPty pty) >>= \case
+          Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
+          Right bs -> pure bs
+
   forkFinally' (\x -> print x >> print "More") $
     fix $ \again -> do
       bs <- hGet stdin 1
@@ -44,9 +49,7 @@ main = do
 
   forkIO $
     fix $ \again -> do
-      bs <- try (Pty.readPty pty) >>= \case
-        Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
-        Right bs -> pure bs
+      bs <- readPty
       hPut stdout bs
       hFlush stdout
       again
