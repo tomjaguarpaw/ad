@@ -39,7 +39,7 @@ main = do
 
   let readPty = do
         try (Pty.readPty pty) >>= \case
-          Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
+          Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
           Right bs -> pure bs
 
   stdinMVar <- newEmptyMVar
