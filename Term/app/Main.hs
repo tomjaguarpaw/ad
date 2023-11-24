@@ -1,3 +1,4 @@
+{-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 
@@ -10,7 +11,7 @@ import GHC.IO.Device
 import System.Exit
 import System.IO
 import System.Posix.IO
-import qualified System.Posix.Pty as Pty
+import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
 import System.Posix.Terminal
 import System.Process
@@ -41,15 +42,30 @@ main = do
           Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
           Right bs -> pure bs
 
+  stdinMVar <- newEmptyMVar
+  ptyMVar <- newEmptyMVar
+
   forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
-      Pty.writePty pty bs
+      putMVar stdinMVar bs
       again
 
   forkIO $
     fix $ \again -> do
       bs <- readPty
+      putMVar ptyMVar bs
+      again
+
+  forkIO $
+    fix $ \again -> do
+      bs <- takeMVar stdinMVar
+      Pty.writePty pty bs
+      again
+
+  forkIO $
+    fix $ \again -> do
+      bs <- takeMVar ptyMVar
       hPut stdout bs
       hFlush stdout
       again
