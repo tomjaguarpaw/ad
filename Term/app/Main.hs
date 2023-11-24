@@ -1,47 +1,50 @@
-import Data.ByteString
-import System.IO
-import Data.Function (fix)
-import System.Process
-import System.Posix.IO
-import System.Posix.Terminal
-import Control.Concurrent
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 
-openPty = do
-  (s, m) <- openPseudoTerminal
-  (,) <$> fdToHandle m <*> fdToHandle s
+import Control.Concurrent
+import Control.Exception
+import Data.ByteString
+import Data.Char
+import Data.Function (fix)
+import GHC.IO.Device
+import System.Exit
+import System.IO
+import System.Posix.IO
+import qualified System.Posix.Pty as Pty
+import System.Posix.Signals
+import System.Posix.Terminal
+import System.Process
 
 main = do
-  Prelude.putStrLn "Starting ..."
   hSetEcho stdin False
   hSetBuffering stdin NoBuffering
 
-  (si, mi) <- openPty
-  (so, mo) <- openPty
-  (se, me) <- openPty
+  (pty, _) <- Pty.spawnWithPty Nothing False "/bin/bash" [] (20, 10)
 
-  hSetBuffering mi NoBuffering
+  _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
+    Pty.writePty pty (pack [3])
 
-  -- This won't work if I change "cat" to "dash"
-  _ <-
-    createProcess (proc "cat" []) { std_in = UseHandle si,
-                                     std_out = UseHandle so,
-                                     std_err = UseHandle se
-                                   }
+  exit <- newEmptyMVar
 
-  forkIO $ fix $ \again -> do
-    bs <- hGet me 1
-    hPut stderr bs
-    hFlush stderr
-    again
+  _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
+    putMVar exit ()
 
-  forkIO $ fix $ \again -> do
-    bs <- hGet mo 1
-    hPut stdout bs
-    hFlush stdout
-    again
+  let forkFinally' :: (Either SomeException () -> IO ()) -> IO () -> IO ThreadId
+      forkFinally' = flip forkFinally
 
-  fix $ \again -> do
-    bs <- hGet stdin 1
-    hPut mi bs
-    hFlush mi
-    again
+  forkFinally' (\x -> print x >> print "More") $
+    fix $ \again -> do
+      bs <- hGet stdin 1
+      Pty.writePty pty bs
+      again
+
+  forkIO $
+    fix $ \again -> do
+      bs <- try (Pty.readPty pty) >>= \case
+        Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
+        Right bs -> pure bs
+      hPut stdout bs
+      hFlush stdout
+      again
+
+  takeMVar exit
