@@ -5,16 +5,10 @@
 import Control.Concurrent
 import Control.Exception
 import Data.ByteString
-import Data.Char
 import Data.Function (fix)
-import GHC.IO.Device
-import System.Exit
 import System.IO
-import System.Posix.IO
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
-import System.Posix.Terminal
-import System.Process
 
 main :: IO ()
 main = do
@@ -34,9 +28,6 @@ main = do
 
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
     putMVar exit ()
-
-  let forkFinally' :: (Either SomeException () -> IO ()) -> IO () -> IO ThreadId
-      forkFinally' = flip forkFinally
 
   let readPty = do
         try (Pty.readPty pty) >>= \case
