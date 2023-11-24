@@ -35,32 +35,26 @@ main = do
           Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
           Right bs -> pure bs
 
-  stdinMVar <- newEmptyMVar
-  ptyMVar <- newEmptyMVar
+  inMVar <- newEmptyMVar
 
   _ <- forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
-      putMVar stdinMVar $
+      putMVar inMVar $
         Pty.writePty pty bs
       again
 
   _ <- forkIO $
     fix $ \again -> do
       bs <- readPty
-      putMVar ptyMVar $ do
+      putMVar inMVar $ do
         hPut stdout bs
         hFlush stdout
       again
 
   _ <- forkIO $
     fix $ \again -> do
-      join (takeMVar stdinMVar)
-      again
-
-  _ <- forkIO $
-    fix $ \again -> do
-      join (takeMVar ptyMVar)
+      join (takeMVar inMVar)
       again
 
   takeMVar exit
