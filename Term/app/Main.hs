@@ -4,12 +4,13 @@
 
 import Control.Concurrent
 import Control.Exception
-import Control.Monad (join)
 import Data.ByteString
 import Data.Function (fix)
 import System.IO
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
+
+data In = PtyIn ByteString | StdIn ByteString
 
 main :: IO ()
 main = do
@@ -40,21 +41,23 @@ main = do
   _ <- forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
-      putMVar inMVar $
-        Pty.writePty pty bs
+      putMVar inMVar (StdIn bs)
       again
 
   _ <- forkIO $
     fix $ \again -> do
       bs <- readPty
-      putMVar inMVar $ do
-        hPut stdout bs
-        hFlush stdout
+      putMVar inMVar (PtyIn bs)
       again
 
   _ <- forkIO $
     fix $ \again -> do
-      join (takeMVar inMVar)
+      takeMVar inMVar >>= \case
+        StdIn bs -> Pty.writePty pty bs
+        PtyIn bs -> do
+          hPut stdout bs
+          hFlush stdout
+
       again
 
   takeMVar exit
