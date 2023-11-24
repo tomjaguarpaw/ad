@@ -45,25 +45,25 @@ main = do
   stdinMVar <- newEmptyMVar
   ptyMVar <- newEmptyMVar
 
-  forkIO $
+  _ <- forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
       putMVar stdinMVar bs
       again
 
-  forkIO $
+  _ <- forkIO $
     fix $ \again -> do
       bs <- readPty
       putMVar ptyMVar bs
       again
 
-  forkIO $
+  _ <- forkIO $
     fix $ \again -> do
       bs <- takeMVar stdinMVar
       Pty.writePty pty bs
       again
 
-  forkIO $
+  _ <- forkIO $
     fix $ \again -> do
       bs <- takeMVar ptyMVar
       hPut stdout bs
