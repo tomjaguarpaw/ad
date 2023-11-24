@@ -4,6 +4,7 @@
 
 import Control.Concurrent
 import Control.Exception
+import Control.Monad (join)
 import Data.ByteString
 import Data.Function (fix)
 import System.IO
@@ -40,26 +41,26 @@ main = do
   _ <- forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
-      putMVar stdinMVar bs
+      putMVar stdinMVar $
+        Pty.writePty pty bs
       again
 
   _ <- forkIO $
     fix $ \again -> do
       bs <- readPty
-      putMVar ptyMVar bs
+      putMVar ptyMVar $ do
+        hPut stdout bs
+        hFlush stdout
       again
 
   _ <- forkIO $
     fix $ \again -> do
-      bs <- takeMVar stdinMVar
-      Pty.writePty pty bs
+      join (takeMVar stdinMVar)
       again
 
   _ <- forkIO $
     fix $ \again -> do
-      bs <- takeMVar ptyMVar
-      hPut stdout bs
-      hFlush stdout
+      join (takeMVar ptyMVar)
       again
 
   takeMVar exit
