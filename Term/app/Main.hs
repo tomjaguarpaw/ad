@@ -41,7 +41,7 @@ main = do
           Left (e :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
           Right bs -> pure bs
 
-  forkFinally' (\x -> print x >> print "More") $
+  forkIO $
     fix $ \again -> do
       bs <- hGet stdin 1
       Pty.writePty pty bs
