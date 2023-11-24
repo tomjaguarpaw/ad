@@ -7,10 +7,16 @@ import Control.Exception
 import Data.ByteString
 import Data.Function (fix)
 import System.IO
+import System.Posix (Fd)
+import System.Posix.IO (stdInput)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
+import Unsafe.Coerce (unsafeCoerce)
 
 data In = PtyIn ByteString | StdIn ByteString
+
+ptyToFd :: Pty.Pty -> Fd
+ptyToFd = unsafeCoerce
 
 main :: IO ()
 main = do
@@ -36,23 +42,29 @@ main = do
           Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
           Right bs -> pure bs
 
-  inMVar <- newEmptyMVar
+  let readEither = do
+        inMVar <- newEmptyMVar
+
+        t1 <- forkIO $ do
+          threadWaitRead stdInput
+          putMVar inMVar True
+
+        t2 <- forkIO $ do
+          threadWaitRead (ptyToFd pty)
+          putMVar inMVar False
+
+        b <- readMVar inMVar
+
+        killThread t1
+        killThread t2
+
+        case b of
+          True -> StdIn <$> hGet stdin 1
+          False -> PtyIn <$> readPty
 
   _ <- forkIO $
     fix $ \again -> do
-      bs <- hGet stdin 1
-      putMVar inMVar (StdIn bs)
-      again
-
-  _ <- forkIO $
-    fix $ \again -> do
-      bs <- readPty
-      putMVar inMVar (PtyIn bs)
-      again
-
-  _ <- forkIO $
-    fix $ \again -> do
-      takeMVar inMVar >>= \case
+      readEither >>= \case
         StdIn bs -> Pty.writePty pty bs
         PtyIn bs -> do
           hPut stdout bs
