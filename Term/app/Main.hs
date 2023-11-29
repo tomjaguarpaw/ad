@@ -76,7 +76,7 @@ main = do
         killThread t2
 
         case b of
-          True -> StdIn <$> hGet stdin 1
+          True -> StdIn <$> hGetNonBlocking stdin 3
           False -> PtyIn <$> readPty
 
   _ <- forkIO $
@@ -91,7 +91,10 @@ main = do
 
           fix $ \again' -> do
             b <- hGet stdin 1
-            when (b /= C8.pack "\o33") again'
+            when (b /= C8.pack "\o33") $ do
+              hPut stdout b
+              hFlush stdout
+              again'
 
           sofar <- flip fix mempty $ \again' sofar -> do
             b <- hGet stdin 1
