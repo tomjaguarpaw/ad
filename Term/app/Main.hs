@@ -35,6 +35,8 @@ main = do
         ( flip withoutMode ProcessInput
             . flip withoutMode ProcessOutput
             . flip withoutMode MapCRtoLF
+            . flip withoutMode StartStopInput
+            . flip withoutMode StartStopOutput
         )
           oldTermSettings
   -- Should probably reset this on exit
