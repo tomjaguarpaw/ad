@@ -86,12 +86,12 @@ main = do
           Pty.writePty pty bs
         PtyIn bs -> do
           hPut stdout bs
-          hPut stdout (C8.pack "\o33[6n")
+          hPut stdout (C8.pack "\ESC[6n")
           hFlush stdout
 
           fix $ \again' -> do
             b <- hGet stdin 1
-            when (b /= C8.pack "\o33") $ do
+            when (b /= C8.pack "\ESC") $ do
               Pty.writePty pty b
               again'
 
@@ -107,10 +107,10 @@ main = do
 
           let x' = read (C8.unpack x) :: Int
           let y' = read (C8.unpack y) :: Int
-          hPut stdout (C8.pack ("\o33[" <> show rows <> ";1H"))
-          hPut stdout (C8.pack "\o33[K")
+          hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
+          hPut stdout (C8.pack "\ESC[K")
           hPut stdout (C8.pack ("A status bar: " <> show sofar))
-          hPut stdout (C8.pack ("\o33[" <> show x' <> ";" <> show y' <> "H"))
+          hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
       again
 
