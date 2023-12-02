@@ -24,7 +24,6 @@ ptyToFd = unsafeCoerce
 
 main :: IO ()
 main = do
-  hSetEcho stdin False
   hSetBuffering stdin NoBuffering
 
   oldTermSettings <- getTerminalAttributes stdInput
@@ -37,6 +36,7 @@ main = do
             . flip withoutMode MapCRtoLF
             . flip withoutMode StartStopInput
             . flip withoutMode StartStopOutput
+            . flip withoutMode EnableEcho
         )
           oldTermSettings
   -- Should probably reset this on exit
