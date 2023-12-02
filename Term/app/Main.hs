@@ -66,20 +66,18 @@ main = do
 
         t1 <- forkIO $ do
           threadWaitRead stdInput
-          putMVar inMVar True
+          putMVar inMVar (StdIn <$> hGetNonBlocking stdin 3)
 
         t2 <- forkIO $ do
           threadWaitRead (ptyToFd pty)
-          putMVar inMVar False
+          putMVar inMVar (PtyIn <$> readPty)
 
-        b <- readMVar inMVar
+        action <- readMVar inMVar
 
         killThread t1
         killThread t2
 
-        case b of
-          True -> StdIn <$> hGetNonBlocking stdin 3
-          False -> PtyIn <$> readPty
+        action
 
   _ <- forkIO $
     fix $ \again -> do
