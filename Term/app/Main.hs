@@ -6,11 +6,11 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad (when)
-import Data.ByteString
+import Data.ByteString hiding (appendFile)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
 import System.IO
-import System.Posix (Fd)
+import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
@@ -25,6 +25,8 @@ ptyToFd = unsafeCoerce
 main :: IO ()
 main = do
   hSetBuffering stdin NoBuffering
+
+  pid <- show <$> getProcessID
 
   oldTermSettings <- getTerminalAttributes stdInput
   -- We might want to copy the settings from abduco:
@@ -85,23 +87,31 @@ main = do
       readEither >>= \case
         StdIn bs -> do
           Pty.writePty pty bs
+          appendFile "/tmp/log" ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
         PtyIn bs -> do
           hPut stdout bs
+          appendFile "/tmp/log" ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
           -- Ask for the position
           hPut stdout (C8.pack "\ESC[6n")
+          appendFile "/tmp/log" ("Requesting position " ++ pid ++ "\n")
           hFlush stdout
 
           fix $ \again' -> do
             b <- hGet stdin 1
             when (b /= C8.pack "\ESC") $ do
               Pty.writePty pty b
+              appendFile "/tmp/log" ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
               again'
+
+          appendFile "/tmp/log" ("Found ESC " ++ pid ++ "\n")
 
           sofar <- flip fix mempty $ \again' sofar -> do
             b <- hGet stdin 1
             if b == C8.pack "R"
               then pure sofar
               else again' (sofar <> b)
+
+          appendFile "/tmp/log" ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
 
           -- Drop ;
           let (x, Data.ByteString.drop 1 -> y) =
