@@ -49,6 +49,7 @@ main = do
   (pty, _) <- Pty.spawnWithPty Nothing False "/bin/bash" [] (cols, subtract 1 rows)
 
   _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
+    -- Write Ctrl-C
     Pty.writePty pty (pack [3])
 
   exit <- newEmptyMVar
@@ -86,6 +87,7 @@ main = do
           Pty.writePty pty bs
         PtyIn bs -> do
           hPut stdout bs
+          -- Ask for the position
           hPut stdout (C8.pack "\ESC[6n")
           hFlush stdout
 
@@ -107,9 +109,12 @@ main = do
 
           let x' = read (C8.unpack x) :: Int
           let y' = read (C8.unpack y) :: Int
+          -- Go to first column on last row
           hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
+          -- Clear line
           hPut stdout (C8.pack "\ESC[K")
           hPut stdout (C8.pack ("A status bar: " <> show sofar))
+          -- Go back to where we were
           hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
       again
