@@ -92,8 +92,7 @@ main = do
           fix $ \again' -> do
             b <- hGet stdin 1
             when (b /= C8.pack "\o33") $ do
-              hPut stdout b
-              hFlush stdout
+              Pty.writePty pty b
               again'
 
           sofar <- flip fix mempty $ \again' sofar -> do
