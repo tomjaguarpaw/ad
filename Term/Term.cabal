@@ -11,7 +11,7 @@ executable Term
     -- other-modules:
     -- other-extensions:
     build-depends:    base >=4.14 && < 4.20,
-                      unix,
+                      unix ^>= 2.8,
                       process,
                       bytestring,
                       posix-pty

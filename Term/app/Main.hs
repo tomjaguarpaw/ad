@@ -12,6 +12,7 @@ import Data.Function (fix)
 import System.IO
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
+import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
 import System.Posix.Terminal
@@ -68,8 +69,11 @@ main = do
         inMVar <- newEmptyMVar
 
         t1 <- forkIO $ do
+          -- We shouldn't threadWaitRead on an Fd from a Handle
+          -- because the Handle buffers some of the input so we wait
+          -- even when there's buffered input available.
           threadWaitRead stdInput
-          putMVar inMVar (StdIn <$> hGetNonBlocking stdin 3)
+          putMVar inMVar (StdIn <$> fdRead stdInput 1)
 
         t2 <- forkIO $ do
           threadWaitRead (ptyToFd pty)
