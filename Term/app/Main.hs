@@ -6,7 +6,7 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad (when)
-import Data.ByteString hiding (appendFile, take)
+import Data.ByteString hiding (appendFile, elem, take)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
 import System.Environment
@@ -98,41 +98,43 @@ main = do
         PtyIn bs -> do
           hPut stdout bs
           appendFile "/tmp/log" ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
-          -- Ask for the position
-          hPut stdout (C8.pack "\ESC[6n")
-          appendFile "/tmp/log" ("Requesting position " ++ pid ++ "\n")
-          hFlush stdout
 
-          fix $ \again' -> do
-            b <- fdRead stdInput 1
-            when (b /= C8.pack "\ESC") $ do
-              Pty.writePty pty b
-              appendFile "/tmp/log" ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
-              again'
+          when (not ('\ESC' `elem` C8.unpack bs)) $ do
+            -- Ask for the position
+            hPut stdout (C8.pack "\ESC[6n")
+            appendFile "/tmp/log" ("Requesting position " ++ pid ++ "\n")
+            hFlush stdout
 
-          appendFile "/tmp/log" ("Found ESC " ++ pid ++ "\n")
+            fix $ \again' -> do
+              b <- fdRead stdInput 1
+              when (b /= C8.pack "\ESC") $ do
+                Pty.writePty pty b
+                appendFile "/tmp/log" ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
+                again'
 
-          sofar <- flip fix mempty $ \again' sofar -> do
-            b <- fdRead stdInput 1
-            if b == C8.pack "R"
-              then pure sofar
-              else again' (sofar <> b)
+            appendFile "/tmp/log" ("Found ESC " ++ pid ++ "\n")
 
-          appendFile "/tmp/log" ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
+            sofar <- flip fix mempty $ \again' sofar -> do
+              b <- fdRead stdInput 1
+              if b == C8.pack "R"
+                then pure sofar
+                else again' (sofar <> b)
 
-          -- Drop ;
-          let (x, Data.ByteString.drop 1 -> y) =
-                C8.break (== ';') (Data.ByteString.drop 1 sofar)
+            appendFile "/tmp/log" ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
 
-          let x' = read (C8.unpack x) :: Int
-          let y' = read (C8.unpack y) :: Int
-          -- Go to first column on last row
-          hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
-          -- Clear line
-          hPut stdout (C8.pack "\ESC[K")
-          hPut stdout (C8.pack (take cols bar))
-          -- Go back to where we were
-          hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
+            -- Drop ;
+            let (x, Data.ByteString.drop 1 -> y) =
+                  C8.break (== ';') (Data.ByteString.drop 1 sofar)
+
+            let x' = read (C8.unpack x) :: Int
+            let y' = read (C8.unpack y) :: Int
+            -- Go to first column on last row
+            hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
+            -- Clear line
+            hPut stdout (C8.pack "\ESC[K")
+            hPut stdout (C8.pack (take cols bar))
+            -- Go back to where we were
+            hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
       again
 
