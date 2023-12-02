@@ -127,7 +127,7 @@ main = do
           hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
           -- Clear line
           hPut stdout (C8.pack "\ESC[K")
-          hPut stdout (C8.pack ("A status bar: " <> show sofar))
+          hPut stdout (C8.pack ("A status bar: " <> show sofar <> " I put: " <> show (C8.unpack bs)))
           -- Go back to where we were
           hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
