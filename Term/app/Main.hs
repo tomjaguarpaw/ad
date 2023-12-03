@@ -9,6 +9,7 @@ import Control.Monad (when)
 import Data.ByteString hiding (appendFile)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
+import System.Environment
 import System.IO
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
@@ -25,6 +26,8 @@ ptyToFd = unsafeCoerce
 
 main :: IO ()
 main = do
+  [arg] <- getArgs
+
   hSetBuffering stdin NoBuffering
 
   pid <- show <$> getProcessID
@@ -49,7 +52,7 @@ main = do
     Just stdInPty <- Pty.createPty 0
     Pty.ptyDimensions stdInPty
 
-  (pty, _) <- Pty.spawnWithPty Nothing False "/bin/bash" [] (cols, subtract 1 rows)
+  (pty, _) <- Pty.spawnWithPty Nothing True "sh" ["-c", arg] (cols, subtract 1 rows)
 
   _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
     -- Write Ctrl-C
