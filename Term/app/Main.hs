@@ -101,7 +101,7 @@ main = do
           hFlush stdout
 
           fix $ \again' -> do
-            b <- hGet stdin 1
+            b <- fdRead stdInput 1
             when (b /= C8.pack "\ESC") $ do
               Pty.writePty pty b
               appendFile "/tmp/log" ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
@@ -110,7 +110,7 @@ main = do
           appendFile "/tmp/log" ("Found ESC " ++ pid ++ "\n")
 
           sofar <- flip fix mempty $ \again' sofar -> do
-            b <- hGet stdin 1
+            b <- fdRead stdInput 1
             if b == C8.pack "R"
               then pure sofar
               else again' (sofar <> b)
