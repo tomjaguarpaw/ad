@@ -6,7 +6,7 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad (when)
-import Data.ByteString hiding (appendFile)
+import Data.ByteString hiding (appendFile, take)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
 import System.Environment
@@ -26,7 +26,7 @@ ptyToFd = unsafeCoerce
 
 main :: IO ()
 main = do
-  [arg] <- getArgs
+  [bar, prog] <- getArgs
 
   hSetBuffering stdin NoBuffering
 
@@ -52,7 +52,7 @@ main = do
     Just stdInPty <- Pty.createPty 0
     Pty.ptyDimensions stdInPty
 
-  (pty, _) <- Pty.spawnWithPty Nothing True "sh" ["-c", arg] (cols, subtract 1 rows)
+  (pty, _) <- Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
 
   _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
     -- Write Ctrl-C
@@ -130,7 +130,7 @@ main = do
           hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
           -- Clear line
           hPut stdout (C8.pack "\ESC[K")
-          hPut stdout (C8.pack ("A status bar: " <> show sofar <> " I put: " <> show (C8.unpack bs)))
+          hPut stdout (C8.pack (take cols bar))
           -- Go back to where we were
           hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
