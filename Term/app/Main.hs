@@ -24,7 +24,6 @@ import System.Posix.Signals
 import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
 import System.Process (getPid, getProcessExitCode)
-import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (log)
 
 data In = PtyIn ByteString | StdIn ByteString | WinchIn
@@ -41,7 +40,7 @@ selectorFd fd =
 
 selectorPty :: Pty.Pty -> Selector ByteString
 selectorPty pty =
-  MkSelector (threadWaitRead (ptyToFd pty)) (readPty pty)
+  MkSelector (Pty.threadWaitReadPty pty) (readPty pty)
 
 selectorMVar :: MVar a -> Selector a
 selectorMVar v =
@@ -64,9 +63,6 @@ select selectors = do
   act <- readMVar inMVar
   for_ ts killThread
   act
-
-ptyToFd :: Pty.Pty -> Fd
-ptyToFd = unsafeCoerce
 
 main :: IO ()
 main = do
