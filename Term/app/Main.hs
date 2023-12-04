@@ -9,7 +9,7 @@ import Control.Monad (when)
 import Data.ByteString hiding (appendFile, elem, take)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
-import Data.IORef (newIORef, readIORef)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import System.Environment
 import System.Exit (exitWith)
 import System.IO
@@ -20,7 +20,7 @@ import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
 import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
-import System.Process (getProcessExitCode)
+import System.Process (getProcessExitCode, getPid)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (log)
 
@@ -157,7 +157,16 @@ main = do
     fix $ \again -> do
       readEither >>= \case
         WinchIn -> do
-          log ("WinchIn " ++ pid ++ "\n")
+          Just stdInPty <- Pty.createPty 0
+          dims@(cols, rows) <- Pty.ptyDimensions stdInPty
+          writeIORef theDims dims
+          Pty.resizePty pty (cols, rows - 1)
+          getPid childHandle >>= \case
+            -- I guess this only happens if there is a race condition
+            -- between SIGWINCH and termination of the child process
+            Nothing -> pure ()
+            Just childPid -> signalProcess sigWINCH childPid
+          log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
         StdIn bs -> do
           Pty.writePty pty bs
           log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
