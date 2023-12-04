@@ -98,6 +98,44 @@ main = do
 
         action
 
+  let drawBar :: IO ()
+      drawBar = do
+        -- Ask for the position
+        hPut stdout (C8.pack "\ESC[6n")
+        log ("Requesting position " ++ pid ++ "\n")
+        hFlush stdout
+
+        fix $ \again' -> do
+          b <- fdRead stdInput 1
+          when (b /= C8.pack "\ESC") $ do
+            Pty.writePty pty b
+            log ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
+            again'
+
+        log ("Found ESC " ++ pid ++ "\n")
+
+        sofar <- flip fix mempty $ \again' sofar -> do
+          b <- fdRead stdInput 1
+          if b == C8.pack "R"
+            then pure sofar
+            else again' (sofar <> b)
+
+        log ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
+
+        -- Drop ;
+        let (x, Data.ByteString.drop 1 -> y) =
+              C8.break (== ';') (Data.ByteString.drop 1 sofar)
+
+        let x' = read (C8.unpack x) :: Int
+        let y' = read (C8.unpack y) :: Int
+        -- Go to first column on last row
+        hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
+        -- Clear line
+        hPut stdout (C8.pack "\ESC[K")
+        hPut stdout (C8.pack (take cols bar))
+        -- Go back to where we were
+        hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
+
   _ <- forkIO $
     fix $ \again -> do
       readEither >>= \case
@@ -108,42 +146,8 @@ main = do
           hPut stdout bs
           log (show bs ++ "\n")
 
-          when (not ('\ESC' `elem` C8.unpack bs)) $ do
-            -- Ask for the position
-            hPut stdout (C8.pack "\ESC[6n")
-            log ("Requesting position " ++ pid ++ "\n")
-            hFlush stdout
-
-            fix $ \again' -> do
-              b <- fdRead stdInput 1
-              when (b /= C8.pack "\ESC") $ do
-                Pty.writePty pty b
-                log ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
-                again'
-
-            log ("Found ESC " ++ pid ++ "\n")
-
-            sofar <- flip fix mempty $ \again' sofar -> do
-              b <- fdRead stdInput 1
-              if b == C8.pack "R"
-                then pure sofar
-                else again' (sofar <> b)
-
-            log ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
-
-            -- Drop ;
-            let (x, Data.ByteString.drop 1 -> y) =
-                  C8.break (== ';') (Data.ByteString.drop 1 sofar)
-
-            let x' = read (C8.unpack x) :: Int
-            let y' = read (C8.unpack y) :: Int
-            -- Go to first column on last row
-            hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
-            -- Clear line
-            hPut stdout (C8.pack "\ESC[K")
-            hPut stdout (C8.pack (take cols bar))
-            -- Go back to where we were
-            hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
+          when (not ('\ESC' `elem` C8.unpack bs)) $
+            drawBar
 
       again
 
