@@ -57,7 +57,7 @@ main = do
 
   (pty, childHandle) <- Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
 
-  _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
+  _ <- flip (installHandler sigINT) Nothing . Catch $ do
     -- Write Ctrl-C
     Pty.writePty pty (pack [3])
 
