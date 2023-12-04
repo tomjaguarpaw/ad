@@ -10,6 +10,7 @@ import Data.ByteString hiding (appendFile, elem, take)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
 import System.Environment
+import System.Exit (exitWith)
 import System.IO
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
@@ -17,6 +18,7 @@ import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
 import System.Posix.Terminal
+import System.Process (getProcessExitCode)
 import Unsafe.Coerce (unsafeCoerce)
 
 data In = PtyIn ByteString | StdIn ByteString
@@ -52,7 +54,7 @@ main = do
     Just stdInPty <- Pty.createPty 0
     Pty.ptyDimensions stdInPty
 
-  (pty, _) <- Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
+  (pty, childHandle) <- Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
 
   _ <- flip (installHandler keyboardSignal) Nothing . Catch $ do
     -- Write Ctrl-C
@@ -61,7 +63,13 @@ main = do
   exit <- newEmptyMVar
 
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
-    putMVar exit ()
+    e <-
+      getProcessExitCode childHandle >>= \case
+        Nothing ->
+          error "Impossible: should only happen when the process is still running"
+        Just e -> pure e
+
+    putMVar exit e
 
   let readPty = do
         try (Pty.readPty pty) >>= \case
@@ -138,4 +146,4 @@ main = do
 
       again
 
-  takeMVar exit
+  exitWith =<< takeMVar exit
