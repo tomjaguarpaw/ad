@@ -9,6 +9,7 @@ import Control.Monad (when)
 import Data.ByteString hiding (appendFile, elem, take)
 import Data.ByteString.Char8 qualified as C8
 import Data.Function (fix)
+import Data.IORef (newIORef, readIORef)
 import System.Environment
 import System.Exit (exitWith)
 import System.IO
@@ -52,11 +53,14 @@ main = do
   -- Should probably reset this on exit
   setTerminalAttributes stdInput newTermSettings Immediately
 
-  (cols, rows) <- do
+  theDims <- do
     Just stdInPty <- Pty.createPty 0
-    Pty.ptyDimensions stdInPty
+    dims <- Pty.ptyDimensions stdInPty
+    newIORef dims
 
-  (pty, childHandle) <- Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
+  (pty, childHandle) <- do
+    (cols, rows) <- readIORef theDims
+    Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
 
   _ <- flip (installHandler sigINT) Nothing . Catch $ do
     -- Write Ctrl-C
@@ -140,6 +144,7 @@ main = do
 
         let x' = read (C8.unpack x) :: Int
         let y' = read (C8.unpack y) :: Int
+        (cols, rows) <- readIORef theDims
         -- Go to first column on last row
         hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
         -- Clear line
