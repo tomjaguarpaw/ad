@@ -112,17 +112,18 @@ main = do
 
     putMVar exit e
 
-  winchMVar <- newEmptyMVar
-
-  _ <- flip (installHandler sigWINCH) Nothing . Catch $ do
-    _ <- tryPutMVar winchMVar ()
-    pure ()
+  winchSelector <- do
+    winchMVar <- newEmptyMVar
+    _ <- flip (installHandler sigWINCH) Nothing . Catch $ do
+      _ <- tryPutMVar winchMVar ()
+      pure ()
+    pure (selectorMVar winchMVar)
 
   let readEither = do
         select
           [ StdIn <$> selectorFd stdInput,
             PtyIn <$> selectorPty pty,
-            WinchIn <$ selectorMVar winchMVar
+            WinchIn <$ winchSelector
           ]
 
   let drawBar :: IO ()
