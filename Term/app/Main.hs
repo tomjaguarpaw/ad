@@ -17,12 +17,13 @@ import System.Posix.IO (stdInput)
 import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
+import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
 import System.Process (getProcessExitCode)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (log)
 
-data In = PtyIn ByteString | StdIn ByteString
+data In = PtyIn ByteString | StdIn ByteString | WinchIn
 
 ptyToFd :: Pty.Pty -> Fd
 ptyToFd = unsafeCoerce
@@ -72,6 +73,12 @@ main = do
 
     putMVar exit e
 
+  winchMVar <- newEmptyMVar
+
+  _ <- flip (installHandler sigWINCH) Nothing . Catch $ do
+    _ <- tryPutMVar winchMVar ()
+    pure ()
+
   let readPty = do
         try (Pty.readPty pty) >>= \case
           Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
@@ -91,10 +98,15 @@ main = do
           threadWaitRead (ptyToFd pty)
           putMVar inMVar (PtyIn <$> readPty)
 
+        t3 <- forkIO $ do
+          readMVar winchMVar
+          putMVar inMVar (WinchIn <$ takeMVar winchMVar)
+
         action <- readMVar inMVar
 
         killThread t1
         killThread t2
+        killThread t3
 
         action
 
@@ -139,6 +151,8 @@ main = do
   _ <- forkIO $
     fix $ \again -> do
       readEither >>= \case
+        WinchIn -> do
+          log ("WinchIn " ++ pid ++ "\n")
         StdIn bs -> do
           Pty.writePty pty bs
           log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
