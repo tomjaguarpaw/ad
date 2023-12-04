@@ -72,6 +72,12 @@ main = do
       putStrLn "I need two arguments: the text to display and the program to run"
       exitFailure
 
+  stdInPty <- Pty.createPty 0 >>= \case
+    Nothing -> do
+      putStrLn "Was not attached to terminal"
+      exitFailure
+    Just stdInPty -> pure stdInPty
+
   hSetBuffering stdin NoBuffering
 
   pid <- show <$> getProcessID
@@ -93,7 +99,6 @@ main = do
   setTerminalAttributes stdInput newTermSettings Immediately
 
   theDims <- do
-    Just stdInPty <- Pty.createPty 0
     dims <- Pty.ptyDimensions stdInPty
     newIORef dims
 
@@ -173,7 +178,6 @@ main = do
     fix $ \again -> do
       readEither >>= \case
         WinchIn -> do
-          Just stdInPty <- Pty.createPty 0
           dims@(cols, rows) <- Pty.ptyDimensions stdInPty
           writeIORef theDims dims
           Pty.resizePty pty (cols, rows - 1)
