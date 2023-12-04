@@ -14,7 +14,7 @@ import Data.Function (fix)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import System.Environment
-import System.Exit (exitWith)
+import System.Exit (exitWith, exitFailure)
 import System.IO
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
@@ -66,7 +66,11 @@ select selectors = do
 
 main :: IO ()
 main = do
-  [bar, prog] <- getArgs
+  (bar, prog) <- getArgs >>= \case
+    [bar, prog] -> pure (bar, prog)
+    _ -> do
+      putStrLn "I need two arguments: the text to display and the program to run"
+      exitFailure
 
   hSetBuffering stdin NoBuffering
 
