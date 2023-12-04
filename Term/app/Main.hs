@@ -20,6 +20,7 @@ import System.Posix.Signals
 import System.Posix.Terminal
 import System.Process (getProcessExitCode)
 import Unsafe.Coerce (unsafeCoerce)
+import Prelude hiding (log)
 
 data In = PtyIn ByteString | StdIn ByteString
 
@@ -102,25 +103,25 @@ main = do
       readEither >>= \case
         StdIn bs -> do
           Pty.writePty pty bs
-          appendFile "/tmp/log" ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
+          log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
         PtyIn bs -> do
           hPut stdout bs
-          appendFile "/tmp/log" ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
+          log (show bs ++ "\n")
 
           when (not ('\ESC' `elem` C8.unpack bs)) $ do
             -- Ask for the position
             hPut stdout (C8.pack "\ESC[6n")
-            appendFile "/tmp/log" ("Requesting position " ++ pid ++ "\n")
+            log ("Requesting position " ++ pid ++ "\n")
             hFlush stdout
 
             fix $ \again' -> do
               b <- fdRead stdInput 1
               when (b /= C8.pack "\ESC") $ do
                 Pty.writePty pty b
-                appendFile "/tmp/log" ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
+                log ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
                 again'
 
-            appendFile "/tmp/log" ("Found ESC " ++ pid ++ "\n")
+            log ("Found ESC " ++ pid ++ "\n")
 
             sofar <- flip fix mempty $ \again' sofar -> do
               b <- fdRead stdInput 1
@@ -128,7 +129,7 @@ main = do
                 then pure sofar
                 else again' (sofar <> b)
 
-            appendFile "/tmp/log" ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
+            log ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
 
             -- Drop ;
             let (x, Data.ByteString.drop 1 -> y) =
@@ -147,3 +148,6 @@ main = do
       again
 
   exitWith =<< takeMVar exit
+
+log :: String -> IO ()
+log = appendFile "/tmp/log"
