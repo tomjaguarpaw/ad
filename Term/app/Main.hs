@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -8,8 +9,10 @@ import Control.Exception
 import Control.Monad (when)
 import Data.ByteString hiding (appendFile, elem, take)
 import Data.ByteString.Char8 qualified as C8
+import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.Traversable (for)
 import System.Environment
 import System.Exit (exitWith)
 import System.IO
@@ -20,11 +23,47 @@ import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
 import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
-import System.Process (getProcessExitCode, getPid)
+import System.Process (getPid, getProcessExitCode)
 import Unsafe.Coerce (unsafeCoerce)
 import Prelude hiding (log)
 
 data In = PtyIn ByteString | StdIn ByteString | WinchIn
+
+data Selector a = MkSelector (IO ()) (IO a)
+  deriving (Functor)
+
+selectorFd :: Fd -> Selector ByteString
+selectorFd fd =
+  -- We shouldn't threadWaitRead on an Fd from a Handle
+  -- because the Handle buffers some of the input so we wait
+  -- even when there's buffered input available.
+  MkSelector (threadWaitRead fd) (fdRead fd 1)
+
+selectorPty :: Pty.Pty -> Selector ByteString
+selectorPty pty =
+  MkSelector (threadWaitRead (ptyToFd pty)) (readPty pty)
+
+selectorMVar :: MVar a -> Selector a
+selectorMVar v =
+  MkSelector (() <$ readMVar v) (takeMVar v)
+
+readPty :: Pty.Pty -> IO ByteString
+readPty pty = do
+  try (Pty.readPty pty) >>= \case
+    Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
+    Right bs -> pure bs
+
+select :: [Selector a] -> IO a
+select selectors = do
+  inMVar <- newEmptyMVar
+
+  ts <- for selectors $ \(MkSelector wait act) -> forkIO $ do
+    wait
+    putMVar inMVar act
+
+  act <- readMVar inMVar
+  for_ ts killThread
+  act
 
 ptyToFd :: Pty.Pty -> Fd
 ptyToFd = unsafeCoerce
@@ -83,36 +122,12 @@ main = do
     _ <- tryPutMVar winchMVar ()
     pure ()
 
-  let readPty = do
-        try (Pty.readPty pty) >>= \case
-          Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
-          Right bs -> pure bs
-
   let readEither = do
-        inMVar <- newEmptyMVar
-
-        t1 <- forkIO $ do
-          -- We shouldn't threadWaitRead on an Fd from a Handle
-          -- because the Handle buffers some of the input so we wait
-          -- even when there's buffered input available.
-          threadWaitRead stdInput
-          putMVar inMVar (StdIn <$> fdRead stdInput 1)
-
-        t2 <- forkIO $ do
-          threadWaitRead (ptyToFd pty)
-          putMVar inMVar (PtyIn <$> readPty)
-
-        t3 <- forkIO $ do
-          readMVar winchMVar
-          putMVar inMVar (WinchIn <$ takeMVar winchMVar)
-
-        action <- readMVar inMVar
-
-        killThread t1
-        killThread t2
-        killThread t3
-
-        action
+        select
+          [ StdIn <$> selectorFd stdInput,
+            PtyIn <$> selectorPty pty,
+            WinchIn <$ selectorMVar winchMVar
+          ]
 
   let drawBar :: IO ()
       drawBar = do
