@@ -13,6 +13,7 @@ import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
+import Foreign.C.Types (CSize)
 import System.Environment
 import System.Exit (exitFailure, exitWith)
 import System.IO
@@ -31,12 +32,12 @@ data In = PtyIn ByteString | StdIn ByteString | WinchIn
 data Selector a = MkSelector (IO ()) (IO a)
   deriving (Functor)
 
-selectorFd :: Fd -> Selector ByteString
-selectorFd fd =
+selectorFd :: CSize -> Fd -> Selector ByteString
+selectorFd n fd =
   -- We shouldn't threadWaitRead on an Fd from a Handle
   -- because the Handle buffers some of the input so we wait
   -- even when there's buffered input available.
-  MkSelector (threadWaitRead fd) (fdRead fd 1)
+  MkSelector (threadWaitRead fd) (fdRead fd n)
 
 selectorPty :: Pty.Pty -> Selector ByteString
 selectorPty pty =
@@ -132,7 +133,7 @@ main = do
 
   let readEither = do
         select
-          [ StdIn <$> selectorFd stdInput,
+          [ StdIn <$> selectorFd 1000 stdInput,
             PtyIn <$> selectorPty pty,
             WinchIn <$ winchSelector
           ]
