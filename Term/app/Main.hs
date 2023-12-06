@@ -14,7 +14,7 @@ import Data.Function (fix)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import System.Environment
-import System.Exit (exitWith, exitFailure)
+import System.Exit (exitFailure, exitWith)
 import System.IO
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
@@ -66,17 +66,19 @@ select selectors = do
 
 main :: IO ()
 main = do
-  (bar, prog) <- getArgs >>= \case
-    [bar, prog] -> pure (bar, prog)
-    _ -> do
-      putStrLn "I need two arguments: the text to display and the program to run"
-      exitFailure
+  (bar, prog) <-
+    getArgs >>= \case
+      [bar, prog] -> pure (bar, prog)
+      _ -> do
+        putStrLn "I need two arguments: the text to display and the program to run"
+        exitFailure
 
-  stdInPty <- Pty.createPty 0 >>= \case
-    Nothing -> do
-      putStrLn "Was not attached to terminal"
-      exitFailure
-    Just stdInPty -> pure stdInPty
+  stdInPty <-
+    Pty.createPty 0 >>= \case
+      Nothing -> do
+        putStrLn "Was not attached to terminal"
+        exitFailure
+      Just stdInPty -> pure stdInPty
 
   hSetBuffering stdin NoBuffering
 
