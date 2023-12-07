@@ -25,6 +25,7 @@ import System.Posix.Signals
 import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
 import System.Process (getPid, getProcessExitCode)
+import Text.Read (readMaybe)
 import Prelude hiding (log)
 
 data In = PtyIn ByteString | StdIn ByteString | WinchIn
@@ -166,8 +167,15 @@ main = do
         let (x, Data.ByteString.drop 1 -> y) =
               C8.break (== ';') (Data.ByteString.drop 1 sofar)
 
-        let x' = read (C8.unpack x) :: Int
-        let y' = read (C8.unpack y) :: Int
+        let mxy = do
+              x' <- readMaybe (C8.unpack x) :: Maybe Int
+              y' <- readMaybe (C8.unpack y) :: Maybe Int
+              pure (x', y')
+
+        (x', y') <- case mxy of
+          Nothing -> error ("No read for " <> C8.unpack sofar)
+          Just xy -> pure xy
+
         (cols, rows) <- readIORef theDims
         -- Go to first column on last row
         hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
