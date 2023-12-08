@@ -97,6 +97,11 @@ main = do
             . flip withoutMode StartStopInput
             . flip withoutMode StartStopOutput
             . flip withoutMode EnableEcho
+            -- Disabling KeyboardInterrupts (ISIG) means that typing
+            -- Ctrl-C, Ctrl-Z, and probably others, is not treated
+            -- specially by the terminal.  It just sends that
+            -- character to the child process.
+            . flip withoutMode KeyboardInterrupts
         )
           oldTermSettings
   -- Should probably reset this on exit
@@ -109,10 +114,6 @@ main = do
   (pty, childHandle) <- do
     (cols, rows) <- readIORef theDims
     Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
-
-  _ <- flip (installHandler sigINT) Nothing . Catch $ do
-    -- Write Ctrl-C
-    Pty.writePty pty (pack [3])
 
   exit <- newEmptyMVar
 
