@@ -5,25 +5,61 @@
 {-# LANGUAGE ViewPatterns #-}
 
 import Control.Concurrent
-import Control.Exception
+  ( MVar,
+    forkIO,
+    killThread,
+    myThreadId,
+    newEmptyMVar,
+    putMVar,
+    readMVar,
+    takeMVar,
+    threadWaitRead,
+    tryPutMVar,
+  )
+import Control.Exception (try)
 import Control.Monad (when)
-import Data.ByteString hiding (appendFile, elem, take)
+import Data.ByteString (ByteString, drop, hPut)
 import Data.ByteString.Char8 qualified as C8
 import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
-import System.Environment
+import System.Environment (getArgs)
 import System.Exit (exitFailure, exitWith)
 import System.IO
+  ( BufferMode (NoBuffering),
+    hFlush,
+    hSetBuffering,
+    stdin,
+    stdout,
+  )
 import System.Posix (Fd, getProcessID)
 import System.Posix.IO (stdInput)
 import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
+  ( Handler (Catch),
+    installHandler,
+    sigCHLD,
+    signalProcess,
+  )
 import System.Posix.Signals.Exts (sigWINCH)
 import System.Posix.Terminal
+  ( TerminalMode
+      ( EnableEcho,
+        KeyboardInterrupts,
+        MapCRtoLF,
+        ProcessInput,
+        ProcessOutput,
+        StartStopInput,
+        StartStopOutput
+      ),
+    TerminalState (Immediately),
+    getTerminalAttributes,
+    setTerminalAttributes,
+    withoutMode,
+  )
 import System.Process (getPid, getProcessExitCode)
 import Text.Read (readMaybe)
 import Prelude hiding (log)
