@@ -4,6 +4,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
+import Control.Arrow (Arrow (second), first)
 import Control.Concurrent
   ( MVar,
     forkIO,
@@ -20,9 +21,10 @@ import Control.Exception (try)
 import Control.Monad (when)
 import Data.ByteString (ByteString, drop, hPut)
 import Data.ByteString.Char8 qualified as C8
+import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
-import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
 import System.Environment (getArgs)
@@ -214,6 +216,9 @@ main = do
           Nothing -> error ("No read for " <> C8.unpack sofar)
           Just xy -> pure xy
 
+  let requestPositionXY0 = do
+        (y, x) <- requestPosition
+        pure (x - 1, y - 1)
 
   let drawBar :: IO ()
       drawBar = do
@@ -228,7 +233,12 @@ main = do
         -- Go back to where we were
         hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
-  _ <- forkIO $
+  _ <- forkIO $ do
+    pos <- do
+      pos <- requestPositionXY0
+      log ("pos: " ++ show pos ++ "\n")
+      newIORef pos
+
     fix $ \again -> do
       readEither >>= \case
         WinchIn -> do
@@ -245,8 +255,89 @@ main = do
           Pty.writePty pty bs
           log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
         PtyIn bs -> do
+          flip fix (C8.unpack bs) $ \again' -> \case
+            [] ->
+              pure ()
+            -- No idea what \SI is or why zsh outputs it
+
+            '\SI' : rest -> do
+              again' rest
+            '\r' : rest -> do
+              modifyIORef' pos (first (const 0))
+              again' rest
+            '\n' : rest -> do
+              (_, rows) <- readIORef theDims
+              modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
+              log "Newline\n"
+              again' rest
+            '\a' : rest ->
+              again' rest
+            '\b' : rest -> do
+              (cols, rows) <- readIORef theDims
+              modifyIORef'
+                pos
+                ( \(x, y) ->
+                    let (yinc, x') = (x - 1) `divMod` cols
+                     in (x', (y + yinc) `min` rows)
+                )
+              again' rest
+            '\ESC' : 'M' : rest -> do
+              modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+              again' rest
+            '\ESC' : '>' : rest -> do
+              again' rest
+            '\ESC' : '=' : rest -> do
+              again' rest
+            -- Not sure how to parse sgr0 (or sgr) as a general CSI
+            -- code.  What are we supposed to do with '\017'?
+            '\ESC' : '[' : 'm' : '\017' : rest -> do
+              again' rest
+            '\ESC' : '[' : csi -> do
+              case break isValidCsiEnder csi of
+                (_, "") -> error "Missing CSI ender"
+                -- In the general case we'll need to parse parameters
+                (_, verb : rest) -> do
+                  case verb of
+                    'H' -> do
+                      writeIORef pos (0, 0)
+                    -- I actually get numeric Cs, despite saying I
+                    -- don't support them :(
+                    'C' -> do
+                      modifyIORef'
+                        pos
+                        ( \(x, y) ->
+                            (x + 1, y) -- This is right if we turn off am and xenl
+                            -- else we'd have to do
+                            -- (cols, rows) <- readIORef theDims
+                            -- (x', (y + yinc) `min` (rows - 1))
+                        )
+                    _ -> pure ()
+                  again' rest
+            _ : rest -> do
+              modifyIORef'
+                pos
+                ( \(x, y) -> (x + 1, y)
+                )
+              again' rest
+
           hPut stdout bs
-          log (show bs ++ "\n")
+          dims@(_, rows) <- readIORef theDims
+          thePos <- do
+            (x, y0) <- readIORef pos
+            y <- do
+              log "Checking overlap: "
+              if y0 == rows - 1
+                then do
+                  log ("detected, going back to " ++ show (y0 - 1) ++ "\n")
+                  hPut stdout (C8.pack "\n\ESCM")
+                  pure (y0 - 1)
+                else do
+                  log "not detected\n"
+                  pure y0
+            writeIORef pos (x, y)
+            pure (x, y)
+
+          log (show bs ++ " " ++ show thePos ++ " " ++ show dims ++ "\n")
 
           when (not ('\ESC' `elem` C8.unpack bs)) $
             drawBar
@@ -254,6 +345,11 @@ main = do
       again
 
   exitWith =<< takeMVar exit
+
+-- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
+isValidCsiEnder :: Char -> Bool
+isValidCsiEnder c =
+  (isAscii c && isAlpha c) || (c == '@') || (c == '`')
 
 log :: String -> IO ()
 log = appendFile "/tmp/log"
