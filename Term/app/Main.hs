@@ -176,10 +176,11 @@ main = do
             WinchIn <$ winchSelector
           ]
 
-  let drawBar :: IO ()
-      drawBar = do
+  let requestPosition :: IO (Int, Int)
+      requestPosition = do
         -- Ask for the position
         hPut stdout (C8.pack "\ESC[6n")
+
         log ("Requesting position " ++ pid ++ "\n")
         hFlush stdout
 
@@ -209,9 +210,14 @@ main = do
               y' <- readMaybe (C8.unpack y) :: Maybe Int
               pure (x', y')
 
-        (x', y') <- case mxy of
+        case mxy of
           Nothing -> error ("No read for " <> C8.unpack sofar)
           Just xy -> pure xy
+
+
+  let drawBar :: IO ()
+      drawBar = do
+        (x', y') <- requestPosition
 
         (cols, rows) <- readIORef theDims
         -- Go to first column on last row
