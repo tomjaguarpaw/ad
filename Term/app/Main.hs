@@ -294,7 +294,7 @@ main = do
               again' rest
             '\ESC' : '[' : csi -> do
               case break isValidCsiEnder csi of
-                (_, "") -> error "Missing CSI ender"
+                (_, "") -> error ("Missing CSI ender in " ++ show csi)
                 -- In the general case we'll need to parse parameters
                 (_, verb : rest) -> do
                   case verb of
