@@ -279,6 +279,8 @@ main = do
             -- In the general case we'll need to parse parameters
             (csi, verb : _) -> do
               case verb of
+                -- I also get numeric Hs, despite saying I don't
+                -- support them.
                 'H' -> writeIORef pos (0, 0)
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
