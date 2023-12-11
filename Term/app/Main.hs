@@ -243,13 +243,11 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
-          leftovers <- newIORef (error "leftovers uninitialized")
+          let again' = pure
 
-          let again' = writeIORef leftovers . C8.pack
-
-          case C8.unpack bsIn of
+          theLeftovers <- fmap C8.pack $ case C8.unpack bsIn of
             [] ->
-              pure ()
+              pure ""
             -- No idea what \SI is or why zsh outputs it
             '\SI' : rest -> do
               again' rest
@@ -322,8 +320,6 @@ main = do
 
               writeIORef pos (x', y')
               again' rest
-
-          theLeftovers <- readIORef leftovers
 
           let bs = C8.take (C8.length bsIn - C8.length theLeftovers) bsIn
 
