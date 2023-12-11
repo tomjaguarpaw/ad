@@ -243,6 +243,8 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
+          barDirty <- newIORef False
+
           (_, seen) <- case C8.unpack bsIn of
             [] ->
               pure ("", 0)
@@ -293,6 +295,7 @@ main = do
                     -- I actually get numeric Cs, despite saying I
                     -- don't support them :(
                     'C' -> modifyIORef' pos (first (+ 1))
+                    'J' -> writeIORef barDirty True
                     _ -> pure ()
                   writeIORef cursorWrapnext False
                   pure (rest, 2 + length csi + 1)
@@ -336,6 +339,7 @@ main = do
                 then do
                   log ("detected, going back to " ++ show (y0 - 1) ++ "\n")
                   hPut stdout (C8.pack "\n\ESCM")
+                  writeIORef barDirty True
                   pure (y0 - 1)
                 else do
                   log "not detected\n"
@@ -345,7 +349,10 @@ main = do
 
           log (show bs ++ " " ++ show thePos ++ " " ++ show dims ++ "\n")
 
-          drawBar
+          dirty <- readIORef barDirty
+          when dirty $ do
+            drawBar
+            writeIORef barDirty False
 
           pure theLeftovers
 
