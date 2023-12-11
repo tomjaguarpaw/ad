@@ -262,7 +262,6 @@ main = do
             [] ->
               pure ()
             -- No idea what \SI is or why zsh outputs it
-
             '\SI' : rest -> do
               again' rest
             '\r' : rest -> do
