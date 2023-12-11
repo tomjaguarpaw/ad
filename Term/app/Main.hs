@@ -245,25 +245,25 @@ main = do
     let handlePty bsIn = do
           barDirty <- newIORef False
 
-          (_, seen) <- case C8.unpack bsIn of
+          seen <- case C8.unpack bsIn of
             [] ->
-              pure ("", 0)
+              pure 0
             -- No idea what \SI is or why zsh outputs it
-            '\SI' : rest -> do
-              pure (rest, 1)
-            '\r' : rest -> do
+            '\SI' : _ -> do
+              pure 1
+            '\r' : _ -> do
               modifyIORef' pos (first (const 0))
               writeIORef cursorWrapnext False
-              pure (rest, 1)
-            '\n' : rest -> do
+              pure 1
+            '\n' : _ -> do
               (_, rows) <- readIORef theDims
               modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
               log "Newline\n"
               writeIORef cursorWrapnext False
-              pure (rest, 1)
-            '\a' : rest ->
-              pure (rest, 1)
-            '\b' : rest -> do
+              pure 1
+            '\a' : _ ->
+              pure 1
+            '\b' : _ -> do
               (cols, rows) <- readIORef theDims
               modifyIORef'
                 pos
@@ -272,24 +272,24 @@ main = do
                      in (x', (y + yinc) `min` rows)
                 )
               writeIORef cursorWrapnext False
-              pure (rest, 1)
-            '\ESC' : 'M' : rest -> do
+              pure 1
+            '\ESC' : 'M' : _ -> do
               modifyIORef' pos (second (\y -> (y - 1) `max` 0))
               writeIORef cursorWrapnext False
-              pure (rest, 2)
-            '\ESC' : '>' : rest -> do
-              pure (rest, 2)
-            '\ESC' : '=' : rest -> do
-              pure (rest, 2)
+              pure 2
+            '\ESC' : '>' : _ -> do
+              pure 2
+            '\ESC' : '=' : _ -> do
+              pure 2
             -- Not sure how to parse sgr0 (or sgr) as a general CSI
             -- code.  What are we supposed to do with '\017'?
-            '\ESC' : '[' : 'm' : '\017' : rest -> do
-              pure (rest, 4)
+            '\ESC' : '[' : 'm' : '\017' : _ -> do
+              pure 4
             '\ESC' : '[' : csiAndRest -> do
               case break isValidCsiEnder csiAndRest of
                 (_, "") -> error ("Missing CSI ender in " ++ show csiAndRest)
                 -- In the general case we'll need to parse parameters
-                (csi, verb : rest) -> do
+                (csi, verb : _) -> do
                   case verb of
                     'H' -> writeIORef pos (0, 0)
                     -- I actually get numeric Cs, despite saying I
@@ -298,8 +298,8 @@ main = do
                     'J' -> writeIORef barDirty True
                     _ -> pure ()
                   writeIORef cursorWrapnext False
-                  pure (rest, 2 + length csi + 1)
-            _ : rest -> do
+                  pure (2 + length csi + 1)
+            _ : _ -> do
               (x, y) <- readIORef pos
 
               (x', y') <-
@@ -320,7 +320,7 @@ main = do
                     pure (x', y)
 
               writeIORef pos (x', y')
-              pure (rest, 1)
+              pure 1
 
           let bs = C8.take seen bsIn
 
