@@ -213,7 +213,7 @@ main = do
               pure (x', y')
 
         case mxy of
-          Nothing -> error ("No read for " <> C8.unpack sofar)
+          Nothing -> error ("No read for " <> show sofar)
           Just xy -> pure xy
 
   let requestPositionXY0 = do
