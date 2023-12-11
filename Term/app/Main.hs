@@ -233,6 +233,83 @@ main = do
         -- Go back to where we were
         hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
 
+  let parse barDirty cursorWrapnext pos = \case
+        [] ->
+          pure 0
+        -- No idea what \SI is or why zsh outputs it
+        '\SI' : _ -> do
+          pure 1
+        '\r' : _ -> do
+          writeIORef cursorWrapnext False
+          modifyIORef' pos (first (const 0))
+          pure 1
+        '\n' : _ -> do
+          (_, rows) <- readIORef theDims
+          modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
+          log "Newline\n"
+          writeIORef cursorWrapnext False
+          pure 1
+        '\a' : _ ->
+          pure 1
+        '\b' : _ -> do
+          (cols, rows) <- readIORef theDims
+          modifyIORef'
+            pos
+            ( \(x, y) ->
+                let (yinc, x') = (x - 1) `divMod` cols
+                 in (x', (y + yinc) `min` rows)
+            )
+          writeIORef cursorWrapnext False
+          pure 1
+        '\ESC' : 'M' : _ -> do
+          modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+          writeIORef cursorWrapnext False
+          pure 2
+        '\ESC' : '>' : _ -> do
+          pure 2
+        '\ESC' : '=' : _ -> do
+          pure 2
+        -- Not sure how to parse sgr0 (or sgr) as a general CSI
+        -- code.  What are we supposed to do with '\017'?
+        '\ESC' : '[' : 'm' : '\017' : _ -> do
+          pure 4
+        '\ESC' : '[' : csiAndRest -> do
+          case break isValidCsiEnder csiAndRest of
+            (_, "") -> error ("Missing CSI ender in " ++ show csiAndRest)
+            -- In the general case we'll need to parse parameters
+            (csi, verb : _) -> do
+              case verb of
+                'H' -> writeIORef pos (0, 0)
+                -- I actually get numeric Cs, despite saying I
+                -- don't support them :(
+                'C' -> modifyIORef' pos (first (+ 1))
+                'J' -> writeIORef barDirty True
+                _ -> pure ()
+              writeIORef cursorWrapnext False
+              pure (2 + length csi + 1)
+        _ : _ -> do
+          (x, y) <- readIORef pos
+
+          (x', y') <-
+            readIORef cursorWrapnext >>= \case
+              True -> do
+                writeIORef cursorWrapnext False
+                pure (0, y + 1)
+              False -> do
+                (cols, _) <- readIORef theDims
+                x' <-
+                  -- x > cols shouldn't happen. Check for it, and
+                  -- at least warn?
+                  if x >= cols - 1
+                    then do
+                      writeIORef cursorWrapnext True
+                      pure x
+                    else pure (x + 1)
+                pure (x', y)
+
+          writeIORef pos (x', y')
+          pure 1
+
   _ <- forkIO $ do
     pos <- do
       pos <- requestPositionXY0
@@ -245,82 +322,7 @@ main = do
     let handlePty bsIn = do
           barDirty <- newIORef False
 
-          seen <- case C8.unpack bsIn of
-            [] ->
-              pure 0
-            -- No idea what \SI is or why zsh outputs it
-            '\SI' : _ -> do
-              pure 1
-            '\r' : _ -> do
-              modifyIORef' pos (first (const 0))
-              writeIORef cursorWrapnext False
-              pure 1
-            '\n' : _ -> do
-              (_, rows) <- readIORef theDims
-              modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
-              log "Newline\n"
-              writeIORef cursorWrapnext False
-              pure 1
-            '\a' : _ ->
-              pure 1
-            '\b' : _ -> do
-              (cols, rows) <- readIORef theDims
-              modifyIORef'
-                pos
-                ( \(x, y) ->
-                    let (yinc, x') = (x - 1) `divMod` cols
-                     in (x', (y + yinc) `min` rows)
-                )
-              writeIORef cursorWrapnext False
-              pure 1
-            '\ESC' : 'M' : _ -> do
-              modifyIORef' pos (second (\y -> (y - 1) `max` 0))
-              writeIORef cursorWrapnext False
-              pure 2
-            '\ESC' : '>' : _ -> do
-              pure 2
-            '\ESC' : '=' : _ -> do
-              pure 2
-            -- Not sure how to parse sgr0 (or sgr) as a general CSI
-            -- code.  What are we supposed to do with '\017'?
-            '\ESC' : '[' : 'm' : '\017' : _ -> do
-              pure 4
-            '\ESC' : '[' : csiAndRest -> do
-              case break isValidCsiEnder csiAndRest of
-                (_, "") -> error ("Missing CSI ender in " ++ show csiAndRest)
-                -- In the general case we'll need to parse parameters
-                (csi, verb : _) -> do
-                  case verb of
-                    'H' -> writeIORef pos (0, 0)
-                    -- I actually get numeric Cs, despite saying I
-                    -- don't support them :(
-                    'C' -> modifyIORef' pos (first (+ 1))
-                    'J' -> writeIORef barDirty True
-                    _ -> pure ()
-                  writeIORef cursorWrapnext False
-                  pure (2 + length csi + 1)
-            _ : _ -> do
-              (x, y) <- readIORef pos
-
-              (x', y') <-
-                readIORef cursorWrapnext >>= \case
-                  True -> do
-                    writeIORef cursorWrapnext False
-                    pure (0, y + 1)
-                  False -> do
-                    (cols, _) <- readIORef theDims
-                    x' <-
-                      -- x > cols shouldn't happen. Check for it, and
-                      -- at least warn?
-                      if x >= cols - 1
-                        then do
-                          writeIORef cursorWrapnext True
-                          pure x
-                        else pure (x + 1)
-                    pure (x', y)
-
-              writeIORef pos (x', y')
-              pure 1
+          seen <- parse barDirty cursorWrapnext pos (C8.unpack bsIn)
 
           let bs = C8.take seen bsIn
 
