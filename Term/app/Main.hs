@@ -220,10 +220,9 @@ main = do
         (y, x) <- requestPosition
         pure (x - 1, y - 1)
 
-  let drawBar :: IO ()
-      drawBar = do
-        (x', y') <- requestPosition
-
+  let drawBar :: (Int, Int) -> IO ()
+      drawBar (x@((+ 1) -> y'), y@((+ 1) -> x')) = do
+        log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         -- Go to first column on last row
         hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
@@ -350,7 +349,7 @@ main = do
 
           dirty <- readIORef barDirty
           when dirty $ do
-            drawBar
+            drawBar =<< readIORef pos
             writeIORef barDirty False
 
           pure theLeftovers
