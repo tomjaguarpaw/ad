@@ -243,24 +243,24 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
-          theLeftovers <- fmap C8.pack $ case C8.unpack bsIn of
+          (theLeftovers, seen) <- (fmap . first) C8.pack $ case C8.unpack bsIn of
             [] ->
-              pure ""
+              pure ("", 0)
             -- No idea what \SI is or why zsh outputs it
             '\SI' : rest -> do
-              pure rest
+              pure (rest, 1)
             '\r' : rest -> do
               modifyIORef' pos (first (const 0))
               writeIORef cursorWrapnext False
-              pure rest
+              pure (rest, 1)
             '\n' : rest -> do
               (_, rows) <- readIORef theDims
               modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
               log "Newline\n"
               writeIORef cursorWrapnext False
-              pure rest
+              pure (rest, 1)
             '\a' : rest ->
-              pure rest
+              pure (rest, 1)
             '\b' : rest -> do
               (cols, rows) <- readIORef theDims
               modifyIORef'
@@ -270,24 +270,24 @@ main = do
                      in (x', (y + yinc) `min` rows)
                 )
               writeIORef cursorWrapnext False
-              pure rest
+              pure (rest, 1)
             '\ESC' : 'M' : rest -> do
               modifyIORef' pos (second (\y -> (y - 1) `max` 0))
               writeIORef cursorWrapnext False
-              pure rest
+              pure (rest, 2)
             '\ESC' : '>' : rest -> do
-              pure rest
+              pure (rest, 2)
             '\ESC' : '=' : rest -> do
-              pure rest
+              pure (rest, 2)
             -- Not sure how to parse sgr0 (or sgr) as a general CSI
             -- code.  What are we supposed to do with '\017'?
             '\ESC' : '[' : 'm' : '\017' : rest -> do
-              pure rest
-            '\ESC' : '[' : csi -> do
-              case break isValidCsiEnder csi of
-                (_, "") -> error ("Missing CSI ender in " ++ show csi)
+              pure (rest, 4)
+            '\ESC' : '[' : csiAndRest -> do
+              case break isValidCsiEnder csiAndRest of
+                (_, "") -> error ("Missing CSI ender in " ++ show csiAndRest)
                 -- In the general case we'll need to parse parameters
-                (_, verb : rest) -> do
+                (csi, verb : rest) -> do
                   case verb of
                     'H' -> writeIORef pos (0, 0)
                     -- I actually get numeric Cs, despite saying I
@@ -295,7 +295,7 @@ main = do
                     'C' -> modifyIORef' pos (first (+ 1))
                     _ -> pure ()
                   writeIORef cursorWrapnext False
-                  pure rest
+                  pure (rest, 2 + length csi + 1)
             _ : rest -> do
               (x, y) <- readIORef pos
 
@@ -317,9 +317,12 @@ main = do
                     pure (x', y)
 
               writeIORef pos (x', y')
-              pure rest
+              pure (rest, 1)
 
-          let bs = C8.take (C8.length bsIn - C8.length theLeftovers) bsIn
+          let bs = C8.take seen bsIn
+
+          when (C8.length bsIn /= seen + C8.length theLeftovers) $
+            error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
           hPut stdout bs
           dims@(_, rows) <- readIORef theDims
