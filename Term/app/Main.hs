@@ -379,10 +379,14 @@ main = do
               writeIORef unhandledPty (Just bs)
         Just bs -> do
           leftovers <- handlePty bs
+          thePos <- readIORef pos
           let mneleftovers =
                 if C8.null leftovers
                   then Nothing
                   else Just leftovers
+          case mneleftovers of
+            Nothing -> log ("handlePty: pos " ++ show thePos ++ "\n")
+            Just {} -> pure ()
           writeIORef unhandledPty mneleftovers
 
       again
