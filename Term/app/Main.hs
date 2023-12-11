@@ -242,8 +242,12 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
-    let handlePty bs = do
-          flip fix (C8.unpack bs) $ \again' -> \case
+    let handlePty bsIn = do
+          leftovers <- newIORef (error "leftovers uninitialized")
+
+          let again' = writeIORef leftovers . C8.pack
+
+          case C8.unpack bsIn of
             [] ->
               pure ()
             -- No idea what \SI is or why zsh outputs it
@@ -319,6 +323,10 @@ main = do
               writeIORef pos (x', y')
               again' rest
 
+          theLeftovers <- readIORef leftovers
+
+          let bs = C8.take (C8.length bsIn - C8.length theLeftovers) bsIn
+
           hPut stdout bs
           dims@(_, rows) <- readIORef theDims
           thePos <- do
@@ -341,6 +349,8 @@ main = do
           when (not ('\ESC' `elem` C8.unpack bs)) $
             drawBar
 
+          pure theLeftovers
+
     unhandledPty <- newIORef Nothing
 
     fix $ \again -> do
@@ -362,8 +372,12 @@ main = do
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
             PtyIn bs -> writeIORef unhandledPty (Just bs)
         Just bs -> do
-          writeIORef unhandledPty Nothing
-          handlePty bs
+          leftovers <- handlePty bs
+          let mneleftovers =
+                if C8.null leftovers
+                  then Nothing
+                  else Just leftovers
+          writeIORef unhandledPty mneleftovers
 
       again
 
