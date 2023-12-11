@@ -340,8 +340,7 @@ main = do
 
           log (show bs ++ " " ++ show thePos ++ " " ++ show dims ++ "\n")
 
-          when (not ('\ESC' `elem` C8.unpack bs)) $
-            drawBar
+          drawBar
 
           pure theLeftovers
 
