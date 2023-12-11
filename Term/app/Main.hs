@@ -243,26 +243,24 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
-          let again' = pure
-
           theLeftovers <- fmap C8.pack $ case C8.unpack bsIn of
             [] ->
               pure ""
             -- No idea what \SI is or why zsh outputs it
             '\SI' : rest -> do
-              again' rest
+              pure rest
             '\r' : rest -> do
               modifyIORef' pos (first (const 0))
               writeIORef cursorWrapnext False
-              again' rest
+              pure rest
             '\n' : rest -> do
               (_, rows) <- readIORef theDims
               modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
               log "Newline\n"
               writeIORef cursorWrapnext False
-              again' rest
+              pure rest
             '\a' : rest ->
-              again' rest
+              pure rest
             '\b' : rest -> do
               (cols, rows) <- readIORef theDims
               modifyIORef'
@@ -272,19 +270,19 @@ main = do
                      in (x', (y + yinc) `min` rows)
                 )
               writeIORef cursorWrapnext False
-              again' rest
+              pure rest
             '\ESC' : 'M' : rest -> do
               modifyIORef' pos (second (\y -> (y - 1) `max` 0))
               writeIORef cursorWrapnext False
-              again' rest
+              pure rest
             '\ESC' : '>' : rest -> do
-              again' rest
+              pure rest
             '\ESC' : '=' : rest -> do
-              again' rest
+              pure rest
             -- Not sure how to parse sgr0 (or sgr) as a general CSI
             -- code.  What are we supposed to do with '\017'?
             '\ESC' : '[' : 'm' : '\017' : rest -> do
-              again' rest
+              pure rest
             '\ESC' : '[' : csi -> do
               case break isValidCsiEnder csi of
                 (_, "") -> error ("Missing CSI ender in " ++ show csi)
@@ -297,7 +295,7 @@ main = do
                     'C' -> modifyIORef' pos (first (+ 1))
                     _ -> pure ()
                   writeIORef cursorWrapnext False
-                  again' rest
+                  pure rest
             _ : rest -> do
               (x, y) <- readIORef pos
 
@@ -319,7 +317,7 @@ main = do
                     pure (x', y)
 
               writeIORef pos (x', y')
-              again' rest
+              pure rest
 
           let bs = C8.take (C8.length bsIn - C8.length theLeftovers) bsIn
 
