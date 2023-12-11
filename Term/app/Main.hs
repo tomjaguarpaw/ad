@@ -243,7 +243,7 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
-          (theLeftovers, seen) <- (fmap . first) C8.pack $ case C8.unpack bsIn of
+          (_, seen) <- case C8.unpack bsIn of
             [] ->
               pure ("", 0)
             -- No idea what \SI is or why zsh outputs it
@@ -320,6 +320,8 @@ main = do
               pure (rest, 1)
 
           let bs = C8.take seen bsIn
+
+          let theLeftovers = C8.drop seen bsIn
 
           when (C8.length bsIn /= seen + C8.length theLeftovers) $
             error (show (C8.length bsIn, seen, C8.length theLeftovers))
