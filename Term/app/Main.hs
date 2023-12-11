@@ -239,6 +239,9 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
+    -- Like CURSOR_WRAPNEXT from st
+    cursorWrapnext <- newIORef False
+
     fix $ \again -> do
       readEither >>= \case
         WinchIn -> do
@@ -264,11 +267,13 @@ main = do
               again' rest
             '\r' : rest -> do
               modifyIORef' pos (first (const 0))
+              writeIORef cursorWrapnext False
               again' rest
             '\n' : rest -> do
               (_, rows) <- readIORef theDims
               modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
               log "Newline\n"
+              writeIORef cursorWrapnext False
               again' rest
             '\a' : rest ->
               again' rest
@@ -280,9 +285,11 @@ main = do
                     let (yinc, x') = (x - 1) `divMod` cols
                      in (x', (y + yinc) `min` rows)
                 )
+              writeIORef cursorWrapnext False
               again' rest
             '\ESC' : 'M' : rest -> do
               modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+              writeIORef cursorWrapnext False
               again' rest
             '\ESC' : '>' : rest -> do
               again' rest
@@ -298,26 +305,34 @@ main = do
                 -- In the general case we'll need to parse parameters
                 (_, verb : rest) -> do
                   case verb of
-                    'H' -> do
-                      writeIORef pos (0, 0)
+                    'H' -> writeIORef pos (0, 0)
                     -- I actually get numeric Cs, despite saying I
                     -- don't support them :(
-                    'C' -> do
-                      modifyIORef'
-                        pos
-                        ( \(x, y) ->
-                            (x + 1, y) -- This is right if we turn off am and xenl
-                            -- else we'd have to do
-                            -- (cols, rows) <- readIORef theDims
-                            -- (x', (y + yinc) `min` (rows - 1))
-                        )
+                    'C' -> modifyIORef' pos (first (+ 1))
                     _ -> pure ()
+                  writeIORef cursorWrapnext False
                   again' rest
             _ : rest -> do
-              modifyIORef'
-                pos
-                ( \(x, y) -> (x + 1, y)
-                )
+              (x, y) <- readIORef pos
+
+              (x', y') <-
+                readIORef cursorWrapnext >>= \case
+                  True -> do
+                    writeIORef cursorWrapnext False
+                    pure (0, y + 1)
+                  False -> do
+                    (cols, _) <- readIORef theDims
+                    x' <-
+                      -- x > cols shouldn't happen. Check for it, and
+                      -- at least warn?
+                      if x >= cols - 1
+                        then do
+                          writeIORef cursorWrapnext True
+                          pure x
+                        else pure (x + 1)
+                    pure (x', y)
+
+              writeIORef pos (x', y')
               again' rest
 
           hPut stdout bs
