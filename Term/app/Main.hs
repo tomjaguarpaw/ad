@@ -341,22 +341,30 @@ main = do
           when (not ('\ESC' `elem` C8.unpack bs)) $
             drawBar
 
+    unhandledPty <- newIORef Nothing
+
     fix $ \again -> do
-      readEither >>= \case
-        WinchIn -> do
-          dims@(cols, rows) <- Pty.ptyDimensions stdInPty
-          writeIORef theDims dims
-          Pty.resizePty pty (cols, rows - 1)
-          getPid childHandle >>= \case
-            -- I guess this only happens if there is a race condition
-            -- between SIGWINCH and termination of the child process
-            Nothing -> pure ()
-            Just childPid -> signalProcess sigWINCH childPid
-          log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
-        StdIn bs -> do
-          Pty.writePty pty bs
-          log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
-        PtyIn bs -> handlePty bs
+      readIORef unhandledPty >>= \case
+        Nothing -> do
+          readEither >>= \case
+            WinchIn -> do
+              dims@(cols, rows) <- Pty.ptyDimensions stdInPty
+              writeIORef theDims dims
+              Pty.resizePty pty (cols, rows - 1)
+              getPid childHandle >>= \case
+                -- I guess this only happens if there is a race condition
+                -- between SIGWINCH and termination of the child process
+                Nothing -> pure ()
+                Just childPid -> signalProcess sigWINCH childPid
+              log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
+            StdIn bs -> do
+              Pty.writePty pty bs
+              log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
+            PtyIn bs -> writeIORef unhandledPty (Just bs)
+        Just bs -> do
+          writeIORef unhandledPty Nothing
+          handlePty bs
+
       again
 
   exitWith =<< takeMVar exit
