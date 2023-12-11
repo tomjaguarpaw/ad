@@ -334,24 +334,19 @@ main = do
             error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
           hPut stdout bs
-          dims@(_, rows) <- readIORef theDims
-          thePos <- do
+          (_, rows) <- readIORef theDims
+          do
             (x, y0) <- readIORef pos
             y <- do
-              log "Checking overlap: "
               if y0 == rows - 1
                 then do
-                  log ("detected, going back to " ++ show (y0 - 1) ++ "\n")
+                  log ("Overlap detected, going back to " ++ show (y0 - 1) ++ "\n")
                   hPut stdout (C8.pack "\n\ESCM")
                   writeIORef barDirty True
                   pure (y0 - 1)
                 else do
-                  log "not detected\n"
                   pure y0
             writeIORef pos (x, y)
-            pure (x, y)
-
-          log (show bs ++ " " ++ show thePos ++ " " ++ show dims ++ "\n")
 
           dirty <- readIORef barDirty
           when dirty $ do
