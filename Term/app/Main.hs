@@ -374,7 +374,9 @@ main = do
             StdIn bs -> do
               Pty.writePty pty bs
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
-            PtyIn bs -> writeIORef unhandledPty (Just bs)
+            PtyIn bs -> do
+              log ("PtyIn" ++ pid ++ ": " ++ show bs ++ "\n")
+              writeIORef unhandledPty (Just bs)
         Just bs -> do
           leftovers <- handlePty bs
           let mneleftovers =
