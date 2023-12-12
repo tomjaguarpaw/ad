@@ -355,11 +355,11 @@ main = do
 
               pure (Just theLeftovers)
 
-    unhandledPty <- newIORef (Left ())
+    unhandledPty <- newIORef (Left mempty)
 
     fix $ \again -> do
       readIORef unhandledPty >>= \case
-        Left () -> do
+        Left neededmore -> do
           readEither >>= \case
             WinchIn -> do
               dims@(cols, rows) <- Pty.ptyDimensions stdInPty
@@ -376,7 +376,7 @@ main = do
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
             PtyIn bs -> do
               log ("PtyIn" ++ pid ++ ": " ++ show bs ++ "\n")
-              writeIORef unhandledPty (Right bs)
+              writeIORef unhandledPty (Right (neededmore <> bs))
         Right bs -> do
           eleftovers <- handlePty bs
           thePos <- readIORef pos
@@ -384,11 +384,11 @@ main = do
                 case eleftovers of
                   Just leftovers ->
                     if C8.null leftovers
-                      then Left ()
+                      then Left mempty
                       else Right leftovers
-                  Nothing -> error "Missing CSI ender"
+                  Nothing -> Left bs
           case mneleftovers of
-            Left () -> log ("handlePty: pos " ++ show thePos ++ "\n")
+            Left {} -> log ("handlePty: pos " ++ show thePos ++ "\n")
             Right {} -> pure ()
           writeIORef unhandledPty mneleftovers
 
