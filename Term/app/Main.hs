@@ -375,6 +375,10 @@ main = do
                   pure y0
             writeIORef pos (x, y)
 
+    do
+      dummy <- newIORef (error "Dummy")
+      scrollIfNeeded dummy (C8.pack "Initial scroll")
+
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
