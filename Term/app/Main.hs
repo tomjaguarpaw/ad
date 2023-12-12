@@ -289,8 +289,27 @@ main = do
                   (_, _) -> error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
-                'C' -> modifyIORef' pos (first (+ 1))
                 'J' -> writeIORef barDirty True
+                'A' -> do
+                  let mdy
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (second (subtract mdy))
+                'B' -> do
+                  let dy
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (second (+ dy))
+                'C' -> do
+                  let dx
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (first (+ dx))
+                'D' -> do
+                  let mdx
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (first (+ (-mdx)))
                 _ -> pure ()
               writeIORef cursorWrapnext False
               pure (Just (2 + length csi + 1))
