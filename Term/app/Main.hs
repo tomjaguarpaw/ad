@@ -346,6 +346,35 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
+    let scrollIfNeeded barDirty bs = do
+          (_, rows) <- readIORef theDims
+          do
+            (x, y0) <- readIORef pos
+            y <- do
+              if y0 == rows - 1
+                then do
+                  log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
+                  (xp, yp) <- readIORef pos
+                  hPut
+                    stdout
+                    ( C8.pack
+                        ( "\ESC["
+                            ++ show rows
+                            ++ ";0H"
+                            ++ "\ESC[K\ESC["
+                            ++ show (yp + 1)
+                            ++ ";"
+                            ++ show (xp + 1)
+                            ++ "H"
+                            ++ "\n\ESCM"
+                        )
+                    )
+                  writeIORef barDirty True
+                  pure (y0 - 1)
+                else do
+                  pure y0
+            writeIORef pos (x, y)
+
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
@@ -363,33 +392,7 @@ main = do
                 error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
               hPut stdout bs
-              (_, rows) <- readIORef theDims
-              do
-                (x, y0) <- readIORef pos
-                y <- do
-                  if y0 == rows - 1
-                    then do
-                      log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
-                      (xp, yp) <- readIORef pos
-                      hPut
-                        stdout
-                        ( C8.pack
-                            ( "\ESC["
-                                ++ show rows
-                                ++ ";0H"
-                                ++ "\ESC[K\ESC["
-                                ++ show (yp + 1)
-                                ++ ";"
-                                ++ show (xp + 1)
-                                ++ "H"
-                                ++ "\n\ESCM"
-                            )
-                        )
-                      writeIORef barDirty True
-                      pure (y0 - 1)
-                    else do
-                      pure y0
-                writeIORef pos (x, y)
+              scrollIfNeeded barDirty bs
 
               dirty <- readIORef barDirty
               when dirty $ do
