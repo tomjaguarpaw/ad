@@ -425,7 +425,7 @@ main = do
               Pty.writePty pty bs
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
             PtyIn bs -> do
-              log ("PtyIn" ++ pid ++ ": " ++ show bs ++ "\n")
+              log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
               writeIORef unhandledPty (Right (neededmore <> bs))
         Right bs -> do
           eleftovers <- handlePty bs
