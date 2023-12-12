@@ -314,6 +314,9 @@ main = do
                 _ -> pure ()
               writeIORef cursorWrapnext False
               pure (Just (2 + length csi + 1))
+        -- This does not deal with Unicode characters correctly.  It
+        -- assumes each unknown byte takes up one terminal space but
+        -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
         _ : _ -> do
           (x, y) <- readIORef pos
 
