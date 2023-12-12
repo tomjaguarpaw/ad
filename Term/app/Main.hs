@@ -367,7 +367,7 @@ main = do
                     ( C8.pack
                         ( "\ESC["
                             ++ show rows
-                            ++ ";0H"
+                            ++ ";1H"
                             ++ "\ESC[K\ESC["
                             ++ show (yp + 1)
                             ++ ";"
