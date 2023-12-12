@@ -234,22 +234,22 @@ main = do
 
   let parse barDirty cursorWrapnext pos = \case
         [] ->
-          pure 0
+          pure (Just 0)
         -- No idea what \SI is or why zsh outputs it
         '\SI' : _ -> do
-          pure 1
+          pure (Just 1)
         '\r' : _ -> do
           writeIORef cursorWrapnext False
           modifyIORef' pos (first (const 0))
-          pure 1
+          pure (Just 1)
         '\n' : _ -> do
           (_, rows) <- readIORef theDims
           modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
           log "Newline\n"
           writeIORef cursorWrapnext False
-          pure 1
+          pure (Just 1)
         '\a' : _ ->
-          pure 1
+          pure (Just 1)
         '\b' : _ -> do
           (cols, rows) <- readIORef theDims
           modifyIORef'
@@ -259,22 +259,22 @@ main = do
                  in (x', (y + yinc) `min` rows)
             )
           writeIORef cursorWrapnext False
-          pure 1
+          pure (Just 1)
         '\ESC' : 'M' : _ -> do
           modifyIORef' pos (second (\y -> (y - 1) `max` 0))
           writeIORef cursorWrapnext False
-          pure 2
+          pure (Just 2)
         '\ESC' : '>' : _ -> do
-          pure 2
+          pure (Just 2)
         '\ESC' : '=' : _ -> do
-          pure 2
+          pure (Just 2)
         -- Not sure how to parse sgr0 (or sgr) as a general CSI
         -- code.  What are we supposed to do with '\017'?
         '\ESC' : '[' : 'm' : '\017' : _ -> do
-          pure 4
+          pure (Just 4)
         '\ESC' : '[' : csiAndRest -> do
           case break isValidCsiEnder csiAndRest of
-            (_, "") -> error ("Missing CSI ender in " ++ show csiAndRest)
+            (_, "") -> pure Nothing
             -- In the general case we'll need to parse parameters
             (csi, verb : _) -> do
               case verb of
@@ -287,7 +287,7 @@ main = do
                 'J' -> writeIORef barDirty True
                 _ -> pure ()
               writeIORef cursorWrapnext False
-              pure (2 + length csi + 1)
+              pure (Just (2 + length csi + 1))
         _ : _ -> do
           (x, y) <- readIORef pos
 
@@ -309,7 +309,7 @@ main = do
                 pure (x', y)
 
           writeIORef pos (x', y')
-          pure 1
+          pure (Just 1)
 
   _ <- forkIO $ do
     pos <- do
@@ -323,36 +323,37 @@ main = do
     let handlePty bsIn = do
           barDirty <- newIORef False
 
-          seen <- parse barDirty cursorWrapnext pos (C8.unpack bsIn)
+          parse barDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
+            Nothing -> error "Missing CSI ender"
+            Just seen -> do
+              let bs = C8.take seen bsIn
 
-          let bs = C8.take seen bsIn
+              let theLeftovers = C8.drop seen bsIn
 
-          let theLeftovers = C8.drop seen bsIn
+              when (C8.length bsIn /= seen + C8.length theLeftovers) $
+                error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
-          when (C8.length bsIn /= seen + C8.length theLeftovers) $
-            error (show (C8.length bsIn, seen, C8.length theLeftovers))
+              hPut stdout bs
+              (_, rows) <- readIORef theDims
+              do
+                (x, y0) <- readIORef pos
+                y <- do
+                  if y0 == rows - 1
+                    then do
+                      log ("Overlap detected, going back to " ++ show (y0 - 1) ++ "\n")
+                      hPut stdout (C8.pack "\n\ESCM")
+                      writeIORef barDirty True
+                      pure (y0 - 1)
+                    else do
+                      pure y0
+                writeIORef pos (x, y)
 
-          hPut stdout bs
-          (_, rows) <- readIORef theDims
-          do
-            (x, y0) <- readIORef pos
-            y <- do
-              if y0 == rows - 1
-                then do
-                  log ("Overlap detected, going back to " ++ show (y0 - 1) ++ "\n")
-                  hPut stdout (C8.pack "\n\ESCM")
-                  writeIORef barDirty True
-                  pure (y0 - 1)
-                else do
-                  pure y0
-            writeIORef pos (x, y)
+              dirty <- readIORef barDirty
+              when dirty $ do
+                drawBar =<< readIORef pos
+                writeIORef barDirty False
 
-          dirty <- readIORef barDirty
-          when dirty $ do
-            drawBar =<< readIORef pos
-            writeIORef barDirty False
-
-          pure theLeftovers
+              pure theLeftovers
 
     unhandledPty <- newIORef (Left ())
 
