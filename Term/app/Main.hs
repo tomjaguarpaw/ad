@@ -361,7 +361,6 @@ main = do
               if y0 == rows - 1
                 then do
                   log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
-                  (xp, yp) <- readIORef pos
                   hPut
                     stdout
                     ( C8.pack
@@ -369,9 +368,9 @@ main = do
                             ++ show rows
                             ++ ";1H"
                             ++ "\ESC[K\ESC["
-                            ++ show (yp + 1)
+                            ++ show (y0 + 1)
                             ++ ";"
-                            ++ show (xp + 1)
+                            ++ show (x + 1)
                             ++ "H"
                             ++ "\n\ESCM"
                         )
