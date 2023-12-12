@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
@@ -278,9 +279,14 @@ main = do
             -- In the general case we'll need to parse parameters
             (csi, verb : _) -> do
               case verb of
-                -- I also get numeric Hs, despite saying I don't
-                -- support them.
-                'H' -> writeIORef pos (0, 0)
+                'H' -> case break (== ';') csi of
+                  ("", "") -> writeIORef pos (0, 0)
+                  (_, "") -> error "I guess this is just y"
+                  (yp1s, ';' : xp1s) -> do
+                    let xp1 = read xp1s
+                        yp1 = read yp1s
+                    writeIORef pos (xp1 - 1, yp1 - 1)
+                  (_, _) -> error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
                 'C' -> modifyIORef' pos (first (+ 1))
