@@ -290,6 +290,7 @@ main = do
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
                 'J' -> writeIORef barDirty True
+                'L' -> writeIORef barDirty True
                 'A' -> do
                   let mdy
                         | null csi = 1
