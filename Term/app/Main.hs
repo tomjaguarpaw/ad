@@ -234,7 +234,7 @@ main = do
 
   let parse barDirty cursorWrapnext pos = \case
         [] ->
-          pure (Just 0)
+          pure Nothing
         -- No idea what \SI is or why zsh outputs it
         '\SI' : _ -> do
           pure (Just 1)
@@ -382,10 +382,7 @@ main = do
           thePos <- readIORef pos
           let mneleftovers =
                 case eleftovers of
-                  Just leftovers ->
-                    if C8.null leftovers
-                      then Left mempty
-                      else Right leftovers
+                  Just leftovers -> Right leftovers
                   Nothing -> Left bs
           case mneleftovers of
             Left {} -> log ("handlePty: pos " ++ show thePos ++ "\n")
