@@ -354,11 +354,11 @@ main = do
 
           pure theLeftovers
 
-    unhandledPty <- newIORef Nothing
+    unhandledPty <- newIORef (Left ())
 
     fix $ \again -> do
       readIORef unhandledPty >>= \case
-        Nothing -> do
+        Left () -> do
           readEither >>= \case
             WinchIn -> do
               dims@(cols, rows) <- Pty.ptyDimensions stdInPty
@@ -375,17 +375,17 @@ main = do
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
             PtyIn bs -> do
               log ("PtyIn" ++ pid ++ ": " ++ show bs ++ "\n")
-              writeIORef unhandledPty (Just bs)
-        Just bs -> do
+              writeIORef unhandledPty (Right bs)
+        Right bs -> do
           leftovers <- handlePty bs
           thePos <- readIORef pos
           let mneleftovers =
                 if C8.null leftovers
-                  then Nothing
-                  else Just leftovers
+                  then Left ()
+                  else Right leftovers
           case mneleftovers of
-            Nothing -> log ("handlePty: pos " ++ show thePos ++ "\n")
-            Just {} -> pure ()
+            Left () -> log ("handlePty: pos " ++ show thePos ++ "\n")
+            Right {} -> pure ()
           writeIORef unhandledPty mneleftovers
 
       again
