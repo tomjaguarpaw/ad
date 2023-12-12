@@ -281,12 +281,12 @@ main = do
               case verb of
                 'H' -> case break (== ';') csi of
                   ("", "") -> writeIORef pos (0, 0)
-                  (_, "") -> error "I guess this is just y"
+                  (_ : _, "") -> error "I guess this is just y"
                   (yp1s, ';' : xp1s) -> do
                     let xp1 = read xp1s
                         yp1 = read yp1s
                     writeIORef pos (xp1 - 1, yp1 - 1)
-                  (_, _) -> error "Impossible.  Split must start with ;"
+                  (_, _ : _) -> error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
                 'J' -> writeIORef barDirty True
