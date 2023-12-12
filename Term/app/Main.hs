@@ -324,7 +324,7 @@ main = do
           barDirty <- newIORef False
 
           parse barDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
-            Nothing -> error "Missing CSI ender"
+            Nothing -> pure Nothing
             Just seen -> do
               let bs = C8.take seen bsIn
 
@@ -353,7 +353,7 @@ main = do
                 drawBar =<< readIORef pos
                 writeIORef barDirty False
 
-              pure theLeftovers
+              pure (Just theLeftovers)
 
     unhandledPty <- newIORef (Left ())
 
@@ -378,12 +378,15 @@ main = do
               log ("PtyIn" ++ pid ++ ": " ++ show bs ++ "\n")
               writeIORef unhandledPty (Right bs)
         Right bs -> do
-          leftovers <- handlePty bs
+          eleftovers <- handlePty bs
           thePos <- readIORef pos
           let mneleftovers =
-                if C8.null leftovers
-                  then Left ()
-                  else Right leftovers
+                case eleftovers of
+                  Just leftovers ->
+                    if C8.null leftovers
+                      then Left ()
+                      else Right leftovers
+                  Nothing -> error "Missing CSI ender"
           case mneleftovers of
             Left () -> log ("handlePty: pos " ++ show thePos ++ "\n")
             Right {} -> pure ()
