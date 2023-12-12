@@ -413,6 +413,9 @@ parse markBarDirty inWrapnext theDims pos = \case
     pure (Just 1, False)
   '\ESC' : 'M' : _ -> do
     modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+    do
+      (_, y) <- readIORef pos
+      when (y == 0) markBarDirty
     pure (Just 2, False)
   '\ESC' : '>' : _ -> do
     pure (Just 2, inWrapnext)
