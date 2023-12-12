@@ -357,29 +357,24 @@ main = do
           (_, rows) <- readIORef theDims
           do
             (x, y0) <- readIORef pos
-            y <- do
-              if y0 == rows - 1
-                then do
-                  log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
-                  hPut
-                    stdout
-                    ( C8.pack
-                        ( "\ESC["
-                            ++ show rows
-                            ++ ";1H"
-                            ++ "\ESC[K\ESC["
-                            ++ show (y0 + 1)
-                            ++ ";"
-                            ++ show (x + 1)
-                            ++ "H"
-                            ++ "\n\ESCM"
-                        )
+            when (y0 == rows - 1) $ do
+              log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
+              hPut
+                stdout
+                ( C8.pack
+                    ( "\ESC["
+                        ++ show rows
+                        ++ ";1H"
+                        ++ "\ESC[K\ESC["
+                        ++ show (y0 + 1)
+                        ++ ";"
+                        ++ show (x + 1)
+                        ++ "H"
+                        ++ "\n\ESCM"
                     )
-                  writeIORef barDirty True
-                  pure (y0 - 1)
-                else do
-                  pure y0
-            writeIORef pos (x, y)
+                )
+              writeIORef barDirty True
+              writeIORef pos (x, y0 - 1)
 
     do
       dummy <- newIORef (error "Dummy")
