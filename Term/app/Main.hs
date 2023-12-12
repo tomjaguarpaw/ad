@@ -369,7 +369,7 @@ main = do
                 y <- do
                   if y0 == rows - 1
                     then do
-                      log ("Overlap detected, going back to " ++ show (y0 - 1) ++ "\n")
+                      log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
                       (xp, yp) <- readIORef pos
                       hPut
                         stdout
