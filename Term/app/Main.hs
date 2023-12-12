@@ -370,7 +370,21 @@ main = do
                   if y0 == rows - 1
                     then do
                       log ("Overlap detected, going back to " ++ show (y0 - 1) ++ "\n")
-                      hPut stdout (C8.pack "\n\ESCM")
+                      (xp, yp) <- readIORef pos
+                      hPut
+                        stdout
+                        ( C8.pack
+                            ( "\ESC["
+                                ++ show rows
+                                ++ ";0H"
+                                ++ "\ESC[K\ESC["
+                                ++ show (yp + 1)
+                                ++ ";"
+                                ++ show (xp + 1)
+                                ++ "H"
+                                ++ "\n\ESCM"
+                            )
+                        )
                       writeIORef barDirty True
                       pure (y0 - 1)
                     else do
