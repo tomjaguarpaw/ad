@@ -225,7 +225,7 @@ main = do
         pure (x - 1, y - 1)
 
   let drawBar :: (Int, Int) -> IO ()
-      drawBar (x@((+ 1) -> y'), y@((+ 1) -> x')) = do
+      drawBar (x@((+ 1) -> xp1), y@((+ 1) -> yp1)) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         -- Go to first column on last row
@@ -234,7 +234,7 @@ main = do
         hPut stdout (C8.pack "\ESC[K")
         hPut stdout (C8.pack (take cols bar))
         -- Go back to where we were
-        hPut stdout (C8.pack ("\ESC[" <> show x' <> ";" <> show y' <> "H"))
+        hPut stdout (C8.pack ("\ESC[" <> show yp1 <> ";" <> show xp1 <> "H"))
 
   let parse barDirty cursorWrapnext pos = \case
         [] ->
