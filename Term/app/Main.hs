@@ -159,7 +159,8 @@ main = do
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
     e <-
       getProcessExitCode childHandle >>= \case
-        Nothing ->
+        Nothing -> do
+          log "Impossible: should only happen when the process is still running"
           error "Impossible: should only happen when the process is still running"
         Just e -> pure e
 
@@ -214,7 +215,9 @@ main = do
               pure (x', y')
 
         case mxy of
-          Nothing -> error ("No read for " <> show sofar)
+          Nothing -> do
+            log ("No read for " <> show sofar)
+            error ("No read for " <> show sofar)
           Just xy -> pure xy
 
   let requestPositionXY0 = do
@@ -281,12 +284,16 @@ main = do
               case verb of
                 'H' -> case break (== ';') csi of
                   ("", "") -> writeIORef pos (0, 0)
-                  (_ : _, "") -> error "I guess this is just y"
+                  (_ : _, "") -> do
+                    log "error: I guess this is just y"
+                    error "I guess this is just y"
                   (yp1s, ';' : xp1s) -> do
                     let xp1 = read xp1s
                         yp1 = read yp1s
                     writeIORef pos (xp1 - 1, yp1 - 1)
-                  (_, _ : _) -> error "Impossible.  Split must start with ;"
+                  (_, _ : _) -> do
+                    log "Impossible.  Split must start with ;"
+                    error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
                 'J' -> writeIORef barDirty True
@@ -392,7 +399,8 @@ main = do
 
               let theLeftovers = C8.drop seen bsIn
 
-              when (C8.length bsIn /= seen + C8.length theLeftovers) $
+              when (C8.length bsIn /= seen + C8.length theLeftovers) $ do
+                log "Invariant violated"
                 error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
               hPut stdout bs
