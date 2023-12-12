@@ -355,26 +355,25 @@ main = do
 
     let scrollIfNeeded barDirty bs = do
           (_, rows) <- readIORef theDims
-          do
-            (x, y0) <- readIORef pos
-            when (y0 == rows - 1) $ do
-              log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
-              hPut
-                stdout
-                ( C8.pack
-                    ( "\ESC["
-                        ++ show rows
-                        ++ ";1H"
-                        ++ "\ESC[K\ESC["
-                        ++ show (y0 + 1)
-                        ++ ";"
-                        ++ show (x + 1)
-                        ++ "H"
-                        ++ "\n\ESCM"
-                    )
-                )
-              writeIORef barDirty True
-              writeIORef pos (x, y0 - 1)
+          (x, y0) <- readIORef pos
+          when (y0 == rows - 1) $ do
+            log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "\n")
+            hPut
+              stdout
+              ( C8.pack
+                  ( "\ESC["
+                      ++ show rows
+                      ++ ";1H"
+                      ++ "\ESC[K\ESC["
+                      ++ show (y0 + 1)
+                      ++ ";"
+                      ++ show (x + 1)
+                      ++ "H"
+                      ++ "\n\ESCM"
+                  )
+              )
+            writeIORef barDirty True
+            writeIORef pos (x, y0 - 1)
 
     do
       dummy <- newIORef (error "Dummy")
