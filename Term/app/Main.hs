@@ -277,7 +277,8 @@ main = do
             barDirty <- newIORef False
             pure (writeIORef barDirty True, readIORef barDirty)
 
-          parse markBarDirty cursorWrapnext theDims pos (C8.unpack bsIn) >>= \case
+          inWrapnext <- readIORef cursorWrapnext
+          parse markBarDirty inWrapnext cursorWrapnext theDims pos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
             Just seen -> do
               let bs = C8.take seen bsIn
@@ -339,12 +340,13 @@ main = do
 
 parse ::
   IO () ->
+  Bool ->
   IORef Bool ->
   IORef (Int, Int) ->
   IORef (Int, Int) ->
   String ->
   IO (Maybe Int)
-parse markBarDirty cursorWrapnext theDims pos = \case
+parse markBarDirty inWrapnext cursorWrapnext theDims pos = \case
   [] ->
     pure Nothing
   -- No idea what \SI is or why zsh outputs it
@@ -436,7 +438,7 @@ parse markBarDirty cursorWrapnext theDims pos = \case
     (x, y) <- readIORef pos
 
     newPos <-
-      readIORef cursorWrapnext >>= \case
+      case inWrapnext of
         True -> do
           writeIORef cursorWrapnext False
           pure (0, y + 1)
