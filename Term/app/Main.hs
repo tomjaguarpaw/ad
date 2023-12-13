@@ -245,7 +245,7 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded (markBarDirty :: IO ()) bs = do
+    let scrollIfNeeded wasWrapnext (oldxm1, oldym1) (markBarDirty :: IO ()) bs = do
           (_, rows) <- readIORef theDims
           (x, y0) <- readIORef pos
           when (y0 == rows - 1) $ do
@@ -256,18 +256,19 @@ main = do
                   ( "\ESC["
                       ++ show rows
                       ++ ";1H"
-                      ++ "\ESC[K\ESC["
-                      ++ show (y0 + 1)
+                      ++ "\ESC[K\n\ESCM\ESC["
+                      ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
                       ++ ";"
-                      ++ show (x + 1)
+                      ++ show (1 + if wasWrapnext then 0 else oldxm1)
                       ++ "H"
-                      ++ "\n\ESCM"
                   )
               )
             markBarDirty
             writeIORef pos (x, y0 - 1)
 
-    scrollIfNeeded (pure ()) (C8.pack "Initial scroll")
+    do
+      oldPos <- readIORef pos
+      scrollIfNeeded False oldPos (pure ()) (C8.pack "Initial scroll")
 
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
@@ -278,6 +279,7 @@ main = do
             pure (writeIORef barDirty True, readIORef barDirty)
 
           inWrapnext <- readIORef cursorWrapnext
+          oldPos <- readIORef pos
           parse markBarDirty inWrapnext theDims pos (C8.unpack bsIn) >>= \case
             (Nothing, nextWrapnext) -> do
               writeIORef cursorWrapnext nextWrapnext
@@ -292,8 +294,8 @@ main = do
                 log "Invariant violated"
                 error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
+              scrollIfNeeded inWrapnext oldPos markBarDirty bs
               hPut stdout bs
-              scrollIfNeeded markBarDirty bs
 
               dirty <- isBarDirty
               when dirty (drawBar =<< readIORef pos)
@@ -436,7 +438,7 @@ parse markBarDirty inWrapnext theDims pos = \case
 
     (newPos, nextWrapnext) <-
       case inWrapnext of
-        True -> pure ((0, y + 1), False)
+        True -> pure ((1, y + 1), False)
         False -> do
           (cols, _) <- readIORef theDims
           -- x > cols shouldn't happen. Check for it, and
