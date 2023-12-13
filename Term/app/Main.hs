@@ -398,8 +398,16 @@ parse markBarDirty inWrapnext theDims pos = \case
               log "error: I guess this is just y"
               error "I guess this is just y"
             (yp1s, ';' : xp1s) -> do
-              let xp1 = read xp1s
-                  yp1 = read yp1s
+              xp1 <- case readMaybe xp1s of
+                Nothing -> do
+                  log ("Could not read: " ++ show xp1s ++ "\n")
+                  error ("Could not read: " ++ show xp1s)
+                Just j -> pure j
+              yp1 <- case readMaybe yp1s of
+                Nothing -> do
+                  log ("Could not read: " ++ show yp1s ++ "\n")
+                  error ("Could not read: " ++ show yp1s)
+                Just j -> pure j
               writeIORef pos (xp1 - 1, yp1 - 1)
             (_, _ : _) -> do
               log "Impossible.  Split must start with ;"
