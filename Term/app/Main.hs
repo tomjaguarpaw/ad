@@ -330,7 +330,7 @@ main = do
         _ : _ -> do
           (x, y) <- readIORef pos
 
-          (x', y') <-
+          newPos <-
             readIORef cursorWrapnext >>= \case
               True -> do
                 writeIORef cursorWrapnext False
@@ -347,7 +347,7 @@ main = do
                     else pure (x + 1)
                 pure (x', y)
 
-          writeIORef pos (x', y')
+          writeIORef pos newPos
           pure (Just 1)
 
   _ <- forkIO $ do
