@@ -384,8 +384,9 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePty bsIn = do
-          barDirty <- newIORef False
-          let markBarDirty = writeIORef barDirty True
+          (markBarDirty, isBarDirty) <- do
+            barDirty <- newIORef False
+            pure (writeIORef barDirty True, readIORef barDirty)
 
           parse markBarDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
@@ -401,7 +402,7 @@ main = do
               hPut stdout bs
               scrollIfNeeded markBarDirty bs
 
-              dirty <- readIORef barDirty
+              dirty <- isBarDirty
               when dirty (drawBar =<< readIORef pos)
 
               pure (Just theLeftovers)
