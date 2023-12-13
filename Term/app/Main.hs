@@ -356,7 +356,7 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded barDirty bs = do
+    let scrollIfNeeded (markBarDirty :: IO ()) bs = do
           (_, rows) <- readIORef theDims
           (x, y0) <- readIORef pos
           when (y0 == rows - 1) $ do
@@ -375,12 +375,11 @@ main = do
                       ++ "\n\ESCM"
                   )
               )
-            writeIORef barDirty True
+            markBarDirty
             writeIORef pos (x, y0 - 1)
 
     do
-      dummy <- newIORef (error "Dummy")
-      scrollIfNeeded dummy (C8.pack "Initial scroll")
+      scrollIfNeeded (pure ()) (C8.pack "Initial scroll")
 
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
@@ -401,7 +400,7 @@ main = do
                 error (show (C8.length bsIn, seen, C8.length theLeftovers))
 
               hPut stdout bs
-              scrollIfNeeded barDirty bs
+              scrollIfNeeded markBarDirty bs
 
               dirty <- readIORef barDirty
               when dirty (drawBar =<< readIORef pos)
