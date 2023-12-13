@@ -25,7 +25,7 @@ import Data.ByteString.Char8 qualified as C8
 import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
-import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
 import System.Environment (getArgs)
@@ -239,117 +239,6 @@ main = do
         -- Go back to where we were
         hPut stdout (C8.pack ("\ESC[" <> show yp1 <> ";" <> show xp1 <> "H"))
 
-  let parse markBarDirty cursorWrapnext theDims pos = \case
-        [] ->
-          pure Nothing
-        -- No idea what \SI is or why zsh outputs it
-        '\SI' : _ -> do
-          pure (Just 1)
-        '\r' : _ -> do
-          writeIORef cursorWrapnext False
-          modifyIORef' pos (first (const 0))
-          pure (Just 1)
-        '\n' : _ -> do
-          (_, rows) <- readIORef theDims
-          modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
-          log "Newline\n"
-          writeIORef cursorWrapnext False
-          pure (Just 1)
-        '\a' : _ ->
-          pure (Just 1)
-        '\b' : _ -> do
-          (cols, rows) <- readIORef theDims
-          modifyIORef'
-            pos
-            ( \(x, y) ->
-                let (yinc, x') = (x - 1) `divMod` cols
-                 in (x', (y + yinc) `min` rows)
-            )
-          writeIORef cursorWrapnext False
-          pure (Just 1)
-        '\ESC' : 'M' : _ -> do
-          modifyIORef' pos (second (\y -> (y - 1) `max` 0))
-          writeIORef cursorWrapnext False
-          pure (Just 2)
-        '\ESC' : '>' : _ -> do
-          pure (Just 2)
-        '\ESC' : '=' : _ -> do
-          pure (Just 2)
-        -- Not sure how to parse sgr0 (or sgr) as a general CSI
-        -- code.  What are we supposed to do with '\017'?
-        '\ESC' : '[' : 'm' : '\017' : _ -> do
-          pure (Just 4)
-        '\ESC' : '[' : csiAndRest -> do
-          case break isValidCsiEnder csiAndRest of
-            (_, "") -> pure Nothing
-            -- In the general case we'll need to parse parameters
-            (csi, verb : _) -> do
-              case verb of
-                'H' -> case break (== ';') csi of
-                  ("", "") -> writeIORef pos (0, 0)
-                  (_ : _, "") -> do
-                    log "error: I guess this is just y"
-                    error "I guess this is just y"
-                  (yp1s, ';' : xp1s) -> do
-                    let xp1 = read xp1s
-                        yp1 = read yp1s
-                    writeIORef pos (xp1 - 1, yp1 - 1)
-                  (_, _ : _) -> do
-                    log "Impossible.  Split must start with ;"
-                    error "Impossible.  Split must start with ;"
-                -- I actually get numeric Cs, despite saying I
-                -- don't support them :(
-                'J' -> markBarDirty
-                'L' -> markBarDirty
-                'A' -> do
-                  let mdy
-                        | null csi = 1
-                        | otherwise = read csi
-                  modifyIORef' pos (second (subtract mdy))
-                'B' -> do
-                  let dy
-                        | null csi = 1
-                        | otherwise = read csi
-                  modifyIORef' pos (second (+ dy))
-                'C' -> do
-                  let dx
-                        | null csi = 1
-                        | otherwise = read csi
-                  modifyIORef' pos (first (+ dx))
-                'D' -> do
-                  let mdx
-                        | null csi = 1
-                        | otherwise = read csi
-                  modifyIORef' pos (first (+ (-mdx)))
-                _ -> pure ()
-              writeIORef cursorWrapnext False
-              pure (Just (2 + length csi + 1))
-        -- This does not deal with Unicode characters correctly.  It
-        -- assumes each unknown byte takes up one terminal space but
-        -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
-        _ : _ -> do
-          (x, y) <- readIORef pos
-
-          newPos <-
-            readIORef cursorWrapnext >>= \case
-              True -> do
-                writeIORef cursorWrapnext False
-                pure (0, y + 1)
-              False -> do
-                (cols, _) <- readIORef theDims
-                x' <-
-                  -- x > cols shouldn't happen. Check for it, and
-                  -- at least warn?
-                  if x >= cols - 1
-                    then do
-                      writeIORef cursorWrapnext True
-                      pure x
-                    else pure (x + 1)
-                pure (x', y)
-
-          writeIORef pos newPos
-          pure (Just 1)
-
   _ <- forkIO $ do
     pos <- do
       pos <- requestPositionXY0
@@ -447,6 +336,124 @@ main = do
       again
 
   exitWith =<< takeMVar exit
+
+parse ::
+  IO () ->
+  IORef Bool ->
+  IORef (Int, Int) ->
+  IORef (Int, Int) ->
+  String ->
+  IO (Maybe Int)
+parse markBarDirty cursorWrapnext theDims pos = \case
+  [] ->
+    pure Nothing
+  -- No idea what \SI is or why zsh outputs it
+  '\SI' : _ -> do
+    pure (Just 1)
+  '\r' : _ -> do
+    writeIORef cursorWrapnext False
+    modifyIORef' pos (first (const 0))
+    pure (Just 1)
+  '\n' : _ -> do
+    (_, rows) <- readIORef theDims
+    modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
+    log "Newline\n"
+    writeIORef cursorWrapnext False
+    pure (Just 1)
+  '\a' : _ ->
+    pure (Just 1)
+  '\b' : _ -> do
+    (cols, rows) <- readIORef theDims
+    modifyIORef'
+      pos
+      ( \(x, y) ->
+          let (yinc, x') = (x - 1) `divMod` cols
+           in (x', (y + yinc) `min` rows)
+      )
+    writeIORef cursorWrapnext False
+    pure (Just 1)
+  '\ESC' : 'M' : _ -> do
+    modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+    writeIORef cursorWrapnext False
+    pure (Just 2)
+  '\ESC' : '>' : _ -> do
+    pure (Just 2)
+  '\ESC' : '=' : _ -> do
+    pure (Just 2)
+  -- Not sure how to parse sgr0 (or sgr) as a general CSI
+  -- code.  What are we supposed to do with '\017'?
+  '\ESC' : '[' : 'm' : '\017' : _ -> do
+    pure (Just 4)
+  '\ESC' : '[' : csiAndRest -> do
+    case break isValidCsiEnder csiAndRest of
+      (_, "") -> pure Nothing
+      -- In the general case we'll need to parse parameters
+      (csi, verb : _) -> do
+        case verb of
+          'H' -> case break (== ';') csi of
+            ("", "") -> writeIORef pos (0, 0)
+            (_ : _, "") -> do
+              log "error: I guess this is just y"
+              error "I guess this is just y"
+            (yp1s, ';' : xp1s) -> do
+              let xp1 = read xp1s
+                  yp1 = read yp1s
+              writeIORef pos (xp1 - 1, yp1 - 1)
+            (_, _ : _) -> do
+              log "Impossible.  Split must start with ;"
+              error "Impossible.  Split must start with ;"
+          -- I actually get numeric Cs, despite saying I
+          -- don't support them :(
+          'J' -> markBarDirty
+          'L' -> markBarDirty
+          'A' -> do
+            let mdy
+                  | null csi = 1
+                  | otherwise = read csi
+            modifyIORef' pos (second (subtract mdy))
+          'B' -> do
+            let dy
+                  | null csi = 1
+                  | otherwise = read csi
+            modifyIORef' pos (second (+ dy))
+          'C' -> do
+            let dx
+                  | null csi = 1
+                  | otherwise = read csi
+            modifyIORef' pos (first (+ dx))
+          'D' -> do
+            let mdx
+                  | null csi = 1
+                  | otherwise = read csi
+            modifyIORef' pos (first (+ (-mdx)))
+          _ -> pure ()
+        writeIORef cursorWrapnext False
+        pure (Just (2 + length csi + 1))
+  -- This does not deal with Unicode characters correctly.  It
+  -- assumes each unknown byte takes up one terminal space but
+  -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
+  _ : _ -> do
+    (x, y) <- readIORef pos
+
+    newPos <-
+      readIORef cursorWrapnext >>= \case
+        True -> do
+          writeIORef cursorWrapnext False
+          pure (0, y + 1)
+        False -> do
+          (cols, _) <- readIORef theDims
+          x' <-
+            -- x > cols shouldn't happen. Check for it, and
+            -- at least warn?
+            if x >= cols - 1
+              then do
+                writeIORef cursorWrapnext True
+                pure x
+              else pure (x + 1)
+          pure (x', y)
+
+    writeIORef pos newPos
+    pure (Just 1)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
