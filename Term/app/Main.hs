@@ -405,7 +405,6 @@ main = do
               dirty <- readIORef barDirty
               when dirty $ do
                 drawBar =<< readIORef pos
-                writeIORef barDirty False
 
               pure (Just theLeftovers)
 
