@@ -378,8 +378,7 @@ main = do
             markBarDirty
             writeIORef pos (x, y0 - 1)
 
-    do
-      scrollIfNeeded (pure ()) (C8.pack "Initial scroll")
+    scrollIfNeeded (pure ()) (C8.pack "Initial scroll")
 
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
