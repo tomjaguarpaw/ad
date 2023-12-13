@@ -440,14 +440,12 @@ parse markBarDirty inWrapnext theDims pos = \case
           pure ((0, y + 1), False)
         False -> do
           (cols, _) <- readIORef theDims
-          (x', nextWrapnext) <-
-            -- x > cols shouldn't happen. Check for it, and
-            -- at least warn?
-            if x >= cols - 1
-              then do
-                pure (x, True)
-              else pure (x + 1, False)
-          pure ((x', y), nextWrapnext)
+          -- x > cols shouldn't happen. Check for it, and
+          -- at least warn?
+          if x >= cols - 1
+            then do
+              pure ((x, y), True)
+            else pure ((x + 1, y), False)
 
     writeIORef pos newPos
     pure (Just 1, nextWrapnext)
