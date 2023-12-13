@@ -278,9 +278,12 @@ main = do
             pure (writeIORef barDirty True, readIORef barDirty)
 
           inWrapnext <- readIORef cursorWrapnext
-          parse markBarDirty inWrapnext cursorWrapnext theDims pos (C8.unpack bsIn) >>= \case
-            Nothing -> pure Nothing
-            Just seen -> do
+          parse markBarDirty inWrapnext theDims pos (C8.unpack bsIn) >>= \case
+            (Nothing, nextWrapnext) -> do
+              writeIORef cursorWrapnext nextWrapnext
+              pure Nothing
+            (Just seen, nextWrapnext) -> do
+              writeIORef cursorWrapnext nextWrapnext
               let bs = C8.take seen bsIn
 
               let theLeftovers = C8.drop seen bsIn
@@ -341,29 +344,26 @@ main = do
 parse ::
   IO () ->
   Bool ->
-  IORef Bool ->
   IORef (Int, Int) ->
   IORef (Int, Int) ->
   String ->
-  IO (Maybe Int)
-parse markBarDirty inWrapnext cursorWrapnext theDims pos = \case
+  IO (Maybe Int, Bool)
+parse markBarDirty inWrapnext theDims pos = \case
   [] ->
-    pure Nothing
+    pure (Nothing, inWrapnext)
   -- No idea what \SI is or why zsh outputs it
   '\SI' : _ -> do
-    pure (Just 1)
+    pure (Just 1, inWrapnext)
   '\r' : _ -> do
-    writeIORef cursorWrapnext False
     modifyIORef' pos (first (const 0))
-    pure (Just 1)
+    pure (Just 1, False)
   '\n' : _ -> do
     (_, rows) <- readIORef theDims
     modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
     log "Newline\n"
-    writeIORef cursorWrapnext False
-    pure (Just 1)
+    pure (Just 1, False)
   '\a' : _ ->
-    pure (Just 1)
+    pure (Just 1, False)
   '\b' : _ -> do
     (cols, rows) <- readIORef theDims
     modifyIORef'
@@ -372,23 +372,21 @@ parse markBarDirty inWrapnext cursorWrapnext theDims pos = \case
           let (yinc, x') = (x - 1) `divMod` cols
            in (x', (y + yinc) `min` rows)
       )
-    writeIORef cursorWrapnext False
-    pure (Just 1)
+    pure (Just 1, False)
   '\ESC' : 'M' : _ -> do
     modifyIORef' pos (second (\y -> (y - 1) `max` 0))
-    writeIORef cursorWrapnext False
-    pure (Just 2)
+    pure (Just 2, False)
   '\ESC' : '>' : _ -> do
-    pure (Just 2)
+    pure (Just 2, inWrapnext)
   '\ESC' : '=' : _ -> do
-    pure (Just 2)
+    pure (Just 2, inWrapnext)
   -- Not sure how to parse sgr0 (or sgr) as a general CSI
   -- code.  What are we supposed to do with '\017'?
   '\ESC' : '[' : 'm' : '\017' : _ -> do
-    pure (Just 4)
+    pure (Just 4, inWrapnext)
   '\ESC' : '[' : csiAndRest -> do
     case break isValidCsiEnder csiAndRest of
-      (_, "") -> pure Nothing
+      (_, "") -> pure (Nothing, inWrapnext)
       -- In the general case we'll need to parse parameters
       (csi, verb : _) -> do
         case verb of
@@ -429,33 +427,30 @@ parse markBarDirty inWrapnext cursorWrapnext theDims pos = \case
                   | otherwise = read csi
             modifyIORef' pos (first (+ (-mdx)))
           _ -> pure ()
-        writeIORef cursorWrapnext False
-        pure (Just (2 + length csi + 1))
+        pure (Just (2 + length csi + 1), False)
   -- This does not deal with Unicode characters correctly.  It
   -- assumes each unknown byte takes up one terminal space but
   -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
   _ : _ -> do
     (x, y) <- readIORef pos
 
-    newPos <-
+    (newPos, nextWrapnext) <-
       case inWrapnext of
         True -> do
-          writeIORef cursorWrapnext False
-          pure (0, y + 1)
+          pure ((0, y + 1), False)
         False -> do
           (cols, _) <- readIORef theDims
-          x' <-
+          (x', nextWrapnext) <-
             -- x > cols shouldn't happen. Check for it, and
             -- at least warn?
             if x >= cols - 1
               then do
-                writeIORef cursorWrapnext True
-                pure x
-              else pure (x + 1)
-          pure (x', y)
+                pure (x, True)
+              else pure (x + 1, inWrapnext)
+          pure ((x', y), nextWrapnext)
 
     writeIORef pos newPos
-    pure (Just 1)
+    pure (Just 1, nextWrapnext)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
