@@ -81,6 +81,9 @@ selectorFd n fd =
 
 selectorPty :: Pty.Pty -> Selector (Either [Pty.PtyControlCode] ByteString)
 selectorPty pty =
+  -- We should not use Pty.readPty after Pty.threadWaitReadPty because
+  -- readPty discards control codes, and may therefore block even
+  -- though using threadWaitRead means we don't expect it to.
   MkSelector (Pty.threadWaitReadPty pty) (readPty pty)
 
 selectorMVar :: MVar a -> Selector a
