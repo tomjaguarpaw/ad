@@ -403,8 +403,7 @@ main = do
               scrollIfNeeded barDirty bs
 
               dirty <- readIORef barDirty
-              when dirty $ do
-                drawBar =<< readIORef pos
+              when dirty (drawBar =<< readIORef pos)
 
               pure (Just theLeftovers)
 
