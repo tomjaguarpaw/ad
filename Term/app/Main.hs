@@ -239,7 +239,7 @@ main = do
         -- Go back to where we were
         hPut stdout (C8.pack ("\ESC[" <> show yp1 <> ";" <> show xp1 <> "H"))
 
-  let parse markBarDirty cursorWrapnext pos = \case
+  let parse markBarDirty cursorWrapnext theDims pos = \case
         [] ->
           pure Nothing
         -- No idea what \SI is or why zsh outputs it
@@ -388,7 +388,7 @@ main = do
             barDirty <- newIORef False
             pure (writeIORef barDirty True, readIORef barDirty)
 
-          parse markBarDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
+          parse markBarDirty cursorWrapnext theDims pos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
             Just seen -> do
               let bs = C8.take seen bsIn
