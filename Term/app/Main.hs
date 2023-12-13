@@ -239,7 +239,7 @@ main = do
         -- Go back to where we were
         hPut stdout (C8.pack ("\ESC[" <> show yp1 <> ";" <> show xp1 <> "H"))
 
-  let parse barDirty cursorWrapnext pos = \case
+  let parse markBarDirty cursorWrapnext pos = \case
         [] ->
           pure Nothing
         -- No idea what \SI is or why zsh outputs it
@@ -299,8 +299,8 @@ main = do
                     error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
-                'J' -> writeIORef barDirty True
-                'L' -> writeIORef barDirty True
+                'J' -> markBarDirty
+                'L' -> markBarDirty
                 'A' -> do
                   let mdy
                         | null csi = 1
@@ -387,8 +387,9 @@ main = do
 
     let handlePty bsIn = do
           barDirty <- newIORef False
+          let markBarDirty = writeIORef barDirty True
 
-          parse barDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
+          parse markBarDirty cursorWrapnext pos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
             Just seen -> do
               let bs = C8.take seen bsIn
