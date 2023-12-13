@@ -446,7 +446,7 @@ parse markBarDirty inWrapnext theDims pos = \case
             if x >= cols - 1
               then do
                 pure (x, True)
-              else pure (x + 1, inWrapnext)
+              else pure (x + 1, False)
           pure ((x', y), nextWrapnext)
 
     writeIORef pos newPos
