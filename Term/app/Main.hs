@@ -67,7 +67,7 @@ import System.Process (getPid, getProcessExitCode)
 import Text.Read (readMaybe)
 import Prelude hiding (log)
 
-data In = PtyIn ByteString | StdIn ByteString | WinchIn
+data In = PtyIn (Either [Pty.PtyControlCode] ByteString) | StdIn ByteString | WinchIn
 
 data Selector a = MkSelector (IO ()) (IO a)
   deriving (Functor)
@@ -79,7 +79,7 @@ selectorFd n fd =
   -- even when there's buffered input available.
   MkSelector (threadWaitRead fd) (fdRead fd n)
 
-selectorPty :: Pty.Pty -> Selector ByteString
+selectorPty :: Pty.Pty -> Selector (Either [Pty.PtyControlCode] ByteString)
 selectorPty pty =
   MkSelector (Pty.threadWaitReadPty pty) (readPty pty)
 
@@ -87,9 +87,9 @@ selectorMVar :: MVar a -> Selector a
 selectorMVar v =
   MkSelector (() <$ readMVar v) (takeMVar v)
 
-readPty :: Pty.Pty -> IO ByteString
+readPty :: Pty.Pty -> IO (Either [Pty.PtyControlCode] ByteString)
 readPty pty = do
-  try (Pty.readPty pty) >>= \case
+  try (Pty.tryReadPty pty) >>= \case
     Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
     Right bs -> pure bs
 
@@ -425,9 +425,12 @@ main = do
             StdIn bs -> do
               Pty.writePty pty bs
               log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
-            PtyIn bs -> do
+            PtyIn (Right bs) -> do
               log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
               writeIORef unhandledPty (Right (neededmore <> bs))
+            PtyIn (Left {}) ->
+              -- I don't know what we should do with PtyControlCodes
+              pure ()
         Right bs -> do
           eleftovers <- handlePty bs
           thePos <- readIORef pos
