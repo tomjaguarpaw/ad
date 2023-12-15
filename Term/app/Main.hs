@@ -377,7 +377,7 @@ warnIfTerminfoMissing terminfoName terminfoFilename = do
     Left (_ :: IOException) -> do
       putStrLn
         ( unwords
-            [ "Warning: I couldn't run tic so I couldn't determine ",
+            [ "Warning: I couldn't run tic so I couldn't determine",
               "whether you have a terminfo entry for smy"
             ]
         )
