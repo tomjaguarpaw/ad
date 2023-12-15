@@ -123,6 +123,7 @@ main = do
       terminfoFilename = "smy"
 
   warnIfTerminfoMissing terminfoName terminfoFilename
+  warnIfHostTerminalUnsuitable
 
   (bar, prog) <-
     getArgs >>= \case
@@ -391,6 +392,19 @@ warnIfTerminfoMissing terminfoName terminfoFilename = do
             ++ " file in the repo and running \"tic "
             ++ terminfoFilename
             ++ "\""
+        )
+
+warnIfHostTerminalUnsuitable :: IO ()
+warnIfHostTerminalUnsuitable = do
+  env <- getEnvironment
+  case lookup "TERM" env of
+    Just "screen" -> pure ()
+    _ ->
+      putStrLn
+        ( unwords
+            [ "Warning: Currently, I only really",
+              "work well with \"screen\" as my host"
+            ]
         )
 
 parse ::

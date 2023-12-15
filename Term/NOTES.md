@@ -18,5 +18,5 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
   * [X] Set `TERM`
   * [X] Encourage users to run `tic smy` (or whatever name we choose)
 * Check the host terminal type
-  * [ ] Warn if it's not `screen`
+  * [X] Warn if it's not `screen`
   * [ ] Expand support to all terminals by using terminfo
