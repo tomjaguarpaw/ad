@@ -12,7 +12,9 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
 
 # TODO
 
-* [ ] Account for UTF-8 characters properly, both width 1 and width 2 ones.
+* Account for UTF-8 characters properly
+  * [X] width 1
+  * [ ] width 2
 * Present our terminal type to clients
   * [ ] Choose a name for the terminal type
   * [X] Set `TERM`

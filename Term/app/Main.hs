@@ -1,4 +1,5 @@
 {-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE BinaryLiterals #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
@@ -20,8 +21,10 @@ import Control.Concurrent
   )
 import Control.Exception (IOException, try)
 import Control.Monad (when)
+import Data.Bits ((.&.))
 import Data.ByteString (ByteString, drop, hPut)
 import Data.ByteString.Char8 qualified as C8
+import Data.ByteString.Internal (c2w)
 import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
@@ -414,120 +417,140 @@ parse ::
   IORef (Int, Int) ->
   String ->
   IO (Maybe Int, Bool)
-parse markBarDirty inWrapnext theDims pos = \case
-  [] ->
-    needMore
-  -- No idea what \SI is or why zsh outputs it
-  '\SI' : _ -> do
-    pure (Just 1, inWrapnext)
-  '\r' : _ -> do
-    modifyIORef' pos (first (const 0))
-    pure (Just 1, False)
-  '\n' : _ -> do
-    (_, rows) <- readIORef theDims
-    modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
-    log "Newline\n"
-    pure (Just 1, False)
-  '\a' : _ ->
-    pure (Just 1, False)
-  '\b' : _ -> do
-    (cols, rows) <- readIORef theDims
-    modifyIORef'
-      pos
-      ( \(x, y) ->
-          let (yinc, x') = (x - 1) `divMod` cols
-           in (x', (y + yinc) `min` rows)
-      )
-    pure (Just 1, False)
-  '\ESC' : 'M' : _ -> do
-    modifyIORef' pos (second (\y -> (y - 1) `max` 0))
-    do
-      (_, y) <- readIORef pos
-      when (y == 0) markBarDirty
-    pure (Just 2, False)
-  '\ESC' : '>' : _ -> do
-    pure (Just 2, inWrapnext)
-  '\ESC' : '=' : _ -> do
-    pure (Just 2, inWrapnext)
-  -- Not sure how to parse sgr0 (or sgr) as a general CSI
-  -- code.  What are we supposed to do with '\017'?
-  '\ESC' : '[' : 'm' : '\017' : _ -> do
-    pure (Just 4, inWrapnext)
-  '\ESC' : '[' : csiAndRest -> do
-    case break isValidCsiEnder csiAndRest of
-      (_, "") -> needMore
-      -- In the general case we'll need to parse parameters
-      (csi, verb : _) -> do
-        case verb of
-          'H' -> case break (== ';') csi of
-            ("", "") -> writeIORef pos (0, 0)
-            (_ : _, "") -> do
-              log "error: I guess this is just y"
-              error "I guess this is just y"
-            (yp1s, ';' : xp1s) -> do
-              xp1 <- case readMaybe xp1s of
-                Nothing -> do
-                  log ("Could not read: " ++ show xp1s ++ "\n")
-                  error ("Could not read: " ++ show xp1s)
-                Just j -> pure j
-              yp1 <- case readMaybe yp1s of
-                Nothing -> do
-                  log ("Could not read: " ++ show yp1s ++ "\n")
-                  error ("Could not read: " ++ show yp1s)
-                Just j -> pure j
-              writeIORef pos (xp1 - 1, yp1 - 1)
-            (_, _ : _) -> do
-              log "Impossible.  Split must start with ;"
-              error "Impossible.  Split must start with ;"
-          -- I actually get numeric Cs, despite saying I
-          -- don't support them :(
-          'J' -> markBarDirty
-          'L' -> markBarDirty
-          'A' -> do
-            let mdy
-                  | null csi = 1
-                  | otherwise = read csi
-            modifyIORef' pos (second (subtract mdy))
-          'B' -> do
-            let dy
-                  | null csi = 1
-                  | otherwise = read csi
-            modifyIORef' pos (second (+ dy))
-          'C' -> do
-            let dx
-                  | null csi = 1
-                  | otherwise = read csi
-            modifyIORef' pos (first (+ dx))
-          'D' -> do
-            let mdx
-                  | null csi = 1
-                  | otherwise = read csi
-            modifyIORef' pos (first (+ (-mdx)))
-          _ -> pure ()
-        pure (Just (2 + length csi + 1), False)
-  -- This does not deal with Unicode characters correctly.  It
-  -- assumes each unknown byte takes up one terminal space but
-  -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
-  _ : _ ->
-    singleDisplayableCharacter 1
+parse markBarDirty inWrapnext theDims pos = parse'
   where
-    singleDisplayableCharacter n = do
-      (x, y) <- readIORef pos
+    parse' =
+      \case
+        [] ->
+          needMore
+        -- No idea what \SI is or why zsh outputs it
+        '\SI' : _ -> do
+          pure (Just 1, inWrapnext)
+        '\r' : _ -> do
+          modifyIORef' pos (first (const 0))
+          pure (Just 1, False)
+        '\n' : _ -> do
+          (_, rows) <- readIORef theDims
+          modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
+          log "Newline\n"
+          pure (Just 1, False)
+        '\a' : _ ->
+          pure (Just 1, False)
+        '\b' : _ -> do
+          (cols, rows) <- readIORef theDims
+          modifyIORef'
+            pos
+            ( \(x, y) ->
+                let (yinc, x') = (x - 1) `divMod` cols
+                 in (x', (y + yinc) `min` rows)
+            )
+          pure (Just 1, False)
+        '\ESC' : 'M' : _ -> do
+          modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+          do
+            (_, y) <- readIORef pos
+            when (y == 0) markBarDirty
+          pure (Just 2, False)
+        '\ESC' : '>' : _ -> do
+          pure (Just 2, inWrapnext)
+        '\ESC' : '=' : _ -> do
+          pure (Just 2, inWrapnext)
+        -- Not sure how to parse sgr0 (or sgr) as a general CSI
+        -- code.  What are we supposed to do with '\017'?
+        '\ESC' : '[' : 'm' : '\017' : _ -> do
+          pure (Just 4, inWrapnext)
+        '\ESC' : '[' : csiAndRest -> do
+          case break isValidCsiEnder csiAndRest of
+            (_, "") -> needMore
+            -- In the general case we'll need to parse parameters
+            (csi, verb : _) -> do
+              case verb of
+                'H' -> case break (== ';') csi of
+                  ("", "") -> writeIORef pos (0, 0)
+                  (_ : _, "") -> do
+                    log "error: I guess this is just y"
+                    error "I guess this is just y"
+                  (yp1s, ';' : xp1s) -> do
+                    xp1 <- case readMaybe xp1s of
+                      Nothing -> do
+                        log ("Could not read: " ++ show xp1s ++ "\n")
+                        error ("Could not read: " ++ show xp1s)
+                      Just j -> pure j
+                    yp1 <- case readMaybe yp1s of
+                      Nothing -> do
+                        log ("Could not read: " ++ show yp1s ++ "\n")
+                        error ("Could not read: " ++ show yp1s)
+                      Just j -> pure j
+                    writeIORef pos (xp1 - 1, yp1 - 1)
+                  (_, _ : _) -> do
+                    log "Impossible.  Split must start with ;"
+                    error "Impossible.  Split must start with ;"
+                -- I actually get numeric Cs, despite saying I
+                -- don't support them :(
+                'J' -> markBarDirty
+                'L' -> markBarDirty
+                'A' -> do
+                  let mdy
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (second (subtract mdy))
+                'B' -> do
+                  let dy
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (second (+ dy))
+                'C' -> do
+                  let dx
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (first (+ dx))
+                'D' -> do
+                  let mdx
+                        | null csi = 1
+                        | otherwise = read csi
+                  modifyIORef' pos (first (+ (-mdx)))
+                _ -> pure ()
+              pure (Just (2 + length csi + 1), False)
+        (c2w -> word) : rest
+          | (word .&. 0b10000000) == 0b00000000 ->
+              -- One byte (ASCII)
+              singleDisplayableCharacter 1
+          | (word .&. 0b11100000) == 0b11000000 ->
+              -- Two byte
+              case rest of
+                _ : _ -> singleDisplayableCharacter 2
+                _ -> needMore
+          | (word .&. 0b11110000) == 0b11100000 ->
+              -- Three byte
+              case rest of
+                _ : _ : _ -> singleDisplayableCharacter 3
+                _ -> needMore
+          | (word .&. 0b11111000) == 0b11110000 ->
+              -- Four byte
+              case rest of
+                _ : _ : _ : _ -> singleDisplayableCharacter 4
+                _ -> needMore
+        _ : _ ->
+          -- No idea what these mysterious entities are
+          singleDisplayableCharacter 1
+      where
+        singleDisplayableCharacter n = do
+          (x, y) <- readIORef pos
 
-      (newPos, nextWrapnext) <-
-        case inWrapnext of
-          True -> pure ((1, y + 1), False)
-          False -> do
-            (cols, _) <- readIORef theDims
-            -- x > cols shouldn't happen. Check for it, and
-            -- at least warn?
-            pure $
-              if x >= cols - 1
-                then ((x, y), True)
-                else ((x + 1, y), False)
-      writeIORef pos newPos
-      pure (Just n, nextWrapnext)
-    needMore = pure (Nothing, inWrapnext)
+          (newPos, nextWrapnext) <-
+            case inWrapnext of
+              True -> pure ((1, y + 1), False)
+              False -> do
+                (cols, _) <- readIORef theDims
+                -- x > cols shouldn't happen. Check for it, and
+                -- at least warn?
+                pure $
+                  if x >= cols - 1
+                    then ((x, y), True)
+                    else ((x + 1, y), False)
+          writeIORef pos newPos
+          pure (Just n, nextWrapnext)
+        needMore = pure (Nothing, inWrapnext)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
