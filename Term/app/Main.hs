@@ -119,7 +119,10 @@ select selectors = do
 
 main :: IO ()
 main = do
-  warnIfTerminfoMissing
+  let terminfoName = "smy"
+      terminfoFilename = "smy"
+
+  warnIfTerminfoMissing terminfoName terminfoFilename
 
   (bar, prog) <-
     getArgs >>= \case
@@ -354,11 +357,8 @@ main = do
 
   exitWith =<< takeMVar exit
 
-warnIfTerminfoMissing :: IO ()
-warnIfTerminfoMissing = do
-  let terminfoName = "smy"
-      terminfoFilename = "smy"
-
+warnIfTerminfoMissing :: String -> String -> IO ()
+warnIfTerminfoMissing terminfoName terminfoFilename = do
   exitCode <-
     try
       $ runProcess
