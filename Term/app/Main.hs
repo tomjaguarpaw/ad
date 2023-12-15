@@ -437,13 +437,13 @@ parse markBarDirty inWrapnext theDims pos s = do
           log "Newline\n"
           pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
         '\a' : _ ->
-          pure ((Just 1, False), thePos)
+          pure ((Just 1, inWrapnext), thePos)
         '\b' : _ -> do
           (cols, rows) <- readIORef theDims
           let newPos =
                 let (x, y) = thePos
                     (yinc, x') = (x - 1) `divMod` cols
-                in (x', (y + yinc) `min` rows)
+                 in (x', (y + yinc) `min` rows)
           pure ((Just 1, False), newPos)
         '\ESC' : 'M' : _ -> do
           let newPos@(_, y) = second (\y -> (y - 1) `max` 0) thePos
