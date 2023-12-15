@@ -508,23 +508,25 @@ parse markBarDirty inWrapnext theDims pos = \case
   -- This does not deal with Unicode characters correctly.  It
   -- assumes each unknown byte takes up one terminal space but
   -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
-  _ : _ -> do
-    (x, y) <- readIORef pos
+  _ : _ ->
+    singleDisplayableCharacter
+  where
+    singleDisplayableCharacter = do
+      (x, y) <- readIORef pos
 
-    (newPos, nextWrapnext) <-
-      case inWrapnext of
-        True -> pure ((1, y + 1), False)
-        False -> do
-          (cols, _) <- readIORef theDims
-          -- x > cols shouldn't happen. Check for it, and
-          -- at least warn?
-          pure $
-            if x >= cols - 1
-              then ((x, y), True)
-              else ((x + 1, y), False)
-
-    writeIORef pos newPos
-    pure (Just 1, nextWrapnext)
+      (newPos, nextWrapnext) <-
+        case inWrapnext of
+          True -> pure ((1, y + 1), False)
+          False -> do
+            (cols, _) <- readIORef theDims
+            -- x > cols shouldn't happen. Check for it, and
+            -- at least warn?
+            pure $
+              if x >= cols - 1
+                then ((x, y), True)
+                else ((x + 1, y), False)
+      writeIORef pos newPos
+      pure (Just 1, nextWrapnext)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
