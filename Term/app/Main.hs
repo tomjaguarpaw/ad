@@ -28,7 +28,7 @@ import Data.ByteString.Internal (c2w)
 import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
-import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
 import System.Environment (getArgs, getEnvironment)
@@ -417,9 +417,11 @@ parse ::
   IORef (Int, Int) ->
   String ->
   IO (Maybe Int, Bool)
-parse markBarDirty inWrapnext theDims pos = parse'
+parse markBarDirty inWrapnext theDims pos s = do
+  thePos <- readIORef pos
+  parse' thePos s
   where
-    parse' =
+    parse' thePos =
       \case
         [] ->
           needMore
@@ -427,26 +429,28 @@ parse markBarDirty inWrapnext theDims pos = parse'
         '\SI' : _ -> do
           pure (Just 1, inWrapnext)
         '\r' : _ -> do
-          modifyIORef' pos (first (const 0))
+          writeIORef pos (first (const 0) thePos)
           pure (Just 1, False)
         '\n' : _ -> do
           (_, rows) <- readIORef theDims
-          modifyIORef' pos (second (\y -> (y + 1) `min` (rows - 1)))
+          writeIORef pos (second (\y -> (y + 1) `min` (rows - 1)) thePos)
           log "Newline\n"
           pure (Just 1, False)
         '\a' : _ ->
           pure (Just 1, False)
         '\b' : _ -> do
           (cols, rows) <- readIORef theDims
-          modifyIORef'
+          writeIORef
             pos
-            ( \(x, y) ->
-                let (yinc, x') = (x - 1) `divMod` cols
-                 in (x', (y + yinc) `min` rows)
+            ( ( \(x, y) ->
+                  let (yinc, x') = (x - 1) `divMod` cols
+                   in (x', (y + yinc) `min` rows)
+              )
+                thePos
             )
           pure (Just 1, False)
         '\ESC' : 'M' : _ -> do
-          modifyIORef' pos (second (\y -> (y - 1) `max` 0))
+          writeIORef pos (second (\y -> (y - 1) `max` 0) thePos)
           do
             (_, y) <- readIORef pos
             when (y == 0) markBarDirty
@@ -493,22 +497,22 @@ parse markBarDirty inWrapnext theDims pos = parse'
                   let mdy
                         | null csi = 1
                         | otherwise = read csi
-                  modifyIORef' pos (second (subtract mdy))
+                  writeIORef pos (second (subtract mdy) thePos)
                 'B' -> do
                   let dy
                         | null csi = 1
                         | otherwise = read csi
-                  modifyIORef' pos (second (+ dy))
+                  writeIORef pos (second (+ dy) thePos)
                 'C' -> do
                   let dx
                         | null csi = 1
                         | otherwise = read csi
-                  modifyIORef' pos (first (+ dx))
+                  writeIORef pos (first (+ dx) thePos)
                 'D' -> do
                   let mdx
                         | null csi = 1
                         | otherwise = read csi
-                  modifyIORef' pos (first (+ (-mdx)))
+                  writeIORef pos (first (+ (-mdx)) thePos)
                 _ -> pure ()
               pure (Just (2 + length csi + 1), False)
         (c2w -> word) : rest
@@ -535,7 +539,7 @@ parse markBarDirty inWrapnext theDims pos = parse'
           singleDisplayableCharacter 1
       where
         singleDisplayableCharacter n = do
-          (x, y) <- readIORef pos
+          let (x, y) = thePos
 
           (newPos, nextWrapnext) <-
             case inWrapnext of
