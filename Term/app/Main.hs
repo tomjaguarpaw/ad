@@ -416,7 +416,7 @@ parse ::
   IO (Maybe Int, Bool)
 parse markBarDirty inWrapnext theDims pos = \case
   [] ->
-    pure (Nothing, inWrapnext)
+    needMore
   -- No idea what \SI is or why zsh outputs it
   '\SI' : _ -> do
     pure (Just 1, inWrapnext)
@@ -455,7 +455,7 @@ parse markBarDirty inWrapnext theDims pos = \case
     pure (Just 4, inWrapnext)
   '\ESC' : '[' : csiAndRest -> do
     case break isValidCsiEnder csiAndRest of
-      (_, "") -> pure (Nothing, inWrapnext)
+      (_, "") -> needMore
       -- In the general case we'll need to parse parameters
       (csi, verb : _) -> do
         case verb of
@@ -527,6 +527,7 @@ parse markBarDirty inWrapnext theDims pos = \case
                 else ((x + 1, y), False)
       writeIORef pos newPos
       pure (Just n, nextWrapnext)
+    needMore = pure (Nothing, inWrapnext)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
