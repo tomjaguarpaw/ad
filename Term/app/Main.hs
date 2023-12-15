@@ -18,7 +18,7 @@ import Control.Concurrent
     threadWaitRead,
     tryPutMVar,
   )
-import Control.Exception (try)
+import Control.Exception (IOException, try)
 import Control.Monad (when)
 import Data.ByteString (ByteString, drop, hPut)
 import Data.ByteString.Char8 qualified as C8
@@ -360,15 +360,23 @@ warnIfTerminfoMissing = do
       terminfoFilename = "smy"
 
   exitCode <-
-    runProcess
+    try
+      $ runProcess
       $ setStdin nullStream
         . setStdout nullStream
         . setStderr nullStream
       $ proc "tic" [terminfoName]
 
   case exitCode of
-    ExitSuccess -> pure ()
-    ExitFailure {} -> do
+    Left (_ :: IOException) -> do
+      putStrLn
+        ( unwords
+            [ "Warning: I couldn't run tic so I couldn't determine ",
+              "whether you have a terminfo entry for smy"
+            ]
+        )
+    Right ExitSuccess -> pure ()
+    Right (ExitFailure {}) -> do
       putStrLn ("Warning: could not find terminfo entry for " ++ terminfoName)
       putStrLn "Terminal programs may not display correctly"
       putStrLn
