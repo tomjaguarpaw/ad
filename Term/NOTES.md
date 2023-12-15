@@ -15,8 +15,8 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
 * [ ] Account for UTF-8 characters properly, both width 1 and width 2 ones.
 * Present our terminal type to clients
   * [ ] Choose a name for the terminal type
-  * [ ] Set `TERM`
-  * [ ] Encourage users to run `tic smy` (or whatever name we choose)
+  * [X] Set `TERM`
+  * [X] Encourage users to run `tic smy` (or whatever name we choose)
 * Check the host terminal type
   * [ ] Warn if it's not `screen`
   * [ ] Expand support to all terminals by using terminfo
