@@ -64,6 +64,15 @@ import System.Posix.Terminal
     withoutMode,
   )
 import System.Process (getPid, getProcessExitCode)
+import System.Process.Typed
+  ( ExitCode (ExitFailure, ExitSuccess),
+    nullStream,
+    proc,
+    runProcess,
+    setStderr,
+    setStdin,
+    setStdout,
+  )
 import Text.Read (readMaybe)
 import Prelude hiding (log)
 
@@ -110,6 +119,8 @@ select selectors = do
 
 main :: IO ()
 main = do
+  warnIfTerminfoMissing
+
   (bar, prog) <-
     getArgs >>= \case
       [bar, prog] -> pure (bar, prog)
@@ -342,6 +353,31 @@ main = do
       again
 
   exitWith =<< takeMVar exit
+
+warnIfTerminfoMissing :: IO ()
+warnIfTerminfoMissing = do
+  let terminfoName = "smy"
+      terminfoFilename = "smy"
+
+  exitCode <-
+    runProcess
+      $ setStdin nullStream
+        . setStdout nullStream
+        . setStderr nullStream
+      $ proc "tic" [terminfoName]
+
+  case exitCode of
+    ExitSuccess -> pure ()
+    ExitFailure {} -> do
+      putStrLn ("Warning: could not find terminfo entry for " ++ terminfoName)
+      putStrLn "Terminal programs may not display correctly"
+      putStrLn
+        ( "You can install the terminfo entry by finding the "
+            ++ terminfoFilename
+            ++ " file in the repo and running \"tic "
+            ++ terminfoFilename
+            ++ "\""
+        )
 
 parse ::
   IO () ->
