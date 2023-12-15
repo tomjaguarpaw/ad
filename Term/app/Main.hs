@@ -429,7 +429,7 @@ parse markBarDirty inWrapnext theDims pos s = do
           needMore
         -- No idea what \SI is or why zsh outputs it
         '\SI' : _ -> do
-          pure ((Just 1, inWrapnext), thePos)
+          noLocationChangeConsuming 1
         '\r' : _ -> do
           pure ((Just 1, False), first (const 0) thePos)
         '\n' : _ -> do
@@ -437,7 +437,7 @@ parse markBarDirty inWrapnext theDims pos s = do
           log "Newline\n"
           pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
         '\a' : _ ->
-          pure ((Just 1, inWrapnext), thePos)
+          noLocationChangeConsuming 1
         '\b' : _ -> do
           (cols, rows) <- readIORef theDims
           let newPos =
@@ -450,13 +450,13 @@ parse markBarDirty inWrapnext theDims pos s = do
           when (y == 0) markBarDirty
           pure ((Just 2, False), newPos)
         '\ESC' : '>' : _ -> do
-          pure ((Just 2, inWrapnext), thePos)
+          noLocationChangeConsuming 2
         '\ESC' : '=' : _ -> do
-          pure ((Just 2, inWrapnext), thePos)
+          noLocationChangeConsuming 2
         -- Not sure how to parse sgr0 (or sgr) as a general CSI
         -- code.  What are we supposed to do with '\017'?
         '\ESC' : '[' : 'm' : '\017' : _ -> do
-          pure ((Just 4, inWrapnext), thePos)
+          noLocationChangeConsuming 4
         '\ESC' : '[' : csiAndRest -> do
           case break isValidCsiEnder csiAndRest of
             (_, "") -> needMore
@@ -536,6 +536,9 @@ parse markBarDirty inWrapnext theDims pos s = do
           -- No idea what these mysterious entities are
           singleDisplayableCharacter 1
       where
+        noLocationChangeConsuming n =
+          pure ((Just n, inWrapnext), thePos)
+
         singleDisplayableCharacter n = do
           let (x, y) = thePos
 
