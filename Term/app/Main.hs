@@ -28,7 +28,7 @@ import Data.Function (fix)
 import Data.IORef (IORef, modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
-import System.Environment (getArgs)
+import System.Environment (getArgs, getEnvironment)
 import System.Exit (exitFailure, exitWith)
 import System.IO
   ( BufferMode (NoBuffering),
@@ -168,8 +168,14 @@ main = do
     newIORef dims
 
   (pty, childHandle) <- do
+    env <- getEnvironment
     (cols, rows) <- readIORef theDims
-    Pty.spawnWithPty Nothing True "sh" ["-c", prog] (cols, subtract 1 rows)
+    Pty.spawnWithPty
+      (Just (("TERM", terminfoName) : env))
+      True
+      "sh"
+      ["-c", prog]
+      (cols, subtract 1 rows)
 
   exit <- newEmptyMVar
 
