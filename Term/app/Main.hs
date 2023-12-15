@@ -419,7 +419,9 @@ parse ::
   IO (Maybe Int, Bool)
 parse markBarDirty inWrapnext theDims pos s = do
   thePos <- readIORef pos
-  parse' thePos s
+  (res, newPos) <- parse' thePos s
+  writeIORef pos newPos
+  pure res
   where
     parse' thePos =
       \case
@@ -427,48 +429,42 @@ parse markBarDirty inWrapnext theDims pos s = do
           needMore
         -- No idea what \SI is or why zsh outputs it
         '\SI' : _ -> do
-          pure (Just 1, inWrapnext)
+          pure ((Just 1, inWrapnext), thePos)
         '\r' : _ -> do
-          writeIORef pos (first (const 0) thePos)
-          pure (Just 1, False)
+          pure ((Just 1, False), first (const 0) thePos)
         '\n' : _ -> do
           (_, rows) <- readIORef theDims
-          writeIORef pos (second (\y -> (y + 1) `min` (rows - 1)) thePos)
           log "Newline\n"
-          pure (Just 1, False)
+          pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
         '\a' : _ ->
-          pure (Just 1, False)
+          pure ((Just 1, False), thePos)
         '\b' : _ -> do
           (cols, rows) <- readIORef theDims
-          writeIORef
-            pos
-            ( let (x, y) = thePos
-                  (yinc, x') = (x - 1) `divMod` cols
-              in (x', (y + yinc) `min` rows)
-            )
-          pure (Just 1, False)
+          let newPos =
+                let (x, y) = thePos
+                    (yinc, x') = (x - 1) `divMod` cols
+                in (x', (y + yinc) `min` rows)
+          pure ((Just 1, False), newPos)
         '\ESC' : 'M' : _ -> do
-          writeIORef pos (second (\y -> (y - 1) `max` 0) thePos)
-          do
-            (_, y) <- readIORef pos
-            when (y == 0) markBarDirty
-          pure (Just 2, False)
+          let newPos@(_, y) = second (\y -> (y - 1) `max` 0) thePos
+          when (y == 0) markBarDirty
+          pure ((Just 2, False), newPos)
         '\ESC' : '>' : _ -> do
-          pure (Just 2, inWrapnext)
+          pure ((Just 2, inWrapnext), thePos)
         '\ESC' : '=' : _ -> do
-          pure (Just 2, inWrapnext)
+          pure ((Just 2, inWrapnext), thePos)
         -- Not sure how to parse sgr0 (or sgr) as a general CSI
         -- code.  What are we supposed to do with '\017'?
         '\ESC' : '[' : 'm' : '\017' : _ -> do
-          pure (Just 4, inWrapnext)
+          pure ((Just 4, inWrapnext), thePos)
         '\ESC' : '[' : csiAndRest -> do
           case break isValidCsiEnder csiAndRest of
             (_, "") -> needMore
             -- In the general case we'll need to parse parameters
             (csi, verb : _) -> do
-              case verb of
+              newPos <- case verb of
                 'H' -> case break (== ';') csi of
-                  ("", "") -> writeIORef pos (0, 0)
+                  ("", "") -> pure (0, 0)
                   (_ : _, "") -> do
                     log "error: I guess this is just y"
                     error "I guess this is just y"
@@ -483,36 +479,40 @@ parse markBarDirty inWrapnext theDims pos s = do
                         log ("Could not read: " ++ show yp1s ++ "\n")
                         error ("Could not read: " ++ show yp1s)
                       Just j -> pure j
-                    writeIORef pos (xp1 - 1, yp1 - 1)
+                    pure (xp1 - 1, yp1 - 1)
                   (_, _ : _) -> do
                     log "Impossible.  Split must start with ;"
                     error "Impossible.  Split must start with ;"
                 -- I actually get numeric Cs, despite saying I
                 -- don't support them :(
-                'J' -> markBarDirty
-                'L' -> markBarDirty
+                'J' -> do
+                  markBarDirty
+                  pure thePos
+                'L' -> do
+                  markBarDirty
+                  pure thePos
                 'A' -> do
                   let mdy
                         | null csi = 1
                         | otherwise = read csi
-                  writeIORef pos (second (subtract mdy) thePos)
+                  pure (second (subtract mdy) thePos)
                 'B' -> do
                   let dy
                         | null csi = 1
                         | otherwise = read csi
-                  writeIORef pos (second (+ dy) thePos)
+                  pure (second (+ dy) thePos)
                 'C' -> do
                   let dx
                         | null csi = 1
                         | otherwise = read csi
-                  writeIORef pos (first (+ dx) thePos)
+                  pure (first (+ dx) thePos)
                 'D' -> do
                   let mdx
                         | null csi = 1
                         | otherwise = read csi
-                  writeIORef pos (first (+ (-mdx)) thePos)
-                _ -> pure ()
-              pure (Just (2 + length csi + 1), False)
+                  pure (first (+ (-mdx)) thePos)
+                _ -> pure thePos
+              pure ((Just (2 + length csi + 1), False), newPos)
         (c2w -> word) : rest
           | (word .&. 0b10000000) == 0b00000000 ->
               -- One byte (ASCII)
@@ -550,9 +550,8 @@ parse markBarDirty inWrapnext theDims pos s = do
                   if x >= cols - 1
                     then ((x, y), True)
                     else ((x + 1, y), False)
-          writeIORef pos newPos
-          pure (Just n, nextWrapnext)
-        needMore = pure (Nothing, inWrapnext)
+          pure ((Just n, nextWrapnext), newPos)
+        needMore = pure ((Nothing, inWrapnext), thePos)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
