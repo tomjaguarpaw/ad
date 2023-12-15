@@ -20,3 +20,9 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
 * Check the host terminal type
   * [X] Warn if it's not `screen`
   * [ ] Expand support to all terminals by using terminfo
+
+# Known issues
+
+`dircolors` (used for telling `ls` which colors to use) doesn't work
+with terminal types it does not know.  For some reason it doesn't use
+`terminfo`.
