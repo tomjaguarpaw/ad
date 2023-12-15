@@ -509,9 +509,9 @@ parse markBarDirty inWrapnext theDims pos = \case
   -- assumes each unknown byte takes up one terminal space but
   -- under UTF-8 2, 3 or 4 bytes can take a one terminal space.
   _ : _ ->
-    singleDisplayableCharacter
+    singleDisplayableCharacter 1
   where
-    singleDisplayableCharacter = do
+    singleDisplayableCharacter n = do
       (x, y) <- readIORef pos
 
       (newPos, nextWrapnext) <-
@@ -526,7 +526,7 @@ parse markBarDirty inWrapnext theDims pos = \case
                 then ((x, y), True)
                 else ((x + 1, y), False)
       writeIORef pos newPos
-      pure (Just 1, nextWrapnext)
+      pure (Just n, nextWrapnext)
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
