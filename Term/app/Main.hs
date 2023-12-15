@@ -442,11 +442,9 @@ parse markBarDirty inWrapnext theDims pos s = do
           (cols, rows) <- readIORef theDims
           writeIORef
             pos
-            ( ( \(x, y) ->
-                  let (yinc, x') = (x - 1) `divMod` cols
-                   in (x', (y + yinc) `min` rows)
-              )
-                thePos
+            ( let (x, y) = thePos
+                  (yinc, x') = (x - 1) `divMod` cols
+              in (x', (y + yinc) `min` rows)
             )
           pure (Just 1, False)
         '\ESC' : 'M' : _ -> do
