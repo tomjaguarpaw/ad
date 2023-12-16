@@ -541,7 +541,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
           (newPos, nextWrapnext) <-
             case inWrapnext of
               True -> pure ((1, y + 1), False)
-              False -> do
+              False ->
                 -- x > cols shouldn't happen. Check for it, and
                 -- at least warn?
                 pure $
