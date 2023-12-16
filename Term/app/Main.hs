@@ -485,24 +485,16 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   markBarDirty
                   pure thePos
                 'A' -> do
-                  let (negate -> dy)
-                        | null csi = 1
-                        | otherwise = read csi
+                  let (negate -> dy) = numberOr1IfMissing csi
                   pure (second (+ dy) thePos)
                 'B' -> do
-                  let dy
-                        | null csi = 1
-                        | otherwise = read csi
+                  let dy = numberOr1IfMissing csi
                   pure (second (+ dy) thePos)
                 'C' -> do
-                  let dx
-                        | null csi = 1
-                        | otherwise = read csi
+                  let dx = numberOr1IfMissing csi
                   pure (first (+ dx) thePos)
                 'D' -> do
-                  let (negate -> dx)
-                        | null csi = 1
-                        | otherwise = read csi
+                  let (negate -> dx) = numberOr1IfMissing csi
                   pure (first (+ dx) thePos)
                 _ -> pure thePos
               pure ((Just (2 + length csi + 1), False), newPos)
@@ -530,6 +522,10 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
           log ("Mysterious entity: " ++ show c ++ "\n")
           singleDisplayableCharacter 1
       where
+        numberOr1IfMissing csi
+          | null csi = 1
+          | otherwise = read csi
+
         noLocationChangeConsuming n =
           pure ((Just n, inWrapnext), thePos)
 
