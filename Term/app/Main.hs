@@ -485,10 +485,10 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   markBarDirty
                   pure thePos
                 'A' -> do
-                  let mdy
+                  let (negate -> dy)
                         | null csi = 1
                         | otherwise = read csi
-                  pure (second (+ negate mdy) thePos)
+                  pure (second (+ dy) thePos)
                 'B' -> do
                   let dy
                         | null csi = 1
