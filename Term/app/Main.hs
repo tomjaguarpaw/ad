@@ -441,8 +441,9 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                  in (x', (y + yinc) `min` rows)
           pure ((Just 1, False), newPos)
         '\ESC' : 'M' : _ -> do
-          let newPos@(_, y) = second (\y' -> (y' - 1) `max` 0) thePos
-          when (y == 0) markBarDirty
+          let (_, oldy) = thePos
+              newPos = second (\y' -> (y' - 1) `max` 0) thePos
+          when (oldy == 0) markBarDirty
           pure ((Just 2, False), newPos)
         '\ESC' : '>' : _ -> do
           noLocationChangeConsuming 2
