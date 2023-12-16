@@ -175,7 +175,7 @@ main = do
     env <- getEnvironment
     (cols, rows) <- readIORef theDims
     Pty.spawnWithPty
-      (Just (("TERM", terminfoName) : env))
+      (Just (insertAssocList "TERM" terminfoName env))
       True
       "sh"
       ["-c", prog]
@@ -497,7 +497,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   let (negate -> dx) = numberOr1IfMissing csi
                   pure (first (+ dx) thePos)
                 'd' -> do
-                  let y = read csi
+                  let y = read csi - 1
                   pure (second (const y) thePos)
                 _ -> pure thePos
               pure ((Just (2 + length csi + 1), False), newPos)
@@ -547,6 +547,13 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                     else ((x + 1, y), False)
           pure ((Just n, nextWrapnext), newPos)
         needMore = pure ((Nothing, inWrapnext), thePos)
+
+insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
+insertAssocList k v [] = [(k, v)]
+insertAssocList k v ((k', v') : kvs) =
+  if k == k'
+    then (k, v) : kvs
+    else (k', v') : insertAssocList k v kvs
 
 -- https://github.com/martanne/dvtm/blob/7bcf43f8dbd5c4a67ec573a1248114caa75fa3c2/vt.c#L619-L624
 isValidCsiEnder :: Char -> Bool
