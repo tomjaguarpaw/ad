@@ -314,9 +314,7 @@ main = do
           case mseen of
             Nothing -> pure Nothing
             Just seen -> do
-              let bs = C8.take seen bsIn
-
-              let theLeftovers = C8.drop seen bsIn
+              let (bs, theLeftovers) = C8.splitAt seen bsIn
 
               when (C8.length bsIn /= seen + C8.length theLeftovers) $ do
                 log "Invariant violated"
