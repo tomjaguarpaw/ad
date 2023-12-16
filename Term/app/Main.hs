@@ -503,7 +503,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   let y = read csi - 1
                   pure (second (const y) thePos)
                 _ -> pure thePos
-              pure ((Just (2 + length csi + 1), False), newPos)
+              pure ((Just (2 + length csi + 1), inWrapnext && (thePos == newPos)), newPos)
         '\ESC' : [] ->
           needMore
         (c2w -> word) : rest
