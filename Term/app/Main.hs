@@ -304,12 +304,14 @@ main = do
 
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
-          parse markBarDirty inWrapnext theDims pos (C8.unpack bsIn) >>= \case
-            (Nothing, nextWrapnext) -> do
+          parse markBarDirty inWrapnext theDims oldPos (C8.unpack bsIn) >>= \case
+            ((Nothing, nextWrapnext), newPos) -> do
               writeIORef cursorWrapnext nextWrapnext
+              writeIORef pos newPos
               pure Nothing
-            (Just seen, nextWrapnext) -> do
+            ((Just seen, nextWrapnext), newPos) -> do
               writeIORef cursorWrapnext nextWrapnext
+              writeIORef pos newPos
               let bs = C8.take seen bsIn
 
               let theLeftovers = C8.drop seen bsIn
@@ -415,14 +417,10 @@ parse ::
   IO () ->
   Bool ->
   IORef (Int, Int) ->
-  IORef (Int, Int) ->
+  (Int, Int) ->
   String ->
-  IO (Maybe Int, Bool)
-parse markBarDirty inWrapnext theDims pos s = do
-  thePos <- readIORef pos
-  (res, newPos) <- parse' thePos s
-  writeIORef pos newPos
-  pure res
+  IO ((Maybe Int, Bool), (Int, Int))
+parse markBarDirty inWrapnext theDims = parse'
   where
     parse' thePos =
       \case
