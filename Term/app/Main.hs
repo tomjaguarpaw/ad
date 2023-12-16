@@ -488,7 +488,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   let mdy
                         | null csi = 1
                         | otherwise = read csi
-                  pure (second (subtract mdy) thePos)
+                  pure (second (+ negate mdy) thePos)
                 'B' -> do
                   let dy
                         | null csi = 1
