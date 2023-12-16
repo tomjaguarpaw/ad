@@ -431,7 +431,6 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
         '\r' : _ -> do
           pure ((Just 1, False), first (const 0) thePos)
         '\n' : _ -> do
-          log "Newline\n"
           pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
         '\a' : _ ->
           noLocationChangeConsuming 1
