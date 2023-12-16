@@ -504,6 +504,8 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   pure (second (const y) thePos)
                 _ -> pure thePos
               pure ((Just (2 + length csi + 1), False), newPos)
+        '\ESC' : [] ->
+          needMore
         (c2w -> word) : rest
           | (word .&. 0b10000000) == 0b00000000 ->
               -- One byte (ASCII)
