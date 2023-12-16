@@ -544,9 +544,10 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
               False ->
                 -- x > cols shouldn't happen. Check for it, and
                 -- at least warn?
-                if x >= cols - 1
-                  then pure ((x, y), True)
-                  else pure ((x + 1, y), False)
+                case x `compare` (cols - 1) of
+                  GT -> pure ((x, y), True)
+                  EQ -> pure ((x, y), True)
+                  LT -> pure ((x + 1, y), False)
           pure ((Just n, nextWrapnext), newPos)
         needMore = pure ((Nothing, inWrapnext), thePos)
 
