@@ -28,7 +28,7 @@ import Data.ByteString.Internal (c2w)
 import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
-import Data.IORef (IORef, newIORef, readIORef, writeIORef)
+import Data.IORef (newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
 import System.Environment (getArgs, getEnvironment)
@@ -304,7 +304,8 @@ main = do
 
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
-          parse markBarDirty inWrapnext theDims oldPos (C8.unpack bsIn) >>= \case
+          dims <- readIORef theDims
+          parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
             ((Nothing, nextWrapnext), newPos) -> do
               writeIORef cursorWrapnext nextWrapnext
               writeIORef pos newPos
@@ -416,11 +417,11 @@ warnIfHostTerminalUnsuitable = do
 parse ::
   IO () ->
   Bool ->
-  IORef (Int, Int) ->
+  (Int, Int) ->
   (Int, Int) ->
   String ->
   IO ((Maybe Int, Bool), (Int, Int))
-parse markBarDirty inWrapnext theDims = parse'
+parse markBarDirty inWrapnext (cols, rows) = parse'
   where
     parse' thePos =
       \case
@@ -432,13 +433,11 @@ parse markBarDirty inWrapnext theDims = parse'
         '\r' : _ -> do
           pure ((Just 1, False), first (const 0) thePos)
         '\n' : _ -> do
-          (_, rows) <- readIORef theDims
           log "Newline\n"
           pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
         '\a' : _ ->
           noLocationChangeConsuming 1
         '\b' : _ -> do
-          (cols, rows) <- readIORef theDims
           let newPos =
                 let (x, y) = thePos
                     (yinc, x') = (x - 1) `divMod` cols
@@ -546,7 +545,6 @@ parse markBarDirty inWrapnext theDims = parse'
             case inWrapnext of
               True -> pure ((1, y + 1), False)
               False -> do
-                (cols, _) <- readIORef theDims
                 -- x > cols shouldn't happen. Check for it, and
                 -- at least warn?
                 pure $
