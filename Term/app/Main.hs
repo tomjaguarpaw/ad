@@ -500,10 +500,10 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                         | otherwise = read csi
                   pure (first (+ dx) thePos)
                 'D' -> do
-                  let mdx
+                  let (negate -> dx)
                         | null csi = 1
                         | otherwise = read csi
-                  pure (first (+ negate mdx) thePos)
+                  pure (first (+ dx) thePos)
                 _ -> pure thePos
               pure ((Just (2 + length csi + 1), False), newPos)
         (c2w -> word) : rest
