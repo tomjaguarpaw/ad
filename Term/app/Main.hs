@@ -496,6 +496,9 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                 'D' -> do
                   let (negate -> dx) = numberOr1IfMissing csi
                   pure (first (+ dx) thePos)
+                'd' -> do
+                  let y = read csi
+                  pure (second (const y) thePos)
                 _ -> pure thePos
               pure ((Just (2 + length csi + 1), False), newPos)
         (c2w -> word) : rest
