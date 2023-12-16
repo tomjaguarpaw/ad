@@ -532,8 +532,9 @@ parse markBarDirty inWrapnext theDims pos s = do
               case rest of
                 _ : _ : _ : _ -> singleDisplayableCharacter 4
                 _ -> needMore
-        _ : _ ->
+        c : _ -> do
           -- No idea what these mysterious entities are
+          log ("Mysterious entity: " ++ show c ++ "\n")
           singleDisplayableCharacter 1
       where
         noLocationChangeConsuming n =
