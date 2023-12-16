@@ -447,7 +447,7 @@ parse markBarDirty inWrapnext theDims pos s = do
                  in (x', (y + yinc) `min` rows)
           pure ((Just 1, False), newPos)
         '\ESC' : 'M' : _ -> do
-          let newPos@(_, y) = second (\y -> (y - 1) `max` 0) thePos
+          let newPos@(_, y) = second (\y' -> (y' - 1) `max` 0) thePos
           when (y == 0) markBarDirty
           pure ((Just 2, False), newPos)
         '\ESC' : '>' : _ -> do
