@@ -542,9 +542,13 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
             case inWrapnext of
               True -> pure ((1, y + 1), False)
               False -> case x `compare` (cols - 1) of
-                -- x > cols shouldn't happen. Check for it, and
-                -- at least warn?
-                GT ->
+                GT -> do
+                  log
+                    ( "Warning: overflow: x: "
+                        ++ show x
+                        ++ " cols: "
+                        ++ show cols
+                    )
                   pure ((x, y), True)
                 EQ ->
                   pure ((x, y), True)
