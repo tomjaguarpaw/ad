@@ -316,10 +316,6 @@ main = do
             Just seen -> do
               let (bs, theLeftovers) = C8.splitAt seen bsIn
 
-              when (C8.length bsIn /= seen + C8.length theLeftovers) $ do
-                log "Invariant violated"
-                error (show (C8.length bsIn, seen, C8.length theLeftovers))
-
               scrollIfNeeded inWrapnext oldPos markBarDirty bs
               hPut stdout bs
 
