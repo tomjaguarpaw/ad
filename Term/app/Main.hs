@@ -422,7 +422,10 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
       \case
         [] ->
           needMore
-        -- No idea what \SI is or why zsh outputs it
+        -- This is "shift in".  Emacs uses it but I don't understand
+        -- what it does.
+        --
+        -- https://en.wikipedia.org/wiki/Shift_Out_and_Shift_In_characters
         '\SI' : _ -> do
           noLocationChangeConsuming 1
         '\r' : _ -> do
