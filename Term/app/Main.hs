@@ -382,7 +382,8 @@ warnIfTerminfoMissing terminfoName terminfoFilename = do
       putStrLn
         ( unwords
             [ "Warning: I couldn't run tic so I couldn't determine",
-              "whether you have a terminfo entry for smy"
+              "whether you have a terminfo entry for ",
+              terminfoName
             ]
         )
     Right ExitSuccess -> pure ()
