@@ -305,14 +305,15 @@ main = do
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
-          parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
-            ((Nothing, nextWrapnext), newPos) -> do
-              writeIORef cursorWrapnext nextWrapnext
-              writeIORef pos newPos
-              pure Nothing
-            ((Just seen, nextWrapnext), newPos) -> do
-              writeIORef cursorWrapnext nextWrapnext
-              writeIORef pos newPos
+          ((mseen, nextWrapnext), newPos) <-
+            parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn)
+
+          writeIORef cursorWrapnext nextWrapnext
+          writeIORef pos newPos
+
+          case mseen of
+            Nothing -> pure Nothing
+            Just seen -> do
               let bs = C8.take seen bsIn
 
               let theLeftovers = C8.drop seen bsIn
