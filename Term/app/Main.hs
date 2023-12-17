@@ -15,6 +15,7 @@ import Control.Concurrent
     newEmptyMVar,
     putMVar,
     takeMVar,
+    threadDelay,
     tryPutMVar,
   )
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
@@ -31,6 +32,7 @@ import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Maybe (fromMaybe)
 import Data.Typeable (Typeable, cast)
 import Data.Unique qualified
+import Data.List
 import System.Environment (getArgs, getEnvironment)
 import System.Exit (exitFailure, exitWith)
 import System.IO
@@ -70,10 +72,12 @@ import System.Process.Typed
   ( ExitCode (ExitFailure, ExitSuccess),
     nullStream,
     proc,
+    readProcessStdout,
     runProcess,
     setStderr,
     setStdin,
     setStdout,
+    shell,
   )
 import Text.Read (readMaybe)
 import Prelude hiding (log)
@@ -163,14 +167,11 @@ main = do
   log <- makeLogger
 
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
-    e <-
-      getProcessExitCode childHandle >>= \case
-        Nothing -> do
-          log "Impossible: should only happen when the process is still running"
-          error "Impossible: should only happen when the process is still running"
-        Just e -> pure e
-
-    requestExit e
+    getProcessExitCode childHandle >>= \case
+      Nothing ->
+        -- It wasn't this process, it was another process
+        pure ()
+      Just e -> requestExit e
 
   winchMVar <- do
     winchMVar <- newEmptyMVar
@@ -233,6 +234,13 @@ main = do
         (y, x) <- requestPosition
         pure (x - 1, y - 1)
 
+  barRef <- newIORef mempty
+  _ <- forkIO $ fix $ \again -> do
+    threadDelay (1000 * 1000)
+    (_, barText) <- gitLog
+    writeIORef barRef barText
+    again
+
   let drawBar :: (Int, Int) -> (Int, Int) -> IO ()
       drawBar (cols, rows) (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
@@ -242,7 +250,8 @@ main = do
           putStdoutStr "\ESC[K"
         -- Go to first column on first row of bar
         putStdoutStr (cupXY0 (0, rows - barLines))
-        putStdoutStr (take cols bar)
+        barText <- readIORef barRef
+        for_ (intersperse (C8.pack "\r\n") (take 3 barText)) (hPut stdout)
         -- Go back to where we were
         putStdoutStr (cupXY0 (x, y))
 
@@ -270,6 +279,7 @@ main = do
                   ++ "\n"
               )
             putStdoutStr
+              -- FIXME: Need to clear barLines rows here
               ( cupXY0 (0, virtualRows)
                   ++ "\ESC[K"
                   ++ cupXY0 (0, rows - 1)
@@ -667,3 +677,13 @@ withScopedException f = do
 
 earlyReturn :: (Typeable r) => ((forall a. r -> IO a) -> IO r) -> IO r
 earlyReturn h = fmap (either id id) (withScopedException h)
+
+gitLog :: IO (ExitCode, [ByteString])
+gitLog =
+  ( (fmap . fmap) (C8.split '\n' . C8.toStrict)
+      . readProcessStdout
+      . setStdin nullStream
+      . setStderr nullStream
+      . shell
+  )
+    "git log --color --graph --decorate --pretty=format:\"%C(auto)%h %<(7,trunc)%C(auto)%ae%Creset%C(auto)%d %s [%ar]%Creset\" HEAD~3.."
