@@ -422,8 +422,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
       \case
         [] ->
           needMore
-        -- This is "shift in".  Emacs uses it but I don't understand
-        -- what it does.
+        -- This is "shift in", equivalent to '\017', and part of sgr0.
         --
         -- https://en.wikipedia.org/wiki/Shift_Out_and_Shift_In_characters
         '\SI' : _ -> do
