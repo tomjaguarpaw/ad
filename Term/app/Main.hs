@@ -179,7 +179,7 @@ main = do
       True
       "sh"
       ["-c", prog]
-      (cols, subtract 1 rows)
+      (cols, rows - 1)
 
   exit <- newEmptyMVar
 
