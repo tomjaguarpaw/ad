@@ -84,6 +84,9 @@ data In = PtyIn (Either [Pty.PtyControlCode] ByteString) | StdIn ByteString | Wi
 data Selector a = MkSelector (IO ()) (IO a)
   deriving (Functor)
 
+barLines :: Int
+barLines = 1
+
 selectorFd :: CSize -> Fd -> Selector ByteString
 selectorFd n fd =
   -- We shouldn't threadWaitRead on an Fd from a Handle
@@ -179,7 +182,7 @@ main = do
       True
       "sh"
       ["-c", prog]
-      (cols, rows - 1)
+      (cols, rows - barLines)
 
   exit <- newEmptyMVar
 
@@ -255,8 +258,8 @@ main = do
       drawBar (x@((+ 1) -> xp1), y@((+ 1) -> yp1)) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
-        -- Go to first column on last row
-        hPut stdout (C8.pack ("\ESC[" <> show (rows - 1 + 1) <> ";1H"))
+        -- Go to first column on first row of bar
+        hPut stdout (C8.pack ("\ESC[" <> show (rows - barLines + 1) <> ";1H"))
         -- Clear line
         hPut stdout (C8.pack "\ESC[K")
         hPut stdout (C8.pack (take cols bar))
@@ -273,13 +276,13 @@ main = do
           (cols, rows) <- readIORef theDims
           let virtualDims = (cols, rows - barLines)
           (x, y0) <- readIORef pos
-          when (y0 == rows - 1) $ do
+          when (y0 == rows - barLines) $ do
             log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "/" ++ show virtualDims ++ "\n")
             hPut
               stdout
               ( C8.pack
                   ( "\ESC["
-                      ++ show (rows - 1 + 1)
+                      ++ show (rows - barLines + 1)
                       ++ ";1H"
                       ++ "\ESC[K\n\ESCM\ESC["
                       ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
@@ -331,7 +334,7 @@ main = do
             WinchIn -> do
               dims@(cols, rows) <- Pty.ptyDimensions stdInPty
               writeIORef theDims dims
-              Pty.resizePty pty (cols, rows - 1)
+              Pty.resizePty pty (cols, rows - barLines)
               getPid childHandle >>= \case
                 -- I guess this only happens if there is a race condition
                 -- between SIGWINCH and termination of the child process
@@ -428,7 +431,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
         '\r' : _ -> do
           pure (Just ((1, False), first (const 0) thePos))
         '\n' : _ -> do
-          pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos))
+          pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos))
         '\a' : _ ->
           noLocationChangeConsuming 1
         '\b' : _ -> do
