@@ -305,15 +305,12 @@ main = do
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
-          ((mseen, nextWrapnext), newPos) <-
-            parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn)
-
-          writeIORef cursorWrapnext nextWrapnext
-          writeIORef pos newPos
-
-          case mseen of
+          parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
-            Just seen -> do
+            Just ((seen, nextWrapnext), newPos) -> do
+              writeIORef cursorWrapnext nextWrapnext
+              writeIORef pos newPos
+
               let (bs, theLeftovers) = C8.splitAt seen bsIn
 
               scrollIfNeeded inWrapnext oldPos markBarDirty bs
@@ -415,7 +412,7 @@ parse ::
   (Int, Int) ->
   (Int, Int) ->
   String ->
-  IO ((Maybe Int, Bool), (Int, Int))
+  IO (Maybe ((Int, Bool), (Int, Int)))
 parse markBarDirty inWrapnext (cols, rows) = parse'
   where
     parse' thePos =
@@ -428,9 +425,9 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
         '\SI' : _ -> do
           noLocationChangeConsuming 1
         '\r' : _ -> do
-          pure ((Just 1, False), first (const 0) thePos)
+          pure (Just ((1, False), first (const 0) thePos))
         '\n' : _ -> do
-          pure ((Just 1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos)
+          pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - 1)) thePos))
         '\a' : _ ->
           noLocationChangeConsuming 1
         '\b' : _ -> do
@@ -438,12 +435,12 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                 let (x, y) = thePos
                     (yinc, x') = (x - 1) `divMod` cols
                  in (x', (y + yinc) `min` rows)
-          pure ((Just 1, False), newPos)
+          pure (Just ((1, False), newPos))
         '\ESC' : 'M' : _ -> do
           let (_, oldy) = thePos
               newPos = second (\y' -> (y' - 1) `max` 0) thePos
           when (oldy == 0) markBarDirty
-          pure ((Just 2, False), newPos)
+          pure (Just ((2, False), newPos))
         '\ESC' : '>' : _ -> do
           noLocationChangeConsuming 2
         '\ESC' : '=' : _ -> do
@@ -502,7 +499,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   let y = read csi - 1
                   pure (second (const y) thePos)
                 _ -> pure thePos
-              pure ((Just (2 + length csi + 1), inWrapnext && (thePos == newPos)), newPos)
+              pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos))
         '\ESC' : [] ->
           needMore
         (c2w -> word) : rest
@@ -534,7 +531,7 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
           | otherwise = read csi
 
         noLocationChangeConsuming n =
-          pure ((Just n, inWrapnext), thePos)
+          pure (Just ((n, inWrapnext), thePos))
 
         singleDisplayableCharacter n = do
           let (x, y) = thePos
@@ -555,8 +552,8 @@ parse markBarDirty inWrapnext (cols, rows) = parse'
                   pure ((x, y), True)
                 LT ->
                   pure ((x + 1, y), False)
-          pure ((Just n, nextWrapnext), newPos)
-        needMore = pure ((Nothing, inWrapnext), thePos)
+          pure (Just ((n, nextWrapnext), newPos))
+        needMore = pure Nothing
 
 insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
 insertAssocList k v [] = [(k, v)]
