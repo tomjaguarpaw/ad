@@ -278,7 +278,7 @@ main = do
               stdout
               ( C8.pack
                   ( "\ESC["
-                      ++ show rows
+                      ++ show (rows - 1 + 1)
                       ++ ";1H"
                       ++ "\ESC[K\n\ESCM\ESC["
                       ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
