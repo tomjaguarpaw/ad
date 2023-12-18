@@ -256,7 +256,7 @@ main = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         -- Go to first column on last row
-        hPut stdout (C8.pack ("\ESC[" <> show rows <> ";1H"))
+        hPut stdout (C8.pack ("\ESC[" <> show (rows - 1 + 1) <> ";1H"))
         -- Clear line
         hPut stdout (C8.pack "\ESC[K")
         hPut stdout (C8.pack (take cols bar))
