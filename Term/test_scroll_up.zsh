@@ -1,6 +1,6 @@
 # Scrolling the screen down with \ESCM should redraw the bar
 
-echo -ne "FAILURE Should not be able to see this"
+echo -ne "FAILURE Should not be able to see this or anything above ^"
 
 for i in $(seq 1 $LINES); do
     echo
