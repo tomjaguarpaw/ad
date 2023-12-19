@@ -23,6 +23,7 @@ import Control.Exception (Exception, IOException, throwIO, try, tryJust)
 import Control.Monad (forever, when)
 import Data.Bits ((.&.))
 import Data.ByteString (ByteString, drop, hPut)
+import Data.ByteString qualified as BS
 import Data.ByteString.Char8 qualified as C8
 import Data.ByteString.Internal (c2w)
 import Data.Char (isAlpha, isAscii)
@@ -93,7 +94,7 @@ type UpdateCursor =
   IO (Bool, (Int, Int), Bool)
 
 barLines :: Int
-barLines = 3
+barLines = 4
 
 readPty :: Pty.Pty -> IO (Either [Pty.PtyControlCode] ByteString)
 readPty pty = do
@@ -251,7 +252,7 @@ main = do
         -- Go to first column on first row of bar
         putStdoutStr (cupXY0 (0, rows - barLines))
         barText <- readIORef barRef
-        for_ (intersperse (C8.pack "\r\n") (take 3 barText)) (hPut stdout)
+        for_ (intersperse (C8.pack "\r\n") (mconcat (replicate cols (BS.pack [226, 148, 128])) : take 3 barText)) (hPut stdout)
         -- Go back to where we were
         putStdoutStr (cupXY0 (x, y))
 
