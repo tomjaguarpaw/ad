@@ -370,7 +370,7 @@ warnIfTerminfoMissing terminfoName terminfoFilename = do
       $ setStdin nullStream
         . setStdout nullStream
         . setStderr nullStream
-      $ proc "tic" [terminfoName]
+      $ proc "infocmp" [terminfoName]
 
   case exitCode of
     Left (_ :: IOException) -> do
