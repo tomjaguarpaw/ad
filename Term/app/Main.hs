@@ -327,6 +327,17 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
+    let withPtyIn bsIn inWrapnext dims oldPos k =
+          parse (C8.unpack bsIn) >>= \case
+            Nothing -> pure Nothing
+            Just f -> do
+              ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
+              let (bs, theLeftovers) = C8.splitAt seen bsIn
+
+              _ <- k nextWrapnext newPos dirty1 bs
+
+              pure (Just theLeftovers)
+
     let handlePty bsIn = do
           (markBarDirty, isBarDirty) <- do
             barDirty <- newIORef False
@@ -335,12 +346,9 @@ main = do
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
-          parse (C8.unpack bsIn) >>= \case
-            Nothing -> pure Nothing
-            Just f -> do
-              ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
-              let (bs, theLeftovers) = C8.splitAt seen bsIn
 
+          withPtyIn bsIn inWrapnext dims oldPos $
+            \nextWrapnext newPos dirty1 bs -> do
               writeIORef cursorWrapnext nextWrapnext
               writeIORef pos newPos
 
@@ -349,8 +357,6 @@ main = do
 
               dirty2 <- isBarDirty
               when (dirty1 || dirty2) (drawBar =<< readIORef pos)
-
-              pure (Just theLeftovers)
 
     unhandledPty <- newIORef (Left mempty)
 
