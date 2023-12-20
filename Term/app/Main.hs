@@ -527,7 +527,15 @@ parse inWrapnext (cols, rows) thePos = \case
             let y = read csi - 1
             pure (second (const y) thePos, False)
           _ -> pure (thePos, False)
-        pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos, dirty))
+        pure
+          ( Just
+              ( ( 2 + length csi + 1,
+                  inWrapnext && (thePos == newPos)
+                ),
+                newPos,
+                dirty
+              )
+          )
   '\ESC' : [] ->
     needMore
   (c2w -> word) : rest
