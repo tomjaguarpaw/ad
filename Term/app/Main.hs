@@ -327,17 +327,6 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
-    let withPtyIn bsIn inWrapnext dims oldPos k =
-          parse (C8.unpack bsIn) >>= \case
-            Nothing -> pure Nothing
-            Just f -> do
-              ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
-              let (bs, theLeftovers) = C8.splitAt seen bsIn
-
-              _ <- k nextWrapnext newPos dirty1 bs
-
-              pure (Just theLeftovers)
-
     let handlePty bsIn = do
           (markBarDirty, isBarDirty) <- do
             barDirty <- newIORef False
@@ -440,6 +429,24 @@ warnIfHostTerminalUnsuitable = do
               "work well with \"screen\" as my host"
             ]
         )
+
+withPtyIn ::
+  ByteString ->
+  Bool ->
+  (Int, Int) ->
+  (Int, Int) ->
+  (Bool -> (Int, Int) -> Bool -> ByteString -> IO a) ->
+  IO (Maybe ByteString)
+withPtyIn bsIn inWrapnext dims oldPos k =
+  parse (C8.unpack bsIn) >>= \case
+    Nothing -> pure Nothing
+    Just f -> do
+      ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
+      let (bs, theLeftovers) = C8.splitAt seen bsIn
+
+      _ <- k nextWrapnext newPos dirty1 bs
+
+      pure (Just theLeftovers)
 
 parse ::
   String ->
