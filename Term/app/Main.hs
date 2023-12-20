@@ -20,7 +20,7 @@ import Control.Concurrent
     tryPutMVar,
   )
 import Control.Exception (IOException, try)
-import Control.Monad (when)
+import Control.Monad (forever, when)
 import Data.Bits ((.&.))
 import Data.ByteString (ByteString, drop, hPut)
 import Data.ByteString.Char8 qualified as C8
@@ -353,7 +353,7 @@ main = do
 
     unhandledPty <- newIORef (Left mempty)
 
-    fix $ \again -> do
+    forever $ do
       readIORef unhandledPty >>= \case
         Left neededmore -> do
           readEither >>= \case
@@ -387,8 +387,6 @@ main = do
             Left {} -> log ("handlePty: pos " ++ show thePos ++ "\n")
             Right {} -> pure ()
           writeIORef unhandledPty mneleftovers
-
-      again
 
   exitWith =<< takeMVar exit
 
