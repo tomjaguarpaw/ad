@@ -285,6 +285,9 @@ main = do
                       ++ show (rows - barLines + 1)
                       ++ ";1H"
                       ++ "\ESC[K"
+                      ++ "\ESC["
+                      ++ show (rows - 1 + 1)
+                      ++ ";1H"
                       ++ "\n\ESCM\ESC["
                       ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
                       ++ ";"
