@@ -339,11 +339,10 @@ main = do
             Nothing -> pure Nothing
             Just f -> do
               ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
+              let (bs, theLeftovers) = C8.splitAt seen bsIn
 
               writeIORef cursorWrapnext nextWrapnext
               writeIORef pos newPos
-
-              let (bs, theLeftovers) = C8.splitAt seen bsIn
 
               scrollIfNeeded inWrapnext oldPos markBarDirty bs
               hPut stdout bs
