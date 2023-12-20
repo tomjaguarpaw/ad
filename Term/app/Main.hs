@@ -466,7 +466,7 @@ parse inWrapnext (cols, rows) thePos = \case
     pure
       ( let (_, oldy) = thePos
             newPos = second (\y' -> (y' - 1) `max` 0) thePos
-         in Just ((2, False), newPos, oldy == 0)
+         in pure ((2, False), newPos, oldy == 0)
       )
   '\ESC' : '>' : _ -> do
     noLocationChangeConsuming 2
