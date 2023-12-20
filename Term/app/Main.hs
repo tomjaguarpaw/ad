@@ -85,7 +85,7 @@ data Selector a = MkSelector (IO ()) (IO a)
   deriving (Functor)
 
 barLines :: Int
-barLines = 1
+barLines = 3
 
 selectorFd :: CSize -> Fd -> Selector ByteString
 selectorFd n fd =
