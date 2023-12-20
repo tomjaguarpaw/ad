@@ -455,11 +455,13 @@ parse inWrapnext (cols, rows) thePos = \case
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
-    let newPos =
-          let (x, y) = thePos
-              (yinc, x') = (x - 1) `divMod` cols
-           in (x', (y + yinc) `min` rows)
-    pure (Just ((1, False), newPos, False))
+    pure
+      ( let newPos =
+              let (x, y) = thePos
+                  (yinc, x') = (x - 1) `divMod` cols
+               in (x', (y + yinc) `min` rows)
+         in Just ((1, False), newPos, False)
+      )
   '\ESC' : 'M' : _ -> do
     let (_, oldy) = thePos
         newPos = second (\y' -> (y' - 1) `max` 0) thePos
