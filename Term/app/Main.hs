@@ -460,7 +460,7 @@ parse inWrapnext (cols, rows) thePos = \case
               let (x, y) = thePos
                   (yinc, x') = (x - 1) `divMod` cols
                in (x', (y + yinc) `min` rows)
-         in Just ((1, False), newPos, False)
+         in pure ((1, False), newPos, False)
       )
   '\ESC' : 'M' : _ -> do
     pure
