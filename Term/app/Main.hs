@@ -335,9 +335,11 @@ main = do
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
-          parse inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
+          parse (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
-            Just ((seen, nextWrapnext), newPos, dirty1) -> do
+            Just f -> do
+              ((seen, nextWrapnext), newPos, dirty1) <- f inWrapnext dims oldPos
+
               writeIORef cursorWrapnext nextWrapnext
               writeIORef pos newPos
 
@@ -435,12 +437,16 @@ warnIfHostTerminalUnsuitable = do
         )
 
 parse ::
-  Bool ->
-  (Int, Int) ->
-  (Int, Int) ->
   String ->
-  IO (Maybe ((Int, Bool), (Int, Int), Bool))
-parse inWrapnext (cols, rows) thePos = \case
+  IO
+    ( Maybe
+        ( Bool ->
+          (Int, Int) ->
+          (Int, Int) ->
+          IO ((Int, Bool), (Int, Int), Bool)
+        )
+    )
+parse = \case
   [] ->
     needMore
   -- This is "shift in", equivalent to '\017', and part of sgr0.
@@ -449,24 +455,31 @@ parse inWrapnext (cols, rows) thePos = \case
   '\SI' : _ -> do
     noLocationChangeConsuming 1
   '\r' : _ -> do
-    pure (Just ((1, False), first (const 0) thePos, False))
+    pure (Just (\_ _ thePos -> pure ((1, False), first (const 0) thePos, False)))
   '\n' : _ -> do
-    pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos, False))
+    pure (Just (\_ (_, rows) thePos -> pure ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
     pure
-      ( let newPos =
-              let (x, y) = thePos
-                  (yinc, x') = (x - 1) `divMod` cols
-               in (x', (y + yinc) `min` rows)
-         in pure ((1, False), newPos, False)
+      ( Just
+          ( ( \_ (cols, rows) thePos ->
+                let newPos =
+                      let (x, y) = thePos
+                          (yinc, x') = (x - 1) `divMod` cols
+                       in (x', (y + yinc) `min` rows)
+                 in pure ((1, False), newPos, False)
+            )
+          )
       )
   '\ESC' : 'M' : _ -> do
     pure
-      ( let (_, oldy) = thePos
-            newPos = second (\y' -> (y' - 1) `max` 0) thePos
-         in pure ((2, False), newPos, oldy == 0)
+      ( Just
+          ( \_ _ thePos ->
+              let (_, oldy) = thePos
+                  newPos = second (\y' -> (y' - 1) `max` 0) thePos
+               in pure ((2, False), newPos, oldy == 0)
+          )
       )
   '\ESC' : '>' : _ -> do
     noLocationChangeConsuming 2
@@ -528,14 +541,17 @@ parse inWrapnext (cols, rows) thePos = \case
             pure (second (const y), False)
           _ -> pure (id, False)
         pure
-          ( let newPos = updatePos thePos
-             in Just
-                  ( ( 2 + length csi + 1,
-                      inWrapnext && (thePos == newPos)
-                    ),
-                    newPos,
-                    dirty
-                  )
+          ( Just
+              ( \inWrapnext _ thePos ->
+                  let newPos = updatePos thePos
+                   in pure
+                        ( ( 2 + length csi + 1,
+                            inWrapnext && (thePos == newPos)
+                          ),
+                          newPos,
+                          dirty
+                        )
+              )
           )
   '\ESC' : [] ->
     needMore
@@ -568,9 +584,9 @@ parse inWrapnext (cols, rows) thePos = \case
       | otherwise = read csi
 
     noLocationChangeConsuming n =
-      pure (Just ((n, inWrapnext), thePos, False))
+      pure (Just (\inWrapnext _ thePos -> pure ((n, inWrapnext), thePos, False)))
 
-    singleDisplayableCharacter n = do
+    singleDisplayableCharacter n = pure $ Just $ \inWrapnext (cols, _) thePos -> do
       let (x, y) = thePos
 
       (newPos, nextWrapnext) <-
@@ -591,7 +607,7 @@ parse inWrapnext (cols, rows) thePos = \case
               pure ((x + 1, y), False)
       -- It's not completely clear whether we should mark the bar
       -- dirty here if we overwrite it, or only when we scroll.
-      pure (Just ((n, nextWrapnext), newPos, False))
+      pure ((n, nextWrapnext), newPos, False)
     needMore = pure Nothing
 
 insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
