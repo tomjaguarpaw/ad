@@ -576,6 +576,8 @@ parse inWrapnext (cols, rows) thePos = \case
               pure ((x, y), True)
             LT ->
               pure ((x + 1, y), False)
+      -- It's not completely clear whether we should mark the bar
+      -- dirty here if we overwrite it, or only when we scroll.
       pure (Just ((n, nextWrapnext), newPos, False))
     needMore = pure Nothing
 
