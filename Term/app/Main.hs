@@ -277,9 +277,9 @@ main = do
     let scrollIfNeeded wasWrapnext (oldxm1, oldym1) (markBarDirty :: IO ()) bs = do
           (cols, rows) <- readIORef theDims
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
-          (x, y0) <- readIORef pos
-          when (y0 == virtualRows) $ do
-            log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y0 - 1) ++ "/" ++ show virtualDims ++ "\n")
+          (x, y) <- readIORef pos
+          when (y == virtualRows) $ do
+            log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y - 1) ++ "/" ++ show virtualDims ++ "\n")
             hPut
               stdout
               ( C8.pack
@@ -298,7 +298,7 @@ main = do
                   )
               )
             markBarDirty
-            writeIORef pos (x, y0 - 1)
+            writeIORef pos (x, y - 1)
 
     do
       oldPos <- readIORef pos
