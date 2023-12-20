@@ -481,9 +481,9 @@ parse inWrapnext (cols, rows) thePos = \case
       (_, "") -> needMore
       -- In the general case we'll need to parse parameters
       (csi, verb : _) -> do
-        (newPos, dirty) <- case verb of
+        (updatePos, dirty) <- case verb of
           'H' -> case break (== ';') csi of
-            ("", "") -> pure ((0, 0), False)
+            ("", "") -> pure (const (0, 0), False)
             (_ : _, "") -> do
               log "error: I guess this is just y"
               error "I guess this is just y"
@@ -498,43 +498,44 @@ parse inWrapnext (cols, rows) thePos = \case
                   log ("Could not read: " ++ show yp1s ++ "\n")
                   error ("Could not read: " ++ show yp1s)
                 Just j -> pure j
-              pure ((xp1 - 1, yp1 - 1), False)
+              pure (const (xp1 - 1, yp1 - 1), False)
             (_, _ : _) -> do
               log "Impossible.  Split must start with ;"
               error "Impossible.  Split must start with ;"
           -- I actually get numeric Cs, despite saying I
           -- don't support them :(
           'J' -> do
-            pure (thePos, True)
+            pure (id, True)
           'L' -> do
-            pure (thePos, True)
+            pure (id, True)
           'A' -> do
             let (negate -> dy) = numberOr1IfMissing csi
-            pure (second (+ dy) thePos, False)
+            pure (second (+ dy), False)
           'B' -> do
             let dy = numberOr1IfMissing csi
-            pure (second (+ dy) thePos, False)
+            pure (second (+ dy), False)
           'C' -> do
             let dx = numberOr1IfMissing csi
-            pure (first (+ dx) thePos, False)
+            pure (first (+ dx), False)
           'D' -> do
             let (negate -> dx) = numberOr1IfMissing csi
-            pure (first (+ dx) thePos, False)
+            pure (first (+ dx), False)
           'G' -> do
             let x = read csi - 1
-            pure (first (const x) thePos, False)
+            pure (first (const x), False)
           'd' -> do
             let y = read csi - 1
-            pure (second (const y) thePos, False)
-          _ -> pure (thePos, False)
+            pure (second (const y), False)
+          _ -> pure (id, False)
         pure
-          ( Just
-              ( ( 2 + length csi + 1,
-                  inWrapnext && (thePos == newPos)
-                ),
-                newPos,
-                dirty
-              )
+          ( let newPos = updatePos thePos
+             in Just
+                  ( ( 2 + length csi + 1,
+                      inWrapnext && (thePos == newPos)
+                    ),
+                    newPos,
+                    dirty
+                  )
           )
   '\ESC' : [] ->
     needMore
