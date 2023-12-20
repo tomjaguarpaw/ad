@@ -278,7 +278,8 @@ main = do
           (cols, rows) <- readIORef theDims
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
           (x, y) <- readIORef pos
-          when (y == virtualRows) $ do
+          let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
+          when (scrollLinesNeeded > 0) $ do
             log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y - 1) ++ "/" ++ show virtualDims ++ "\n")
             hPut
               stdout
@@ -298,7 +299,7 @@ main = do
                   )
               )
             markBarDirty
-            writeIORef pos (x, y - 1)
+            writeIORef pos (x, y - scrollLinesNeeded)
 
     do
       oldPos <- readIORef pos
