@@ -28,7 +28,7 @@ import Data.ByteString.Internal (c2w)
 import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
-import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
 import Data.Traversable (for)
 import Foreign.C.Types (CSize)
 import System.Environment (getArgs, getEnvironment)
@@ -302,8 +302,27 @@ main = do
             writeIORef pos (x, y - scrollLinesNeeded)
 
     do
-      oldPos <- readIORef pos
-      scrollIfNeeded False oldPos (pure ()) (C8.pack "Initial scroll")
+      (x, y) <- readIORef pos
+      (_, rows) <- readIORef theDims
+      let virtualRows = rows - barLines
+          scrollLinesNeeded = (y - virtualRows + 1) `max` 0
+      log ("scrollLinesNeeded: " ++ show scrollLinesNeeded ++ "\n")
+      when (scrollLinesNeeded > 0) $ do
+        hPut
+          stdout
+          ( C8.pack
+              ( "\ESC["
+                  ++ show (rows - 1 + 1)
+                  ++ ";1H"
+                  ++ replicate scrollLinesNeeded '\n'
+                  ++ "\ESC["
+                  ++ show (y - scrollLinesNeeded + 1)
+                  ++ ";"
+                  ++ show (x + 1)
+                  ++ "H"
+              )
+          )
+        modifyIORef' pos (second (subtract scrollLinesNeeded))
 
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
