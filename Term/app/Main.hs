@@ -441,150 +441,147 @@ parse ::
   (Int, Int) ->
   String ->
   IO (Maybe ((Int, Bool), (Int, Int)))
-parse markBarDirty inWrapnext (cols, rows) = parse'
-  where
-    parse' thePos =
-      \case
-        [] ->
-          needMore
-        -- This is "shift in", equivalent to '\017', and part of sgr0.
-        --
-        -- https://en.wikipedia.org/wiki/Shift_Out_and_Shift_In_characters
-        '\SI' : _ -> do
-          noLocationChangeConsuming 1
-        '\r' : _ -> do
-          pure (Just ((1, False), first (const 0) thePos))
-        '\n' : _ -> do
-          pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos))
-        '\a' : _ ->
-          noLocationChangeConsuming 1
-        '\b' : _ -> do
-          let newPos =
-                let (x, y) = thePos
-                    (yinc, x') = (x - 1) `divMod` cols
-                 in (x', (y + yinc) `min` rows)
-          pure (Just ((1, False), newPos))
-        '\ESC' : 'M' : _ -> do
-          let (_, oldy) = thePos
-              newPos = second (\y' -> (y' - 1) `max` 0) thePos
-          when (oldy == 0) markBarDirty
-          pure (Just ((2, False), newPos))
-        '\ESC' : '>' : _ -> do
-          noLocationChangeConsuming 2
-        '\ESC' : '=' : _ -> do
-          noLocationChangeConsuming 2
-        -- Not sure how to parse sgr0 (or sgr) as a general CSI
-        -- code.  What are we supposed to do with '\017'?
-        '\ESC' : '[' : 'm' : '\017' : _ -> do
-          noLocationChangeConsuming 4
-        '\ESC' : '[' : csiAndRest -> do
-          case break isValidCsiEnder csiAndRest of
-            (_, "") -> needMore
-            -- In the general case we'll need to parse parameters
-            (csi, verb : _) -> do
-              newPos <- case verb of
-                'H' -> case break (== ';') csi of
-                  ("", "") -> pure (0, 0)
-                  (_ : _, "") -> do
-                    log "error: I guess this is just y"
-                    error "I guess this is just y"
-                  (yp1s, ';' : xp1s) -> do
-                    xp1 <- case readMaybe xp1s of
-                      Nothing -> do
-                        log ("Could not read: " ++ show xp1s ++ "\n")
-                        error ("Could not read: " ++ show xp1s)
-                      Just j -> pure j
-                    yp1 <- case readMaybe yp1s of
-                      Nothing -> do
-                        log ("Could not read: " ++ show yp1s ++ "\n")
-                        error ("Could not read: " ++ show yp1s)
-                      Just j -> pure j
-                    pure (xp1 - 1, yp1 - 1)
-                  (_, _ : _) -> do
-                    log "Impossible.  Split must start with ;"
-                    error "Impossible.  Split must start with ;"
-                -- I actually get numeric Cs, despite saying I
-                -- don't support them :(
-                'J' -> do
-                  markBarDirty
-                  pure thePos
-                'L' -> do
-                  markBarDirty
-                  pure thePos
-                'A' -> do
-                  let (negate -> dy) = numberOr1IfMissing csi
-                  pure (second (+ dy) thePos)
-                'B' -> do
-                  let dy = numberOr1IfMissing csi
-                  pure (second (+ dy) thePos)
-                'C' -> do
-                  let dx = numberOr1IfMissing csi
-                  pure (first (+ dx) thePos)
-                'D' -> do
-                  let (negate -> dx) = numberOr1IfMissing csi
-                  pure (first (+ dx) thePos)
-                'G' -> do
-                  let x = read csi - 1
-                  pure (first (const x) thePos)
-                'd' -> do
-                  let y = read csi - 1
-                  pure (second (const y) thePos)
-                _ -> pure thePos
-              pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos))
-        '\ESC' : [] ->
-          needMore
-        (c2w -> word) : rest
-          | (word .&. 0b10000000) == 0b00000000 ->
-              -- One byte (ASCII)
-              singleDisplayableCharacter 1
-          | (word .&. 0b11100000) == 0b11000000 ->
-              -- Two byte
-              case rest of
-                _ : _ -> singleDisplayableCharacter 2
-                _ -> needMore
-          | (word .&. 0b11110000) == 0b11100000 ->
-              -- Three byte
-              case rest of
-                _ : _ : _ -> singleDisplayableCharacter 3
-                _ -> needMore
-          | (word .&. 0b11111000) == 0b11110000 ->
-              -- Four byte
-              case rest of
-                _ : _ : _ : _ -> singleDisplayableCharacter 4
-                _ -> needMore
-        c : _ -> do
-          -- No idea what these mysterious entities are
-          log ("Mysterious entity: " ++ show c ++ "\n")
-          singleDisplayableCharacter 1
-      where
-        numberOr1IfMissing csi
-          | null csi = 1
-          | otherwise = read csi
-
-        noLocationChangeConsuming n =
-          pure (Just ((n, inWrapnext), thePos))
-
-        singleDisplayableCharacter n = do
+parse markBarDirty inWrapnext (cols, rows) thePos = \case
+  [] ->
+    needMore
+  -- This is "shift in", equivalent to '\017', and part of sgr0.
+  --
+  -- https://en.wikipedia.org/wiki/Shift_Out_and_Shift_In_characters
+  '\SI' : _ -> do
+    noLocationChangeConsuming 1
+  '\r' : _ -> do
+    pure (Just ((1, False), first (const 0) thePos))
+  '\n' : _ -> do
+    pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos))
+  '\a' : _ ->
+    noLocationChangeConsuming 1
+  '\b' : _ -> do
+    let newPos =
           let (x, y) = thePos
+              (yinc, x') = (x - 1) `divMod` cols
+           in (x', (y + yinc) `min` rows)
+    pure (Just ((1, False), newPos))
+  '\ESC' : 'M' : _ -> do
+    let (_, oldy) = thePos
+        newPos = second (\y' -> (y' - 1) `max` 0) thePos
+    when (oldy == 0) markBarDirty
+    pure (Just ((2, False), newPos))
+  '\ESC' : '>' : _ -> do
+    noLocationChangeConsuming 2
+  '\ESC' : '=' : _ -> do
+    noLocationChangeConsuming 2
+  -- Not sure how to parse sgr0 (or sgr) as a general CSI
+  -- code.  What are we supposed to do with '\017'?
+  '\ESC' : '[' : 'm' : '\017' : _ -> do
+    noLocationChangeConsuming 4
+  '\ESC' : '[' : csiAndRest -> do
+    case break isValidCsiEnder csiAndRest of
+      (_, "") -> needMore
+      -- In the general case we'll need to parse parameters
+      (csi, verb : _) -> do
+        newPos <- case verb of
+          'H' -> case break (== ';') csi of
+            ("", "") -> pure (0, 0)
+            (_ : _, "") -> do
+              log "error: I guess this is just y"
+              error "I guess this is just y"
+            (yp1s, ';' : xp1s) -> do
+              xp1 <- case readMaybe xp1s of
+                Nothing -> do
+                  log ("Could not read: " ++ show xp1s ++ "\n")
+                  error ("Could not read: " ++ show xp1s)
+                Just j -> pure j
+              yp1 <- case readMaybe yp1s of
+                Nothing -> do
+                  log ("Could not read: " ++ show yp1s ++ "\n")
+                  error ("Could not read: " ++ show yp1s)
+                Just j -> pure j
+              pure (xp1 - 1, yp1 - 1)
+            (_, _ : _) -> do
+              log "Impossible.  Split must start with ;"
+              error "Impossible.  Split must start with ;"
+          -- I actually get numeric Cs, despite saying I
+          -- don't support them :(
+          'J' -> do
+            markBarDirty
+            pure thePos
+          'L' -> do
+            markBarDirty
+            pure thePos
+          'A' -> do
+            let (negate -> dy) = numberOr1IfMissing csi
+            pure (second (+ dy) thePos)
+          'B' -> do
+            let dy = numberOr1IfMissing csi
+            pure (second (+ dy) thePos)
+          'C' -> do
+            let dx = numberOr1IfMissing csi
+            pure (first (+ dx) thePos)
+          'D' -> do
+            let (negate -> dx) = numberOr1IfMissing csi
+            pure (first (+ dx) thePos)
+          'G' -> do
+            let x = read csi - 1
+            pure (first (const x) thePos)
+          'd' -> do
+            let y = read csi - 1
+            pure (second (const y) thePos)
+          _ -> pure thePos
+        pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos))
+  '\ESC' : [] ->
+    needMore
+  (c2w -> word) : rest
+    | (word .&. 0b10000000) == 0b00000000 ->
+        -- One byte (ASCII)
+        singleDisplayableCharacter 1
+    | (word .&. 0b11100000) == 0b11000000 ->
+        -- Two byte
+        case rest of
+          _ : _ -> singleDisplayableCharacter 2
+          _ -> needMore
+    | (word .&. 0b11110000) == 0b11100000 ->
+        -- Three byte
+        case rest of
+          _ : _ : _ -> singleDisplayableCharacter 3
+          _ -> needMore
+    | (word .&. 0b11111000) == 0b11110000 ->
+        -- Four byte
+        case rest of
+          _ : _ : _ : _ -> singleDisplayableCharacter 4
+          _ -> needMore
+  c : _ -> do
+    -- No idea what these mysterious entities are
+    log ("Mysterious entity: " ++ show c ++ "\n")
+    singleDisplayableCharacter 1
+  where
+    numberOr1IfMissing csi
+      | null csi = 1
+      | otherwise = read csi
 
-          (newPos, nextWrapnext) <-
-            case inWrapnext of
-              True -> pure ((1, y + 1), False)
-              False -> case x `compare` (cols - 1) of
-                GT -> do
-                  log
-                    ( "Warning: overflow: x: "
-                        ++ show x
-                        ++ " cols: "
-                        ++ show cols
-                    )
-                  pure ((x, y), True)
-                EQ ->
-                  pure ((x, y), True)
-                LT ->
-                  pure ((x + 1, y), False)
-          pure (Just ((n, nextWrapnext), newPos))
-        needMore = pure Nothing
+    noLocationChangeConsuming n =
+      pure (Just ((n, inWrapnext), thePos))
+
+    singleDisplayableCharacter n = do
+      let (x, y) = thePos
+
+      (newPos, nextWrapnext) <-
+        case inWrapnext of
+          True -> pure ((1, y + 1), False)
+          False -> case x `compare` (cols - 1) of
+            GT -> do
+              log
+                ( "Warning: overflow: x: "
+                    ++ show x
+                    ++ " cols: "
+                    ++ show cols
+                )
+              pure ((x, y), True)
+            EQ ->
+              pure ((x, y), True)
+            LT ->
+              pure ((x + 1, y), False)
+      pure (Just ((n, nextWrapnext), newPos))
+    needMore = pure Nothing
 
 insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
 insertAssocList k v [] = [(k, v)]
