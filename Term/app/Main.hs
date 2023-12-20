@@ -335,9 +335,9 @@ main = do
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
-          parse markBarDirty inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
+          parse inWrapnext dims oldPos (C8.unpack bsIn) >>= \case
             Nothing -> pure Nothing
-            Just ((seen, nextWrapnext), newPos) -> do
+            Just ((seen, nextWrapnext), newPos, dirty1) -> do
               writeIORef cursorWrapnext nextWrapnext
               writeIORef pos newPos
 
@@ -346,8 +346,8 @@ main = do
               scrollIfNeeded inWrapnext oldPos markBarDirty bs
               hPut stdout bs
 
-              dirty <- isBarDirty
-              when dirty (drawBar =<< readIORef pos)
+              dirty2 <- isBarDirty
+              when (dirty1 || dirty2) (drawBar =<< readIORef pos)
 
               pure (Just theLeftovers)
 
@@ -435,13 +435,12 @@ warnIfHostTerminalUnsuitable = do
         )
 
 parse ::
-  IO () ->
   Bool ->
   (Int, Int) ->
   (Int, Int) ->
   String ->
-  IO (Maybe ((Int, Bool), (Int, Int)))
-parse markBarDirty inWrapnext (cols, rows) thePos = \case
+  IO (Maybe ((Int, Bool), (Int, Int), Bool))
+parse inWrapnext (cols, rows) thePos = \case
   [] ->
     needMore
   -- This is "shift in", equivalent to '\017', and part of sgr0.
@@ -450,9 +449,9 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
   '\SI' : _ -> do
     noLocationChangeConsuming 1
   '\r' : _ -> do
-    pure (Just ((1, False), first (const 0) thePos))
+    pure (Just ((1, False), first (const 0) thePos, False))
   '\n' : _ -> do
-    pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos))
+    pure (Just ((1, False), second (\y -> (y + 1) `min` (rows - barLines)) thePos, False))
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
@@ -460,12 +459,11 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
           let (x, y) = thePos
               (yinc, x') = (x - 1) `divMod` cols
            in (x', (y + yinc) `min` rows)
-    pure (Just ((1, False), newPos))
+    pure (Just ((1, False), newPos, False))
   '\ESC' : 'M' : _ -> do
     let (_, oldy) = thePos
         newPos = second (\y' -> (y' - 1) `max` 0) thePos
-    when (oldy == 0) markBarDirty
-    pure (Just ((2, False), newPos))
+    pure (Just ((2, False), newPos, oldy == 0))
   '\ESC' : '>' : _ -> do
     noLocationChangeConsuming 2
   '\ESC' : '=' : _ -> do
@@ -479,9 +477,9 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
       (_, "") -> needMore
       -- In the general case we'll need to parse parameters
       (csi, verb : _) -> do
-        newPos <- case verb of
+        (newPos, dirty) <- case verb of
           'H' -> case break (== ';') csi of
-            ("", "") -> pure (0, 0)
+            ("", "") -> pure ((0, 0), False)
             (_ : _, "") -> do
               log "error: I guess this is just y"
               error "I guess this is just y"
@@ -496,38 +494,36 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
                   log ("Could not read: " ++ show yp1s ++ "\n")
                   error ("Could not read: " ++ show yp1s)
                 Just j -> pure j
-              pure (xp1 - 1, yp1 - 1)
+              pure ((xp1 - 1, yp1 - 1), False)
             (_, _ : _) -> do
               log "Impossible.  Split must start with ;"
               error "Impossible.  Split must start with ;"
           -- I actually get numeric Cs, despite saying I
           -- don't support them :(
           'J' -> do
-            markBarDirty
-            pure thePos
+            pure (thePos, True)
           'L' -> do
-            markBarDirty
-            pure thePos
+            pure (thePos, True)
           'A' -> do
             let (negate -> dy) = numberOr1IfMissing csi
-            pure (second (+ dy) thePos)
+            pure (second (+ dy) thePos, False)
           'B' -> do
             let dy = numberOr1IfMissing csi
-            pure (second (+ dy) thePos)
+            pure (second (+ dy) thePos, False)
           'C' -> do
             let dx = numberOr1IfMissing csi
-            pure (first (+ dx) thePos)
+            pure (first (+ dx) thePos, False)
           'D' -> do
             let (negate -> dx) = numberOr1IfMissing csi
-            pure (first (+ dx) thePos)
+            pure (first (+ dx) thePos, False)
           'G' -> do
             let x = read csi - 1
-            pure (first (const x) thePos)
+            pure (first (const x) thePos, False)
           'd' -> do
             let y = read csi - 1
-            pure (second (const y) thePos)
-          _ -> pure thePos
-        pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos))
+            pure (second (const y) thePos, False)
+          _ -> pure (thePos, False)
+        pure (Just ((2 + length csi + 1, inWrapnext && (thePos == newPos)), newPos, dirty))
   '\ESC' : [] ->
     needMore
   (c2w -> word) : rest
@@ -559,7 +555,7 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
       | otherwise = read csi
 
     noLocationChangeConsuming n =
-      pure (Just ((n, inWrapnext), thePos))
+      pure (Just ((n, inWrapnext), thePos, False))
 
     singleDisplayableCharacter n = do
       let (x, y) = thePos
@@ -580,7 +576,7 @@ parse markBarDirty inWrapnext (cols, rows) thePos = \case
               pure ((x, y), True)
             LT ->
               pure ((x + 1, y), False)
-      pure (Just ((n, nextWrapnext), newPos))
+      pure (Just ((n, nextWrapnext), newPos, False))
     needMore = pure Nothing
 
 insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
