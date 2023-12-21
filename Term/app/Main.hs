@@ -482,14 +482,13 @@ parse log = \case
   '\b' : _ -> do
     pure
       ( Just
-          ( ( 1,
-              \_ (cols, rows) thePos ->
-                let newPos =
-                      let (x, y) = thePos
-                          (yinc, x') = (x - 1) `divMod` cols
-                       in (x', (y + yinc) `min` rows)
-                 in pure (False, newPos, False)
-            )
+          ( 1,
+            \_ (cols, rows) thePos ->
+              let newPos =
+                    let (x, y) = thePos
+                        (yinc, x') = (x - 1) `divMod` cols
+                     in (x', (y + yinc) `min` rows)
+               in pure (False, newPos, False)
           )
       )
   '\ESC' : 'M' : _ -> do
