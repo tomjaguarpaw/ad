@@ -452,13 +452,27 @@ withPtyIn' ::
   (Int, Int) ->
   IO (Maybe (ByteString, (Bool, (Int, Int), Bool, ByteString)))
 withPtyIn' bsIn inWrapnext dims oldPos =
+  withPtyIn'' bsIn >>= \case
+    Nothing -> pure Nothing
+    Just ((bs, theLeftovers), f) -> do
+      (nextWrapnext, newPos, dirty1) <- f inWrapnext dims oldPos
+      pure (Just (theLeftovers, (nextWrapnext, newPos, dirty1, bs)))
+
+withPtyIn'' ::
+  ByteString ->
+  IO
+    ( Maybe
+        ( (ByteString, ByteString),
+          Bool ->
+          (Int, Int) ->
+          (Int, Int) ->
+          IO (Bool, (Int, Int), Bool)
+        )
+    )
+withPtyIn'' bsIn =
   parse (C8.unpack bsIn) >>= \case
     Nothing -> pure Nothing
-    Just (seen, f) -> do
-      (nextWrapnext, newPos, dirty1) <- f inWrapnext dims oldPos
-      let (bs, theLeftovers) = C8.splitAt seen bsIn
-
-      pure (Just (theLeftovers, (nextWrapnext, newPos, dirty1, bs)))
+    Just (seen, f) -> pure (Just (C8.splitAt seen bsIn, f))
 
 parse ::
   String ->
