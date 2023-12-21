@@ -20,6 +20,7 @@ import Control.Concurrent
     threadWaitRead,
     tryPutMVar,
   )
+import Control.Concurrent.Chan (newChan, readChan, writeChan)
 import Control.Exception (IOException, try)
 import Control.Monad (forever, when)
 import Data.Bits ((.&.))
@@ -188,6 +189,14 @@ main = do
 
   exit <- newEmptyMVar
 
+  log <- do
+    q <- newChan
+    _ <- forkIO $ forever $ do
+      s <- readChan q
+      appendFile "/tmp/log" s
+
+    pure (writeChan q)
+
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
     e <-
       getProcessExitCode childHandle >>= \case
@@ -205,7 +214,7 @@ main = do
       pure ()
     pure (selectorMVar winchMVar)
 
-  ptyInVar <- myPtyIn pid pty
+  ptyInVar <- myPtyIn log pid pty
 
   let readEither = do
         select
@@ -421,11 +430,11 @@ forkLoopToMVar loop = do
   _ <- forkIO (loop (putMVar v))
   pure v
 
-myPtyIn :: String -> Pty.Pty -> IO (MVar PtyParse)
-myPtyIn pid pty = forkLoopToMVar (myLoop pid pty)
+myPtyIn :: (String -> IO ()) -> String -> Pty.Pty -> IO (MVar PtyParse)
+myPtyIn log pid pty = forkLoopToMVar (myLoop log pid pty)
 
-myLoop :: String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
-myLoop pid pty yield = do
+myLoop :: (String -> IO ()) -> String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
+myLoop log pid pty yield = do
   unhandledPty <- newIORef (Left mempty)
 
   forever $ do
@@ -439,21 +448,24 @@ myLoop pid pty yield = do
             log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
             writeIORef unhandledPty (Right (neededmore <> bs))
       Right bsIn -> do
-        withPtyIn'' bsIn >>= \case
+        withPtyIn'' log bsIn >>= \case
           Nothing -> do
             writeIORef unhandledPty (Left bsIn)
           Just ((bs, theLeftovers), f) -> do
             yield (bs, f)
             writeIORef unhandledPty (Right theLeftovers)
 
-withPtyIn'' :: ByteString -> IO (Maybe ((ByteString, ByteString), UpdateCursor))
-withPtyIn'' bsIn =
-  parse (C8.unpack bsIn) >>= \case
+withPtyIn'' ::
+  (String -> IO ()) ->
+  ByteString ->
+  IO (Maybe ((ByteString, ByteString), UpdateCursor))
+withPtyIn'' log bsIn =
+  parse log (C8.unpack bsIn) >>= \case
     Nothing -> pure Nothing
     Just (seen, f) -> pure (Just (C8.splitAt seen bsIn, f))
 
-parse :: String -> IO (Maybe (Int, UpdateCursor))
-parse = \case
+parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor))
+parse log = \case
   [] ->
     needMore
   -- This is "shift in", equivalent to '\017', and part of sgr0.
@@ -634,6 +646,3 @@ insertAssocList k v ((k', v') : kvs) =
 isValidCsiEnder :: Char -> Bool
 isValidCsiEnder c =
   (isAscii c && isAlpha c) || (c == '@') || (c == '`')
-
-log :: String -> IO ()
-log = appendFile "/tmp/log"
