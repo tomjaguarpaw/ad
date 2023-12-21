@@ -610,28 +610,31 @@ parse = \case
     noLocationChangeConsuming n =
       pure (Just (\inWrapnext _ thePos -> pure ((n, inWrapnext), thePos, False)))
 
-    singleDisplayableCharacter n = pure $ Just $ \inWrapnext (cols, _) thePos -> do
-      let (x, y) = thePos
+    singleDisplayableCharacter n =
+      pure $
+        Just $
+          \inWrapnext (cols, _) thePos -> do
+            let (x, y) = thePos
 
-      (newPos, nextWrapnext) <-
-        case inWrapnext of
-          True -> pure ((1, y + 1), False)
-          False -> case x `compare` (cols - 1) of
-            GT -> do
-              log
-                ( "Warning: overflow: x: "
-                    ++ show x
-                    ++ " cols: "
-                    ++ show cols
-                )
-              pure ((x, y), True)
-            EQ ->
-              pure ((x, y), True)
-            LT ->
-              pure ((x + 1, y), False)
-      -- It's not completely clear whether we should mark the bar
-      -- dirty here if we overwrite it, or only when we scroll.
-      pure ((n, nextWrapnext), newPos, False)
+            (newPos, nextWrapnext) <-
+              case inWrapnext of
+                True -> pure ((1, y + 1), False)
+                False -> case x `compare` (cols - 1) of
+                  GT -> do
+                    log
+                      ( "Warning: overflow: x: "
+                          ++ show x
+                          ++ " cols: "
+                          ++ show cols
+                      )
+                    pure ((x, y), True)
+                  EQ ->
+                    pure ((x, y), True)
+                  LT ->
+                    pure ((x + 1, y), False)
+            -- It's not completely clear whether we should mark the bar
+            -- dirty here if we overwrite it, or only when we scroll.
+            pure ((n, nextWrapnext), newPos, False)
     needMore = pure Nothing
 
 insertAssocList :: (Eq k) => k -> v -> [(k, v)] -> [(k, v)]
