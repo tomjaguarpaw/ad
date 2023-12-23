@@ -289,10 +289,9 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded wasWrapnext (oldx, oldy) bs = do
+    let scrollIfNeeded wasWrapnext (oldx, oldy) thePos@(_, y) bs = do
           (cols, rows) <- readIORef theDims
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
-          (_, y) <- readIORef pos
           let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
           let returnTo =
                 if wasWrapnext
@@ -315,9 +314,8 @@ main = do
                   ++ "\n"
                   ++ cupXY0 returnTo
               )
-            modifyIORef' pos (second (subtract scrollLinesNeeded))
           let dirty = scrollLinesNeeded > 0
-          pure dirty
+          pure (second (subtract scrollLinesNeeded) thePos, dirty)
 
     do
       (x, y) <- readIORef pos
@@ -344,9 +342,9 @@ main = do
           (nextWrapnext, newPos, dirty1) <- updateCursor inWrapnext dims oldPos
 
           writeIORef cursorWrapnext nextWrapnext
-          writeIORef pos newPos
 
-          dirty2 <- scrollIfNeeded inWrapnext oldPos bs
+          (newerPos, dirty2) <- scrollIfNeeded inWrapnext oldPos newPos bs
+          writeIORef pos newerPos
           hPut stdout bs
 
           when (dirty1 || dirty2) (drawBar =<< readIORef pos)
