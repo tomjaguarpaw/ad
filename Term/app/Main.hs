@@ -81,6 +81,12 @@ import Prelude hiding (log)
 
 data In = PtyIn (Either [Pty.PtyControlCode] ByteString) | StdIn ByteString | WinchIn
 
+type UpdateCursor =
+  Bool ->
+  (Int, Int) ->
+  (Int, Int) ->
+  IO (Bool, (Int, Int), Bool)
+
 data Selector a = MkSelector (IO ()) (IO a)
   deriving (Functor)
 
@@ -463,10 +469,7 @@ withPtyIn'' ::
   IO
     ( Maybe
         ( (ByteString, ByteString),
-          Bool ->
-          (Int, Int) ->
-          (Int, Int) ->
-          IO (Bool, (Int, Int), Bool)
+          UpdateCursor
         )
     )
 withPtyIn'' bsIn =
@@ -479,10 +482,7 @@ parse ::
   IO
     ( Maybe
         ( Int,
-          Bool ->
-          (Int, Int) ->
-          (Int, Int) ->
-          IO (Bool, (Int, Int), Bool)
+          UpdateCursor
         )
     )
 parse = \case
