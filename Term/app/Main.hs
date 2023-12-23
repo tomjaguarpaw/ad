@@ -268,8 +268,8 @@ main = do
       drawBar (x@((+ 1) -> xp1), y@((+ 1) -> yp1)) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
-        for_ [rows - barLines + 1 .. rows - 1 + 1] $ \l -> do
-          hPut stdout (C8.pack ("\ESC[" <> show l <> ";1H"))
+        for_ [rows - barLines .. rows - 1] $ \l -> do
+          hPut stdout (C8.pack ("\ESC[" <> show (l + 1) <> ";1H"))
           -- Clear line
           hPut stdout (C8.pack "\ESC[K")
         -- Go to first column on first row of bar
