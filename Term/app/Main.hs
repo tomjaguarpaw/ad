@@ -458,10 +458,11 @@ withPtyIn'' ::
   (String -> IO ()) ->
   ByteString ->
   IO (Maybe ((ByteString, ByteString), UpdateCursor))
-withPtyIn'' log bsIn =
-  parse log (C8.unpack bsIn) >>= \case
-    Nothing -> pure Nothing
-    Just (seen, f) -> pure (Just (C8.splitAt seen bsIn, f))
+withPtyIn'' log bsIn = do
+  mResult <- parse log (C8.unpack bsIn)
+  pure $ do
+    (seen, f) <- mResult
+    Just (C8.splitAt seen bsIn, f)
 
 parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor))
 parse log = \case
