@@ -464,27 +464,13 @@ withPtyIn' bsIn inWrapnext dims oldPos =
       (nextWrapnext, newPos, dirty1) <- f inWrapnext dims oldPos
       pure (Just (theLeftovers, (nextWrapnext, newPos, dirty1, bs)))
 
-withPtyIn'' ::
-  ByteString ->
-  IO
-    ( Maybe
-        ( (ByteString, ByteString),
-          UpdateCursor
-        )
-    )
+withPtyIn'' :: ByteString -> IO (Maybe ((ByteString, ByteString), UpdateCursor))
 withPtyIn'' bsIn =
   parse (C8.unpack bsIn) >>= \case
     Nothing -> pure Nothing
     Just (seen, f) -> pure (Just (C8.splitAt seen bsIn, f))
 
-parse ::
-  String ->
-  IO
-    ( Maybe
-        ( Int,
-          UpdateCursor
-        )
-    )
+parse :: String -> IO (Maybe (Int, UpdateCursor))
 parse = \case
   [] ->
     needMore
