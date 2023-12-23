@@ -5,7 +5,7 @@ for i in $(seq 1 $LINES); do
     echo
 done
 
-echo "Should not see X overlapping the bar"
+echo "Should see both < > and X not overlapping the bar"
 
 /usr/bin/echo -n "<"
 for i in `seq 2 $[COLUMNS-1]`; do
