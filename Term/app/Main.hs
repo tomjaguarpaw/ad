@@ -335,15 +335,15 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePtyF (bs, updateCursor) = do
-          inWrapnext <- readIORef cursorWrapnext
+          oldWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
 
-          (nextWrapnext, newPos, dirty1) <- updateCursor inWrapnext dims oldPos
+          (nextWrapnext, newPos, dirty1) <- updateCursor oldWrapnext dims oldPos
 
           writeIORef cursorWrapnext nextWrapnext
 
-          (newerPos, dirty2) <- scrollIfNeeded inWrapnext oldPos newPos bs
+          (newerPos, dirty2) <- scrollIfNeeded oldWrapnext oldPos newPos bs
           writeIORef pos newerPos
           hPut stdout bs
 
