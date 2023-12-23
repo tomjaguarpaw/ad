@@ -289,15 +289,15 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded wasWrapnext (oldxm1, oldym1) bs = do
+    let scrollIfNeeded wasWrapnext (oldx, oldy) bs = do
           (cols, rows) <- readIORef theDims
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
           (_, y) <- readIORef pos
           let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
           let returnTo =
                 if wasWrapnext
-                  then (0, oldym1)
-                  else (oldxm1, oldym1 - 1)
+                  then (0, oldy)
+                  else (oldx, oldy - 1)
           if scrollLinesNeeded > 0
             then do
               log
