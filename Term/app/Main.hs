@@ -36,7 +36,6 @@ import System.Environment (getArgs, getEnvironment)
 import System.Exit (exitFailure, exitWith)
 import System.IO
   ( BufferMode (NoBuffering),
-    hFlush,
     hSetBuffering,
     stdin,
     stdout,
@@ -228,7 +227,6 @@ main = do
         hPut stdout (C8.pack "\ESC[6n")
 
         log ("Requesting position " ++ pid ++ "\n")
-        hFlush stdout
 
         fix $ \again' -> do
           b <- fdRead stdInput 1
