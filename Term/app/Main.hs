@@ -302,8 +302,9 @@ main = do
                       ++ cupXY0 (0, rows - 1)
                       ++ "\n\ESCM"
                       ++ cupXY0
-                        ( if wasWrapnext then 0 else oldxm1,
-                          if wasWrapnext then oldym1 else oldym1 - 1
+                        ( if wasWrapnext
+                            then (0, oldym1)
+                            else (oldxm1, oldym1 - 1)
                         )
                   )
               )
