@@ -264,19 +264,22 @@ main = do
         (y, x) <- requestPosition
         pure (x - 1, y - 1)
 
+  let cupXY0 :: (Int, Int) -> String
+      cupXY0 (x, y) = "\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"
+
   let drawBar :: (Int, Int) -> IO ()
       drawBar (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         for_ [rows - barLines .. rows - 1] $ \l -> do
-          hPut stdout (C8.pack ("\ESC[" <> show (l + 1) <> ";1H"))
+          hPut stdout (C8.pack (cupXY0 (0, l)))
           -- Clear line
           hPut stdout (C8.pack "\ESC[K")
         -- Go to first column on first row of bar
-        hPut stdout (C8.pack ("\ESC[" <> show (rows - barLines + 1) <> ";1H"))
+        hPut stdout (C8.pack (cupXY0 (0, rows - barLines)))
         hPut stdout (C8.pack (take cols bar))
         -- Go back to where we were
-        hPut stdout (C8.pack ("\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"))
+        hPut stdout (C8.pack (cupXY0 (x, y)))
 
   _ <- forkIO $ do
     pos <- do
@@ -294,19 +297,14 @@ main = do
             hPut
               stdout
               ( C8.pack
-                  ( "\ESC["
-                      ++ show (virtualRows + 1)
-                      ++ ";1H"
+                  ( cupXY0 (0, virtualRows)
                       ++ "\ESC[K"
-                      ++ "\ESC["
-                      ++ show (rows - 1 + 1)
-                      ++ ";1H"
+                      ++ cupXY0 (0, rows - 1)
                       ++ "\n\ESCM"
-                      ++ "\ESC["
-                      ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
-                      ++ ";"
-                      ++ show (1 + if wasWrapnext then 0 else oldxm1)
-                      ++ "H"
+                      ++ cupXY0
+                        ( if wasWrapnext then 0 else oldxm1,
+                          if wasWrapnext then oldym1 else oldym1 - 1
+                        )
                   )
               )
             markBarDirty
@@ -322,15 +320,9 @@ main = do
         hPut
           stdout
           ( C8.pack
-              ( "\ESC["
-                  ++ show (rows - 1 + 1)
-                  ++ ";1H"
+              ( cupXY0 (0, rows - 1)
                   ++ replicate scrollLinesNeeded '\n'
-                  ++ "\ESC["
-                  ++ show (y - scrollLinesNeeded + 1)
-                  ++ ";"
-                  ++ show (x + 1)
-                  ++ "H"
+                  ++ cupXY0 (x, y - scrollLinesNeeded)
               )
           )
         modifyIORef' pos (second (subtract scrollLinesNeeded))
