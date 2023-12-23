@@ -289,7 +289,7 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded wasWrapnext (oldxm1, oldym1) (markBarDirty :: IO ()) bs = do
+    let scrollIfNeeded wasWrapnext (oldxm1, oldym1) bs = do
           (cols, rows) <- readIORef theDims
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
           (_, y) <- readIORef pos
@@ -298,25 +298,27 @@ main = do
                 if wasWrapnext
                   then (0, oldym1)
                   else (oldxm1, oldym1 - 1)
-          when (scrollLinesNeeded > 0) $ do
-            log
-              ( "Overlap detected before "
-                  ++ show bs
-                  ++ ", going back to "
-                  ++ show returnTo
-                  ++ "/"
-                  ++ show virtualDims
-                  ++ "\n"
-              )
-            putStdoutStr
-              ( cupXY0 (0, virtualRows)
-                  ++ "\ESC[K"
-                  ++ cupXY0 (0, rows - 1)
-                  ++ "\n"
-                  ++ cupXY0 returnTo
-              )
-            markBarDirty
-            modifyIORef' pos (second (subtract scrollLinesNeeded))
+          if scrollLinesNeeded > 0
+            then do
+              log
+                ( "Overlap detected before "
+                    ++ show bs
+                    ++ ", going back to "
+                    ++ show returnTo
+                    ++ "/"
+                    ++ show virtualDims
+                    ++ "\n"
+                )
+              putStdoutStr
+                ( cupXY0 (0, virtualRows)
+                    ++ "\ESC[K"
+                    ++ cupXY0 (0, rows - 1)
+                    ++ "\n"
+                    ++ cupXY0 returnTo
+                )
+              modifyIORef' pos (second (subtract scrollLinesNeeded))
+              pure True
+            else pure False
 
     do
       (x, y) <- readIORef pos
@@ -336,10 +338,6 @@ main = do
     cursorWrapnext <- newIORef False
 
     let handlePtyF (bs, updateCursor) = do
-          (markBarDirty, isBarDirty) <- do
-            barDirty <- newIORef False
-            pure (writeIORef barDirty True, readIORef barDirty)
-
           inWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
           dims <- readIORef theDims
@@ -349,10 +347,9 @@ main = do
           writeIORef cursorWrapnext nextWrapnext
           writeIORef pos newPos
 
-          scrollIfNeeded inWrapnext oldPos markBarDirty bs
+          dirty2 <- scrollIfNeeded inWrapnext oldPos bs
           hPut stdout bs
 
-          dirty2 <- isBarDirty
           when (dirty1 || dirty2) (drawBar =<< readIORef pos)
 
     forever $ do
