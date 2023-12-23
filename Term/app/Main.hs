@@ -213,7 +213,7 @@ main = do
       pure ()
     pure (selectorMVar winchMVar)
 
-  ptyInVar <- forkLoopToMVar (myLoop log pid pty)
+  ptyInVar <- forkLoopToMVar (ptyParses log pid pty)
 
   let readEither = do
         select
@@ -429,8 +429,8 @@ forkLoopToMVar loop = do
   _ <- forkIO (loop (putMVar v))
   pure v
 
-myLoop :: (String -> IO ()) -> String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
-myLoop log pid pty yield = do
+ptyParses :: (String -> IO ()) -> String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
+ptyParses log pid pty yield = do
   unhandledPty <- newIORef (Left mempty)
 
   forever $ do
