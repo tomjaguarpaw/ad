@@ -265,7 +265,7 @@ main = do
         pure (x - 1, y - 1)
 
   let drawBar :: (Int, Int) -> IO ()
-      drawBar (x@((+ 1) -> xp1), y@((+ 1) -> yp1)) = do
+      drawBar (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         for_ [rows - barLines .. rows - 1] $ \l -> do
@@ -276,7 +276,7 @@ main = do
         hPut stdout (C8.pack ("\ESC[" <> show (rows - barLines + 1) <> ";1H"))
         hPut stdout (C8.pack (take cols bar))
         -- Go back to where we were
-        hPut stdout (C8.pack ("\ESC[" <> show yp1 <> ";" <> show xp1 <> "H"))
+        hPut stdout (C8.pack ("\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"))
 
   _ <- forkIO $ do
     pos <- do
