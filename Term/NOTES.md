@@ -14,10 +14,9 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
 
 * Account for UTF-8 characters properly
   * [X] width 1
-  * [ ] width 2 (however, I'm skeptical that underlying terminals even
-        have good support for width 2 ([full
+  * [ ] width 2 (xterm renders these as width 2 ([full
         width](https://en.wikipedia.org/wiki/Halfwidth_and_fullwidth_forms))
-        forms (for example ⓐ)
+        forms: 🎄, 🎅, 🏻, but not this: ⓐ)
 
 * Present our terminal type to clients
   * [ ] Choose a name for the terminal type
