@@ -301,7 +301,8 @@ main = do
                       ++ "\ESC["
                       ++ show (rows - 1 + 1)
                       ++ ";1H"
-                      ++ "\n\ESCM\ESC["
+                      ++ "\n\ESCM"
+                      ++ "\ESC["
                       ++ show (1 + if wasWrapnext then oldym1 else oldym1 - 1)
                       ++ ";"
                       ++ show (1 + if wasWrapnext then 0 else oldxm1)
