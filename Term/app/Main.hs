@@ -429,27 +429,29 @@ forkLoopToMVar loop = do
   _ <- forkIO (loop (putMVar v))
   pure v
 
+data PtyInput = NeedMore C8.ByteString | TryToParse C8.ByteString
+
 ptyParses :: (String -> IO ()) -> String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
 ptyParses log pid pty yield = do
-  unhandledPty <- newIORef (Left mempty)
+  unhandledPty <- newIORef (NeedMore mempty)
 
   forever $ do
     readIORef unhandledPty >>= \case
-      Left neededmore -> do
+      NeedMore neededmore -> do
         readPty pty >>= \case
           Left {} ->
             -- I don't know what we should do with PtyControlCodes
             pure ()
           Right bs -> do
             log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
-            writeIORef unhandledPty (Right (neededmore <> bs))
-      Right bsIn -> do
+            writeIORef unhandledPty (TryToParse (neededmore <> bs))
+      TryToParse bsIn -> do
         parseBS log bsIn >>= \case
           Nothing -> do
-            writeIORef unhandledPty (Left bsIn)
+            writeIORef unhandledPty (NeedMore bsIn)
           Just ((bs, theLeftovers), f) -> do
             yield (bs, f)
-            writeIORef unhandledPty (Right theLeftovers)
+            writeIORef unhandledPty (TryToParse theLeftovers)
 
 parseBS ::
   (String -> IO ()) ->
