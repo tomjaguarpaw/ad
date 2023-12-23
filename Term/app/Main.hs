@@ -447,18 +447,18 @@ myLoop log pid pty yield = do
             log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
             writeIORef unhandledPty (Right (neededmore <> bs))
       Right bsIn -> do
-        withPtyIn'' log bsIn >>= \case
+        parseBS log bsIn >>= \case
           Nothing -> do
             writeIORef unhandledPty (Left bsIn)
           Just ((bs, theLeftovers), f) -> do
             yield (bs, f)
             writeIORef unhandledPty (Right theLeftovers)
 
-withPtyIn'' ::
+parseBS ::
   (String -> IO ()) ->
   ByteString ->
   IO (Maybe ((ByteString, ByteString), UpdateCursor))
-withPtyIn'' log bsIn = do
+parseBS log bsIn = do
   mResult <- parse log (C8.unpack bsIn)
   pure $ do
     (seen, f) <- mResult
