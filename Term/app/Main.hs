@@ -299,7 +299,15 @@ main = do
                   then (0, oldym1)
                   else (oldxm1, oldym1 - 1)
           when (scrollLinesNeeded > 0) $ do
-            log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y - 1) ++ "/" ++ show virtualDims ++ "\n")
+            log
+              ( "Overlap detected before "
+                  ++ show bs
+                  ++ ", going back to "
+                  ++ show (y - 1)
+                  ++ "/"
+                  ++ show virtualDims
+                  ++ "\n"
+              )
             putStdoutStr
               ( cupXY0 (0, virtualRows)
                   ++ "\ESC[K"
