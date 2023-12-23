@@ -298,27 +298,29 @@ main = do
                 if wasWrapnext
                   then (0, oldy)
                   else (oldx, oldy - 1)
-          if scrollLinesNeeded > 0
-            then do
-              log
-                ( "Overlap detected before "
-                    ++ show bs
-                    ++ ", going back to "
-                    ++ show returnTo
-                    ++ "/"
-                    ++ show virtualDims
-                    ++ "\n"
-                )
-              putStdoutStr
-                ( cupXY0 (0, virtualRows)
-                    ++ "\ESC[K"
-                    ++ cupXY0 (0, rows - 1)
-                    ++ "\n"
-                    ++ cupXY0 returnTo
-                )
-              modifyIORef' pos (second (subtract scrollLinesNeeded))
-              pure True
-            else pure False
+          dirty <-
+            if scrollLinesNeeded > 0
+              then do
+                log
+                  ( "Overlap detected before "
+                      ++ show bs
+                      ++ ", going back to "
+                      ++ show returnTo
+                      ++ "/"
+                      ++ show virtualDims
+                      ++ "\n"
+                  )
+                putStdoutStr
+                  ( cupXY0 (0, virtualRows)
+                      ++ "\ESC[K"
+                      ++ cupXY0 (0, rows - 1)
+                      ++ "\n"
+                      ++ cupXY0 returnTo
+                  )
+                modifyIORef' pos (second (subtract scrollLinesNeeded))
+                pure True
+              else pure False
+          pure dirty
 
     do
       (x, y) <- readIORef pos
