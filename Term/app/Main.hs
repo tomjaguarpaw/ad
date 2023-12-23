@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE ViewPatterns #-}
 
@@ -79,7 +80,9 @@ import System.Process.Typed
 import Text.Read (readMaybe)
 import Prelude hiding (log)
 
-data In = PtyIn (Either [Pty.PtyControlCode] ByteString) | StdIn ByteString | WinchIn
+data In = PtyIn PtyParse | StdIn ByteString | WinchIn
+
+type PtyParse = (ByteString, UpdateCursor)
 
 type UpdateCursor =
   Bool ->
@@ -99,13 +102,6 @@ selectorFd n fd =
   -- because the Handle buffers some of the input so we wait
   -- even when there's buffered input available.
   MkSelector (threadWaitRead fd) (fdRead fd n)
-
-selectorPty :: Pty.Pty -> Selector (Either [Pty.PtyControlCode] ByteString)
-selectorPty pty =
-  -- We should not use Pty.readPty after Pty.threadWaitReadPty because
-  -- readPty discards control codes, and may therefore block even
-  -- though using threadWaitRead means we don't expect it to.
-  MkSelector (Pty.threadWaitReadPty pty) (readPty pty)
 
 selectorMVar :: MVar a -> Selector a
 selectorMVar v =
@@ -209,10 +205,12 @@ main = do
       pure ()
     pure (selectorMVar winchMVar)
 
+  ptyInVar <- myPtyIn pid pty
+
   let readEither = do
         select
           [ StdIn <$> selectorFd 1000 stdInput,
-            PtyIn <$> selectorPty pty,
+            PtyIn <$> selectorMVar ptyInVar,
             WinchIn <$ winchSelector
           ]
 
@@ -333,7 +331,7 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
-    let handlePty bsIn = do
+    let handlePtyF (bs, updateCursor) = do
           (markBarDirty, isBarDirty) <- do
             barDirty <- newIORef False
             pure (writeIORef barDirty True, readIORef barDirty)
@@ -342,53 +340,34 @@ main = do
           oldPos <- readIORef pos
           dims <- readIORef theDims
 
-          withPtyIn bsIn inWrapnext dims oldPos $
-            \nextWrapnext newPos dirty1 bs -> do
-              writeIORef cursorWrapnext nextWrapnext
-              writeIORef pos newPos
+          (nextWrapnext, newPos, dirty1) <- updateCursor inWrapnext dims oldPos
 
-              scrollIfNeeded inWrapnext oldPos markBarDirty bs
-              hPut stdout bs
+          writeIORef cursorWrapnext nextWrapnext
+          writeIORef pos newPos
 
-              dirty2 <- isBarDirty
-              when (dirty1 || dirty2) (drawBar =<< readIORef pos)
+          scrollIfNeeded inWrapnext oldPos markBarDirty bs
+          hPut stdout bs
 
-    unhandledPty <- newIORef (Left mempty)
+          dirty2 <- isBarDirty
+          when (dirty1 || dirty2) (drawBar =<< readIORef pos)
 
     forever $ do
-      readIORef unhandledPty >>= \case
-        Left neededmore -> do
-          readEither >>= \case
-            WinchIn -> do
-              dims@(cols, rows) <- Pty.ptyDimensions stdInPty
-              writeIORef theDims dims
-              Pty.resizePty pty (cols, rows - barLines)
-              getPid childHandle >>= \case
-                -- I guess this only happens if there is a race condition
-                -- between SIGWINCH and termination of the child process
-                Nothing -> pure ()
-                Just childPid -> signalProcess sigWINCH childPid
-              log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
-            StdIn bs -> do
-              Pty.writePty pty bs
-              log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
-            PtyIn (Right bs) -> do
-              log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
-              writeIORef unhandledPty (Right (neededmore <> bs))
-            PtyIn (Left {}) ->
-              -- I don't know what we should do with PtyControlCodes
-              pure ()
-        Right bs -> do
-          eleftovers <- handlePty bs
-          thePos <- readIORef pos
-          let mneleftovers =
-                case eleftovers of
-                  Just leftovers -> Right leftovers
-                  Nothing -> Left bs
-          case mneleftovers of
-            Left {} -> log ("handlePty: pos " ++ show thePos ++ "\n")
-            Right {} -> pure ()
-          writeIORef unhandledPty mneleftovers
+      readEither >>= \case
+        WinchIn -> do
+          dims@(cols, rows) <- Pty.ptyDimensions stdInPty
+          writeIORef theDims dims
+          Pty.resizePty pty (cols, rows - barLines)
+          getPid childHandle >>= \case
+            -- I guess this only happens if there is a race condition
+            -- between SIGWINCH and termination of the child process
+            Nothing -> pure ()
+            Just childPid -> signalProcess sigWINCH childPid
+          log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
+        StdIn bs -> do
+          Pty.writePty pty bs
+          log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
+        PtyIn move -> do
+          handlePtyF move
 
   exitWith =<< takeMVar exit
 
@@ -436,33 +415,36 @@ warnIfHostTerminalUnsuitable = do
             ]
         )
 
-withPtyIn ::
-  ByteString ->
-  Bool ->
-  (Int, Int) ->
-  (Int, Int) ->
-  (Bool -> (Int, Int) -> Bool -> ByteString -> IO a) ->
-  IO (Maybe ByteString)
-withPtyIn bsIn inWrapnext dims oldPos k = do
-  withPtyIn' bsIn inWrapnext dims oldPos >>= \case
-    Nothing -> pure Nothing
-    Just (theLeftovers, (nextWrapnext, newPos, dirty1, bs)) -> do
-      _ <- k nextWrapnext newPos dirty1 bs
+forkLoopToMVar :: (forall r. (a -> IO ()) -> IO r) -> IO (MVar a)
+forkLoopToMVar loop = do
+  v <- newEmptyMVar
+  _ <- forkIO (loop (putMVar v))
+  pure v
 
-      pure (Just theLeftovers)
+myPtyIn :: String -> Pty.Pty -> IO (MVar PtyParse)
+myPtyIn pid pty = forkLoopToMVar (myLoop pid pty)
 
-withPtyIn' ::
-  ByteString ->
-  Bool ->
-  (Int, Int) ->
-  (Int, Int) ->
-  IO (Maybe (ByteString, (Bool, (Int, Int), Bool, ByteString)))
-withPtyIn' bsIn inWrapnext dims oldPos =
-  withPtyIn'' bsIn >>= \case
-    Nothing -> pure Nothing
-    Just ((bs, theLeftovers), f) -> do
-      (nextWrapnext, newPos, dirty1) <- f inWrapnext dims oldPos
-      pure (Just (theLeftovers, (nextWrapnext, newPos, dirty1, bs)))
+myLoop :: String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
+myLoop pid pty yield = do
+  unhandledPty <- newIORef (Left mempty)
+
+  forever $ do
+    readIORef unhandledPty >>= \case
+      Left neededmore -> do
+        readPty pty >>= \case
+          Left {} ->
+            -- I don't know what we should do with PtyControlCodes
+            pure ()
+          Right bs -> do
+            log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
+            writeIORef unhandledPty (Right (neededmore <> bs))
+      Right bsIn -> do
+        withPtyIn'' bsIn >>= \case
+          Nothing -> do
+            writeIORef unhandledPty (Left bsIn)
+          Just ((bs, theLeftovers), f) -> do
+            yield (bs, f)
+            writeIORef unhandledPty (Right theLeftovers)
 
 withPtyIn'' :: ByteString -> IO (Maybe ((ByteString, ByteString), UpdateCursor))
 withPtyIn'' bsIn =
