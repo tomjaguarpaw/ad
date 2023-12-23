@@ -304,7 +304,7 @@ main = do
                   ( cupXY0 (0, virtualRows)
                       ++ "\ESC[K"
                       ++ cupXY0 (0, rows - 1)
-                      ++ "\n\ESCM"
+                      ++ "\n"
                       ++ cupXY0 returnTo
                   )
               )
