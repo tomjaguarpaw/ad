@@ -292,6 +292,10 @@ main = do
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
           (_, y) <- readIORef pos
           let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
+          let returnTo =
+                if wasWrapnext
+                  then (0, oldym1)
+                  else (oldxm1, oldym1 - 1)
           when (scrollLinesNeeded > 0) $ do
             log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y - 1) ++ "/" ++ show virtualDims ++ "\n")
             hPut
@@ -301,11 +305,7 @@ main = do
                       ++ "\ESC[K"
                       ++ cupXY0 (0, rows - 1)
                       ++ "\n\ESCM"
-                      ++ cupXY0
-                        ( if wasWrapnext
-                            then (0, oldym1)
-                            else (oldxm1, oldym1 - 1)
-                        )
+                      ++ cupXY0 returnTo
                   )
               )
             markBarDirty
