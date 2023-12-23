@@ -221,10 +221,12 @@ main = do
             WinchIn <$ winchSelector
           ]
 
+  let putStdoutStr = hPut stdout . C8.pack
+
   let requestPosition :: IO (Int, Int)
       requestPosition = do
         -- Ask for the position
-        hPut stdout (C8.pack "\ESC[6n")
+        putStdoutStr "\ESC[6n"
 
         log ("Requesting position " ++ pid ++ "\n")
 
@@ -272,14 +274,14 @@ main = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
         (cols, rows) <- readIORef theDims
         for_ [rows - barLines .. rows - 1] $ \l -> do
-          hPut stdout (C8.pack (cupXY0 (0, l)))
+          putStdoutStr (cupXY0 (0, l))
           -- Clear line
-          hPut stdout (C8.pack "\ESC[K")
+          putStdoutStr "\ESC[K"
         -- Go to first column on first row of bar
-        hPut stdout (C8.pack (cupXY0 (0, rows - barLines)))
-        hPut stdout (C8.pack (take cols bar))
+        putStdoutStr (cupXY0 (0, rows - barLines))
+        putStdoutStr (take cols bar)
         -- Go back to where we were
-        hPut stdout (C8.pack (cupXY0 (x, y)))
+        putStdoutStr (cupXY0 (x, y))
 
   _ <- forkIO $ do
     pos <- do
@@ -298,15 +300,12 @@ main = do
                   else (oldxm1, oldym1 - 1)
           when (scrollLinesNeeded > 0) $ do
             log ("Overlap detected before " ++ show bs ++ ", going back to " ++ show (y - 1) ++ "/" ++ show virtualDims ++ "\n")
-            hPut
-              stdout
-              ( C8.pack
-                  ( cupXY0 (0, virtualRows)
-                      ++ "\ESC[K"
-                      ++ cupXY0 (0, rows - 1)
-                      ++ "\n"
-                      ++ cupXY0 returnTo
-                  )
+            putStdoutStr
+              ( cupXY0 (0, virtualRows)
+                  ++ "\ESC[K"
+                  ++ cupXY0 (0, rows - 1)
+                  ++ "\n"
+                  ++ cupXY0 returnTo
               )
             markBarDirty
             modifyIORef' pos (second (subtract scrollLinesNeeded))
@@ -318,13 +317,10 @@ main = do
           scrollLinesNeeded = (y - virtualRows + 1) `max` 0
       log ("scrollLinesNeeded: " ++ show scrollLinesNeeded ++ "\n")
       when (scrollLinesNeeded > 0) $ do
-        hPut
-          stdout
-          ( C8.pack
-              ( cupXY0 (0, rows - 1)
-                  ++ replicate scrollLinesNeeded '\n'
-                  ++ cupXY0 (x, y - scrollLinesNeeded)
-              )
+        putStdoutStr
+          ( cupXY0 (0, rows - 1)
+              ++ replicate scrollLinesNeeded '\n'
+              ++ cupXY0 (x, y - scrollLinesNeeded)
           )
         modifyIORef' pos (second (subtract scrollLinesNeeded))
 
