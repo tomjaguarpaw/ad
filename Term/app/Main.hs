@@ -303,7 +303,7 @@ main = do
               ( "Overlap detected before "
                   ++ show bs
                   ++ ", going back to "
-                  ++ show (y - 1)
+                  ++ show returnTo
                   ++ "/"
                   ++ show virtualDims
                   ++ "\n"
