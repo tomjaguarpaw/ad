@@ -3,6 +3,10 @@ name:               Term
 version:            0.1.0.0
 
 common warnings
+    -- We have to use -threaded because otherwise the file descriptor
+    -- reads, as foreign calls, block the whole process.  See
+    --
+    --    https://hackage.haskell.org/package/base-4.17.0.0/docs/Control-Concurrent.html#g:5
     ghc-options: -Wall -threaded
 
 executable Term
