@@ -117,8 +117,6 @@ main = do
 
   hSetBuffering stdin NoBuffering
 
-  pid <- show <$> getProcessID
-
   oldTermSettings <- getTerminalAttributes stdInput
   -- We might want to copy the settings from abduco:
   --
@@ -157,6 +155,7 @@ main = do
   exit <- newEmptyMVar
 
   log <- do
+    pid <- show <$> getProcessID
     q <- newChan
     _ <- forkIO $ forever $ do
       s <- readChan q
