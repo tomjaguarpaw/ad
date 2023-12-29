@@ -19,7 +19,7 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
         forms: 🎄, 🎅, 🏻, but not this: ⓐ)
 
 * Present our terminal type to clients
-  * [ ] Choose a name for the terminal type
+  * [ ] Choose a name for the terminal type (perhaps `turbot`?)
   * [X] Set `TERM`
   * [X] Encourage users to run `tic smy` (or whatever name we choose)
 * Check the host terminal type
