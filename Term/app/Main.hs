@@ -408,29 +408,42 @@ makeLogger = do
 
   pure (writeChan q)
 
-data PtyInput = NeedMore C8.ByteString | TryToParse C8.ByteString
-
 ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
 ptyParses log pty yield = do
-  unhandledPty <- newIORef (NeedMore mempty)
+  unhandledPty <- newIORef mempty
 
   forever $ do
-    readIORef unhandledPty >>= \case
-      NeedMore neededmore -> do
-        readPty pty >>= \case
-          Left {} ->
-            -- I don't know what we should do with PtyControlCodes
-            pure ()
-          Right bs -> do
-            log ("PtyIn: " ++ show bs ++ "\n")
-            writeIORef unhandledPty (TryToParse (neededmore <> bs))
-      TryToParse bsIn -> do
-        parseBS log bsIn >>= \case
-          Nothing -> do
-            writeIORef unhandledPty (NeedMore bsIn)
-          Just ((bs, theLeftovers), f) -> do
-            yield (bs, f)
-            writeIORef unhandledPty (TryToParse theLeftovers)
+    bs <- fix $ \again ->
+      readPty pty >>= \case
+        -- I don't know what we should do with PtyControlCodes
+        Left _ -> again
+        Right bs -> do
+          log ("PtyIn: " ++ show bs ++ "\n")
+          pure bs
+
+    neededMore <- readIORef unhandledPty
+
+    remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
+      yield ptyParse
+
+    writeIORef unhandledPty remainder
+
+parseUntilNeedMore ::
+  (String -> IO ()) ->
+  ByteString ->
+  (PtyParse -> IO ()) ->
+  IO ByteString
+parseUntilNeedMore log bsInStart yield = do
+  unhandledPty <- newIORef bsInStart
+
+  fix $ \again -> do
+    bsIn <- readIORef unhandledPty
+    parseBS log bsIn >>= \case
+      Nothing -> pure bsIn
+      Just ((bs, theLeftovers), f) -> do
+        yield (bs, f)
+        writeIORef unhandledPty theLeftovers
+        again
 
 parseBS ::
   (String -> IO ()) ->
