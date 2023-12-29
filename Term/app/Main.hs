@@ -219,7 +219,7 @@ main = do
 
         pure
           [ selectorToLoop (StdIn <$> selectorFd 1000 stdInput) yield,
-            selectorToLoop (PtyIn <$> selectorMVar ptyInVar) yield,
+            mvarToLoop ptyInVar (yield . PtyIn),
             selectorToLoop (WinchIn <$ winchSelector) yield
           ]
 
