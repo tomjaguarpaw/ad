@@ -102,10 +102,6 @@ selectorFd n fd =
   -- even when there's buffered input available.
   MkSelector (threadWaitRead fd) (fdRead fd n)
 
-selectorMVar :: MVar a -> Selector a
-selectorMVar v =
-  MkSelector (() <$ readMVar v) (takeMVar v)
-
 readPty :: Pty.Pty -> IO (Either [Pty.PtyControlCode] ByteString)
 readPty pty = do
   try (Pty.tryReadPty pty) >>= \case
@@ -205,12 +201,12 @@ main = do
 
     putMVar exit e
 
-  winchSelector <- do
+  winchMVar <- do
     winchMVar <- newEmptyMVar
     _ <- flip (installHandler sigWINCH) Nothing . Catch $ do
       _ <- tryPutMVar winchMVar ()
       pure ()
-    pure (selectorMVar winchMVar)
+    pure winchMVar
 
   ptyInVar <- forkLoopToMVar (ptyParses log pty)
 
@@ -220,7 +216,7 @@ main = do
         pure
           [ selectorToLoop (StdIn <$> selectorFd 1000 stdInput) yield,
             mvarToLoop ptyInVar (yield . PtyIn),
-            selectorToLoop (WinchIn <$ winchSelector) yield
+            mvarToLoop winchMVar (yield . const WinchIn)
           ]
 
   let putStdoutStr = hPut stdout . C8.pack
