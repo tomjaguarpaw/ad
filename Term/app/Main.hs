@@ -152,7 +152,9 @@ main = do
       ["-c", prog]
       (cols, rows - barLines)
 
-  exit <- newEmptyMVar
+  (requestExit, exitWhenRequested) <- do
+    exit <- newEmptyMVar
+    pure (putMVar exit, exitWith =<< takeMVar exit)
 
   log <- makeLogger
 
@@ -164,7 +166,7 @@ main = do
           error "Impossible: should only happen when the process is still running"
         Just e -> pure e
 
-    putMVar exit e
+    requestExit e
 
   winchMVar <- do
     winchMVar <- newEmptyMVar
@@ -327,7 +329,7 @@ main = do
       PtyIn move -> do
         handlePtyF move
 
-  exitWith =<< takeMVar exit
+  exitWhenRequested
 
 handleForever :: IO a -> (a -> IO ()) -> IO r
 handleForever act yield = forever (yield =<< act)
