@@ -412,21 +412,19 @@ ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
 ptyParses log pty yield = do
   unhandledPty <- newIORef mempty
 
-  forever $ do
-    bs <- fix $ \again ->
-      readPty pty >>= \case
-        -- I don't know what we should do with PtyControlCodes
-        Left _ -> again
-        Right bs -> do
-          log ("PtyIn: " ++ show bs ++ "\n")
-          pure bs
+  handleForever (readPty pty) $ \case
+    Left _ ->
+      -- I don't know what we should do with PtyControlCodes
+      pure ()
+    Right bs -> do
+      log ("PtyIn: " ++ show bs ++ "\n")
 
-    neededMore <- readIORef unhandledPty
+      neededMore <- readIORef unhandledPty
 
-    remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
-      yield ptyParse
+      remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
+        yield ptyParse
 
-    writeIORef unhandledPty remainder
+      writeIORef unhandledPty remainder
 
 parseUntilNeedMore ::
   (String -> IO ()) ->
