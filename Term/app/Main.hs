@@ -214,11 +214,13 @@ main = do
 
   ptyInVar <- forkLoopToMVar (ptyParses log pty)
 
-  let readEither = do
-        select
-          [ StdIn <$> selectorFd 1000 stdInput,
-            PtyIn <$> selectorMVar ptyInVar,
-            WinchIn <$ winchSelector
+  let readLoop yield' = sequentialize $ \sequentializer -> do
+        yield <- sequentializer yield'
+
+        pure
+          [ selectorToLoop (StdIn <$> selectorFd 1000 stdInput) yield,
+            selectorToLoop (PtyIn <$> selectorMVar ptyInVar) yield,
+            selectorToLoop (WinchIn <$ winchSelector) yield
           ]
 
   let putStdoutStr = hPut stdout . C8.pack
@@ -349,25 +351,49 @@ main = do
 
           when (dirty1 || dirty2) (drawBar =<< readIORef pos)
 
-    forever $ do
-      readEither >>= \case
-        WinchIn -> do
-          dims@(cols, rows) <- Pty.ptyDimensions stdInPty
-          writeIORef theDims dims
-          Pty.resizePty pty (cols, rows - barLines)
-          getPid childHandle >>= \case
-            -- I guess this only happens if there is a race condition
-            -- between SIGWINCH and termination of the child process
-            Nothing -> pure ()
-            Just childPid -> signalProcess sigWINCH childPid
-          log ("WinchIn: " ++ show dims ++ "\n")
-        StdIn bs -> do
-          Pty.writePty pty bs
-          log ("StdIn: " ++ show bs ++ "\n")
-        PtyIn move -> do
-          handlePtyF move
+    readLoop $ \case
+      WinchIn -> do
+        dims@(cols, rows) <- Pty.ptyDimensions stdInPty
+        writeIORef theDims dims
+        Pty.resizePty pty (cols, rows - barLines)
+        getPid childHandle >>= \case
+          -- I guess this only happens if there is a race condition
+          -- between SIGWINCH and termination of the child process
+          Nothing -> pure ()
+          Just childPid -> signalProcess sigWINCH childPid
+        log ("WinchIn: " ++ show dims ++ "\n")
+      StdIn bs -> do
+        Pty.writePty pty bs
+        log ("StdIn: " ++ show bs ++ "\n")
+      PtyIn move -> do
+        handlePtyF move
 
   exitWith =<< takeMVar exit
+
+selectorToLoop :: Selector a -> (a -> IO ()) -> IO r
+selectorToLoop selector yield = forever (yield =<< select [selector])
+
+sequentialize ::
+  ((forall a b. (a -> IO b) -> IO (a -> IO b)) -> IO [IO ()]) -> IO ()
+sequentialize tasks = do
+  requesting <- newEmptyMVar
+
+  tasks' <- tasks $ \handler -> do
+    av <- newEmptyMVar
+    bv <- newEmptyMVar
+
+    _ <- forkIO $ forever $ do
+      a <- takeMVar av
+      b <- handler a
+      putMVar bv b
+      takeMVar requesting
+
+    pure $ \a -> do
+      putMVar requesting ()
+      putMVar av a
+      takeMVar bv
+
+  for_ tasks' forkIO
 
 warnIfTerminfoMissing :: String -> String -> IO ()
 warnIfTerminfoMissing terminfoName terminfoFilename = do
