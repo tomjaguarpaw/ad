@@ -1,5 +1,4 @@
 {-# LANGUAGE BinaryLiterals #-}
-{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
@@ -14,9 +13,7 @@ import Control.Concurrent
     myThreadId,
     newEmptyMVar,
     putMVar,
-    readMVar,
     takeMVar,
-    threadWaitRead,
     tryPutMVar,
   )
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
@@ -30,8 +27,6 @@ import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
-import Data.Traversable (for)
-import Foreign.C.Types (CSize)
 import System.Environment (getArgs, getEnvironment)
 import System.Exit (exitFailure, exitWith)
 import System.IO
@@ -40,7 +35,7 @@ import System.IO
     stdin,
     stdout,
   )
-import System.Posix (Fd, getProcessID)
+import System.Posix (getProcessID)
 import System.Posix.IO (stdInput)
 import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
@@ -89,36 +84,14 @@ type UpdateCursor =
   (Int, Int) ->
   IO (Bool, (Int, Int), Bool)
 
-data Selector a = MkSelector (IO ()) (IO a)
-  deriving (Functor)
-
 barLines :: Int
 barLines = 3
-
-selectorFd :: CSize -> Fd -> Selector ByteString
-selectorFd n fd =
-  -- We shouldn't threadWaitRead on an Fd from a Handle
-  -- because the Handle buffers some of the input so we wait
-  -- even when there's buffered input available.
-  MkSelector (threadWaitRead fd) (fdRead fd n)
 
 readPty :: Pty.Pty -> IO (Either [Pty.PtyControlCode] ByteString)
 readPty pty = do
   try (Pty.tryReadPty pty) >>= \case
     Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
     Right bs -> pure bs
-
-select :: [Selector a] -> IO a
-select selectors = do
-  inMVar <- newEmptyMVar
-
-  ts <- for selectors $ \(MkSelector wait act) -> forkIO $ do
-    wait
-    putMVar inMVar act
-
-  act <- readMVar inMVar
-  for_ ts killThread
-  act
 
 main :: IO ()
 main = do
@@ -214,7 +187,7 @@ main = do
         yield <- sequentializer yield'
 
         pure
-          [ selectorToLoop (StdIn <$> selectorFd 1000 stdInput) yield,
+          [ handleForever (fdRead stdInput 1000) (yield . StdIn),
             mvarToLoop ptyInVar (yield . PtyIn),
             mvarToLoop winchMVar (yield . const WinchIn)
           ]
@@ -368,9 +341,6 @@ main = do
 
 handleForever :: IO a -> (a -> IO ()) -> IO r
 handleForever act yield = forever (yield =<< act)
-
-selectorToLoop :: Selector a -> (a -> IO ()) -> IO r
-selectorToLoop selector = handleForever (select [selector])
 
 mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
 mvarToLoop v = handleForever (takeMVar v)
