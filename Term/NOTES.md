@@ -10,6 +10,12 @@ utilities like `cat` won't work properly.  If we have `am` we probably
 ought to turn on `xenl` because that's what all the popular terminals
 do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
 
+### References
+
+tedunangst's post "[write your own
+terminal](https://flak.tedunangst.com/post/write-your-own-terminal)"
+has some good references to escape sequence documentation.
+
 # TODO
 
 * Account for UTF-8 characters properly
