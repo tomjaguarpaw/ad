@@ -191,7 +191,7 @@ main = do
     q <- newChan
     _ <- forkIO $ forever $ do
       s <- readChan q
-      appendFile "/tmp/log" s
+      appendFile "/tmp/log" (pid ++ ": " ++ s)
 
     pure (writeChan q)
 
@@ -212,7 +212,7 @@ main = do
       pure ()
     pure (selectorMVar winchMVar)
 
-  ptyInVar <- forkLoopToMVar (ptyParses log pid pty)
+  ptyInVar <- forkLoopToMVar (ptyParses log pty)
 
   let readEither = do
         select
@@ -228,16 +228,16 @@ main = do
         -- Ask for the position
         putStdoutStr "\ESC[6n"
 
-        log ("Requesting position " ++ pid ++ "\n")
+        log "Requesting position\n"
 
         fix $ \again' -> do
           b <- fdRead stdInput 1
           when (b /= C8.pack "\ESC") $ do
             Pty.writePty pty b
-            log ("StdIn whilst searching ESC " ++ pid ++ ": " ++ show b ++ "\n")
+            log ("StdIn whilst searching ESC: " ++ show b ++ "\n")
             again'
 
-        log ("Found ESC " ++ pid ++ "\n")
+        log "Found ESC\n"
 
         sofar <- flip fix mempty $ \again' sofar -> do
           b <- fdRead stdInput 1
@@ -245,7 +245,7 @@ main = do
             then pure sofar
             else again' (sofar <> b)
 
-        log ("Handled ESC " ++ pid ++ " " ++ show (C8.unpack sofar) ++ "\n")
+        log ("Handled ESC: " ++ show (C8.unpack sofar) ++ "\n")
 
         -- Drop ;
         let (x, Data.ByteString.drop 1 -> y) =
@@ -360,10 +360,10 @@ main = do
             -- between SIGWINCH and termination of the child process
             Nothing -> pure ()
             Just childPid -> signalProcess sigWINCH childPid
-          log ("WinchIn " ++ pid ++ ": " ++ show dims ++ "\n")
+          log ("WinchIn: " ++ show dims ++ "\n")
         StdIn bs -> do
           Pty.writePty pty bs
-          log ("StdIn " ++ pid ++ ": " ++ show bs ++ "\n")
+          log ("StdIn: " ++ show bs ++ "\n")
         PtyIn move -> do
           handlePtyF move
 
@@ -421,8 +421,8 @@ forkLoopToMVar loop = do
 
 data PtyInput = NeedMore C8.ByteString | TryToParse C8.ByteString
 
-ptyParses :: (String -> IO ()) -> String -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
-ptyParses log pid pty yield = do
+ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
+ptyParses log pty yield = do
   unhandledPty <- newIORef (NeedMore mempty)
 
   forever $ do
@@ -433,7 +433,7 @@ ptyParses log pid pty yield = do
             -- I don't know what we should do with PtyControlCodes
             pure ()
           Right bs -> do
-            log ("PtyIn " ++ pid ++ ": " ++ show bs ++ "\n")
+            log ("PtyIn: " ++ show bs ++ "\n")
             writeIORef unhandledPty (TryToParse (neededmore <> bs))
       TryToParse bsIn -> do
         parseBS log bsIn >>= \case
