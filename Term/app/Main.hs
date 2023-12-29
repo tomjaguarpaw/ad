@@ -249,8 +249,7 @@ main = do
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
-    let scrollIfNeeded wasWrapnext (oldx, oldy) thePos@(_, y) bs = do
-          (cols, rows) <- readIORef theDims
+    let scrollIfNeeded (cols, rows) wasWrapnext (oldx, oldy) thePos@(_, y) bs = do
           let virtualDims@(_, virtualRows) = (cols, rows - barLines)
           let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
           let returnTo =
@@ -303,7 +302,7 @@ main = do
 
           writeIORef cursorWrapnext nextWrapnext
 
-          (newerPos, dirty2) <- scrollIfNeeded oldWrapnext oldPos newPos bs
+          (newerPos, dirty2) <- scrollIfNeeded dims oldWrapnext oldPos newPos bs
           writeIORef pos newerPos
           hPut stdout bs
 
