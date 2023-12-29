@@ -229,9 +229,6 @@ main = do
         (y, x) <- requestPosition
         pure (x - 1, y - 1)
 
-  let cupXY0 :: (Int, Int) -> String
-      cupXY0 (x, y) = "\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"
-
   let drawBar :: (Int, Int) -> IO ()
       drawBar (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
@@ -628,3 +625,6 @@ insertAssocList k v ((k', v') : kvs) =
 isValidCsiEnder :: Char -> Bool
 isValidCsiEnder c =
   (isAscii c && isAlpha c) || (c == '@') || (c == '`')
+
+cupXY0 :: (Int, Int) -> String
+cupXY0 (x, y) = "\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"
