@@ -181,14 +181,12 @@ main = do
       pure ()
     pure winchMVar
 
-  ptyInVar <- forkLoopToMVar (ptyParses log pty)
-
   let readLoop yield' = sequentialize $ \sequentializer -> do
         yield <- sequentializer yield'
 
         pure
           [ handleForever (fdRead stdInput 1000) (yield . StdIn),
-            mvarToLoop ptyInVar (yield . PtyIn),
+            ptyParses log pty (yield . PtyIn),
             mvarToLoop winchMVar (yield . const WinchIn)
           ]
 
@@ -410,12 +408,6 @@ warnIfHostTerminalUnsuitable = do
               "work well with \"screen\" as my host"
             ]
         )
-
-forkLoopToMVar :: (forall r. (a -> IO ()) -> IO r) -> IO (MVar a)
-forkLoopToMVar loop = do
-  v <- newEmptyMVar
-  _ <- forkIO (loop (putMVar v))
-  pure v
 
 data PtyInput = NeedMore C8.ByteString | TryToParse C8.ByteString
 
