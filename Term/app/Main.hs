@@ -293,10 +293,9 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
-    let handlePtyF (bs, updateCursor) = do
+    let handlePtyF dims (bs, updateCursor) = do
           oldWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
-          dims <- readIORef theDims
 
           (nextWrapnext, newPos, dirty1) <- updateCursor oldWrapnext dims oldPos
 
@@ -323,7 +322,8 @@ main = do
         Pty.writePty pty bs
         log ("StdIn: " ++ show bs ++ "\n")
       PtyIn move -> do
-        handlePtyF move
+        dims <- readIORef theDims
+        handlePtyF dims move
 
   exitWhenRequested
 
