@@ -442,19 +442,20 @@ parseUntilNeedMore log bsInStart yield = do
     bsIn <- readIORef unhandledPty
     parseBS log bsIn >>= \case
       Nothing -> early bsIn
-      Just ((bs, theLeftovers), f) -> do
-        yield (bs, f)
+      Just (p, theLeftovers) -> do
+        yield p
         writeIORef unhandledPty theLeftovers
 
 parseBS ::
   (String -> IO ()) ->
   ByteString ->
-  IO (Maybe ((ByteString, ByteString), UpdateCursor))
+  IO (Maybe ((ByteString, UpdateCursor), ByteString))
 parseBS log bsIn = do
   mResult <- parse log (C8.unpack bsIn)
   pure $ do
     (seen, f) <- mResult
-    Just (C8.splitAt seen bsIn, f)
+    let (bs, theLeftovers) = C8.splitAt seen bsIn
+    Just ((bs, f), theLeftovers)
 
 parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor))
 parse log = \case
