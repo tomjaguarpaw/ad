@@ -154,14 +154,7 @@ main = do
 
   exit <- newEmptyMVar
 
-  log <- do
-    pid <- show <$> getProcessID
-    q <- newChan
-    _ <- forkIO $ forever $ do
-      s <- readChan q
-      appendFile "/tmp/log" (pid ++ ": " ++ s)
-
-    pure (writeChan q)
+  log <- makeLogger
 
   _ <- flip (installHandler sigCHLD) Nothing . Catch $ do
     e <-
@@ -407,6 +400,16 @@ warnIfHostTerminalUnsuitable = do
               "work well with \"screen\" as my host"
             ]
         )
+
+makeLogger :: IO (String -> IO ())
+makeLogger = do
+  pid <- show <$> getProcessID
+  q <- newChan
+  _ <- forkIO $ forever $ do
+    s <- readChan q
+    appendFile "/tmp/log" (pid ++ ": " ++ s)
+
+  pure (writeChan q)
 
 data PtyInput = NeedMore C8.ByteString | TryToParse C8.ByteString
 
