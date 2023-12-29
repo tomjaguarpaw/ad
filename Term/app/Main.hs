@@ -229,10 +229,9 @@ main = do
         (y, x) <- requestPosition
         pure (x - 1, y - 1)
 
-  let drawBar :: (Int, Int) -> IO ()
-      drawBar (x, y) = do
+  let drawBar :: (Int, Int) -> (Int, Int) -> IO ()
+      drawBar (cols, rows) (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
-        (cols, rows) <- readIORef theDims
         for_ [rows - barLines .. rows - 1] $ \l -> do
           putStdoutStr (cupXY0 (0, l))
           -- Clear line
@@ -305,7 +304,7 @@ main = do
           writeIORef pos newerPos
           hPut stdout bs
 
-          when (dirty1 || dirty2) (drawBar =<< readIORef pos)
+          when (dirty1 || dirty2) (drawBar dims =<< readIORef pos)
 
     readLoop $ \case
       WinchIn -> do
