@@ -26,6 +26,18 @@ do (`screen`, `tmux`, `xterm`, `rxvt`, ...).
   * [X] Warn if it's not `screen`
   * [ ] Expand support to all terminals by using terminfo
 
+* `csr` scroll region
+
+  > A terminal that has the csr capability can scroll part of its
+  > screen while leaving other lines above and below the region
+  > untouched. A forward scroll applied to a region deletes the top of
+  > the region, shifts, and adds a line to the bottom of the
+  > region. When finished with the scrolling region, you should use
+  > the csr capability to restore the scrolling region to the full
+  > screen.
+
+  https://www.ibm.com/docs/sl/aix/7.2?topic=formats-terminfo-directory
+
 # Known issues
 
 `dircolors` (used for telling `ls` which colors to use) doesn't work
