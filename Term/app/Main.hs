@@ -373,6 +373,9 @@ main = do
 selectorToLoop :: Selector a -> (a -> IO ()) -> IO r
 selectorToLoop selector yield = forever (yield =<< select [selector])
 
+mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
+mvarToLoop v yield = forever (yield =<< takeMVar v)
+
 sequentialize ::
   ((forall a b. (a -> IO b) -> IO (a -> IO b)) -> IO [IO ()]) -> IO ()
 sequentialize tasks = do
