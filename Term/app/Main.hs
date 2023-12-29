@@ -366,11 +366,14 @@ main = do
 
   exitWith =<< takeMVar exit
 
+handleForever :: IO a -> (a -> IO ()) -> IO r
+handleForever act yield = forever (yield =<< act)
+
 selectorToLoop :: Selector a -> (a -> IO ()) -> IO r
-selectorToLoop selector yield = forever (yield =<< select [selector])
+selectorToLoop selector = handleForever (select [selector])
 
 mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
-mvarToLoop v yield = forever (yield =<< takeMVar v)
+mvarToLoop v = handleForever (takeMVar v)
 
 sequentialize ::
   ((forall a b. (a -> IO b) -> IO (a -> IO b)) -> IO [IO ()]) -> IO ()
