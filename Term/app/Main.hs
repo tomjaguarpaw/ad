@@ -1,4 +1,5 @@
 {-# LANGUAGE BinaryLiterals #-}
+{-# LANGUAGE GADTs #-}
 {-# LANGUAGE ImportQualifiedPost #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE RankNTypes #-}
@@ -17,7 +18,7 @@ import Control.Concurrent
     tryPutMVar,
   )
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
-import Control.Exception (IOException, try)
+import Control.Exception (Exception, IOException, throwIO, try, tryJust)
 import Control.Monad (forever, when)
 import Data.Bits ((.&.))
 import Data.ByteString (ByteString, drop, hPut)
@@ -27,6 +28,9 @@ import Data.Char (isAlpha, isAscii)
 import Data.Foldable (for_)
 import Data.Function (fix)
 import Data.IORef (modifyIORef', newIORef, readIORef, writeIORef)
+import Data.Maybe (fromMaybe)
+import Data.Typeable (Typeable, cast)
+import Data.Unique qualified
 import System.Environment (getArgs, getEnvironment)
 import System.Exit (exitFailure, exitWith)
 import System.IO
@@ -434,14 +438,13 @@ parseUntilNeedMore ::
 parseUntilNeedMore log bsInStart yield = do
   unhandledPty <- newIORef bsInStart
 
-  fix $ \again -> do
+  earlyReturn $ \early -> forever $ do
     bsIn <- readIORef unhandledPty
     parseBS log bsIn >>= \case
-      Nothing -> pure bsIn
+      Nothing -> early bsIn
       Just ((bs, theLeftovers), f) -> do
         yield (bs, f)
         writeIORef unhandledPty theLeftovers
-        again
 
 parseBS ::
   (String -> IO ()) ->
@@ -637,3 +640,29 @@ isValidCsiEnder c =
 
 cupXY0 :: (Int, Int) -> String
 cupXY0 (x, y) = "\ESC[" <> show (y + 1) <> ";" <> show (x + 1) <> "H"
+
+data MyException where
+  MyException :: (Typeable e) => e -> Data.Unique.Unique -> MyException
+
+instance Show MyException where
+  show _ = "<MyException>"
+
+instance Exception MyException
+
+-- This is similar to how effectful does it.  I don't like the
+-- Typeable constraint.  Maybe we should use unsafeCoerce instead of
+-- cast.
+withScopedException ::
+  (Typeable e) => ((forall a. e -> IO a) -> IO r) -> IO (Either e r)
+withScopedException f = do
+  fresh <- Data.Unique.newUnique
+
+  flip tryJust (f (\e -> throwIO (MyException e fresh))) $ \case
+    MyException e tag ->
+      if tag == fresh
+        then -- We should be able to successfully cast if the tags match
+          Just (fromMaybe (error "Unexpected Typeable") (cast e))
+        else Nothing
+
+earlyReturn :: (Typeable r) => ((forall a. r -> IO a) -> IO r) -> IO r
+earlyReturn h = fmap (either id id) (withScopedException h)
