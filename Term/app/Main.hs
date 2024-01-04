@@ -547,7 +547,7 @@ parse log = \case
             let (negate -> dx) = numberOr1IfMissing csi
             pure (first (+ dx), False)
           'G' -> do
-            let x = read csi - 1
+            let x = numberOr1IfMissing csi - 1
             pure (first (const x), False)
           'd' -> do
             let y = read csi - 1
