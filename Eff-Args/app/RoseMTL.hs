@@ -22,10 +22,12 @@
 
 module RoseMTL where
 
-import Control.Monad.Morph (hoist, MFunctor)
+import Control.Monad.Morph (MFunctor, hoist)
 import Control.Monad.Trans (MonadTrans (lift))
-import Control.Monad.Trans.State.Strict as State
+import Control.Monad.Trans.State.Strict (StateT)
+import qualified Control.Monad.Trans.State.Strict as State
 import Data.Kind (Type)
+import Prelude hiding (read)
 
 data Rose a = Branch (Rose a) (Rose a) | Leaf a | Empty
 
@@ -100,22 +102,41 @@ instance (SingI es) => MonadTrans (Eff es) where
     SLeaf -> EffLeaf . lift
     SBranch -> EffBranch . lift . lift
 
-instance SingI es => MFunctor (Eff es) where
+instance (SingI es) => MFunctor (Eff es) where
   hoist f = case sing @es of
     SEmpty -> \(EffEmpty m) -> EffEmpty (f m)
     SLeaf -> \(EffLeaf m) -> EffLeaf (hoist f m)
     SBranch -> \(EffBranch m) -> EffBranch (hoist (hoist f) m)
 
+data State s st where
+  MkState ::
+    ( forall m' a' effs.
+      (Leaf (StateT s) :> effs) =>
+      (SingI effs) =>
+      (Monad m') =>
+      StateT s m' a' ->
+      Eff effs m' a'
+    ) ->
+    State s (Leaf (StateT s))
+
 handleState ::
   (SingI effs, Monad m) =>
   s ->
-  ( ( forall m' a'.
-      (Monad m') =>
-      StateT s m' a' ->
-      Eff (Leaf (StateT s) :& effs) m' a'
-    ) ->
+  ( State s (Leaf (StateT s)) ->
     Eff (Leaf (StateT s) :& effs) m a
   ) ->
   Eff effs m a
-handleState s f = case f (EffBranch . EffLeaf . hoist lift) of
-  EffBranch (EffLeaf m) -> evalStateT m s
+handleState s f = case f (MkState (embed . EffLeaf)) of
+  EffBranch (EffLeaf m) -> State.evalStateT m s
+
+read ::
+  (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
+read (MkState r) = r State.get
+
+write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
+write (MkState r) s = r (State.put s)
+
+modify :: (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
+modify state f = do
+  !s <- read state
+  write state (f s)
