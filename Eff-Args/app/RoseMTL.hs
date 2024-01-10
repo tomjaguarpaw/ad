@@ -26,6 +26,8 @@ import Control.Monad.Morph (MFunctor, hoist)
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
+import Data.Foldable (for_)
+import Data.Functor.Identity (Identity (runIdentity))
 import Data.Kind (Type)
 import Prelude hiding (read)
 
@@ -68,10 +70,17 @@ instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
 instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
   embed = EffBranch . hoist lift
 
+embed' :: forall a b m r. (a :> b, Monad m) => Eff a m r -> Eff b m r
+embed' = embed
+
 data Eff (es :: Rose Effect) m a where
   EffEmpty :: m a -> Eff Empty m a
   EffLeaf :: t m a -> Eff (Leaf t) m a
   EffBranch :: Eff s1 (Eff s2 m) a -> Eff (Branch s1 s2) m a
+
+runEffPure :: Eff Empty Identity a -> a
+runEffPure = \case
+  EffEmpty ma -> runIdentity ma
 
 instance (SingI es, Monad m) => Functor (Eff es m) where
   fmap f = case sing @es of
@@ -92,9 +101,15 @@ instance (SingI es, Monad m) => Applicative (Eff es m) where
 
 instance (SingI es, Monad m) => Monad (Eff es m) where
   (>>=) = case sing @es of
-    SEmpty -> \(EffEmpty m) f -> f =<< EffEmpty m
-    SLeaf -> \(EffLeaf m) f -> f =<< EffLeaf m
-    SBranch -> \(EffBranch m) f -> f =<< EffBranch m
+    SEmpty -> \(EffEmpty m) f -> EffEmpty $ do
+      m' <- m
+      case f m' of EffEmpty m'' -> m''
+    SLeaf -> \(EffLeaf m) f -> EffLeaf $ do
+      m' <- m
+      case f m' of EffLeaf m'' -> m''
+    SBranch -> \(EffBranch m) f -> EffBranch $ do
+      m' <- m
+      case f m' of EffBranch m'' -> m''
 
 instance (SingI es) => MonadTrans (Eff es) where
   lift = case sing @es of
@@ -136,7 +151,38 @@ read (MkState r) = r State.get
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
 write (MkState r) s = r (State.put s)
 
-modify :: (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
+modify ::
+  (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
 modify state f = do
   !s <- read state
   write state (f s)
+
+examplePure :: (SingI effs, Monad m) => Eff effs m ()
+examplePure = pure ()
+
+exampleRead :: (SingI effs, Monad m) => Eff effs m ()
+exampleRead =
+  handleState () $ \st -> read st
+
+exampleWrite :: (SingI effs, Monad m) => Eff effs m (Int, Int)
+exampleWrite =
+  handleState 0 $ \st -> do
+    handleState 100 $ \st2 -> do
+      modify st (+ 1)
+      (,) <$> read st <*> read st2
+
+exampleParity :: (SingI effs, Monad m) => Eff effs m (Int, Int)
+exampleParity =
+  handleState 0 $ \evens -> do
+    handleState 0 $ \odds -> do
+      for_ [1 :: Int .. 10] $ \i -> do
+        ( if even i
+            then modify odds
+            else modify evens
+          )
+          (+ 1)
+
+      e <- read evens
+      o <- read odds
+
+      pure (e, o)
