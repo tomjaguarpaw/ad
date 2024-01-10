@@ -137,9 +137,7 @@ data State s st where
 handleState ::
   (SingI effs, Monad m) =>
   s ->
-  ( State s (Leaf (StateT s)) ->
-    Eff (Leaf (StateT s) :& effs) m a
-  ) ->
+  (forall st. SingI st => State s st -> Eff (st :& effs) m a) ->
   Eff effs m a
 handleState s f = case f (MkState (embed . EffLeaf)) of
   EffBranch (EffLeaf m) -> State.evalStateT m s
