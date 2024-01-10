@@ -19,6 +19,8 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UnliftedNewtypes #-}
+{-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module RoseMTL where
 
@@ -66,7 +68,7 @@ instance {-# INCOHERENT #-} e :> e where
   {-# INLINE embed #-}
 
 instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
-  embed = EffBranch . lift . embed
+  embed = MkEff . lift . embed
   {-# INLINE embed #-}
 
 -- Do we want this?
@@ -74,67 +76,73 @@ instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
 
 -- This seems a bit wobbly
 instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
-  embed = EffBranch . hoist lift
+  embed = MkEff . hoist lift
   {-# INLINE embed #-}
 
 embed' :: forall a b m r. (a :> b, Monad m) => Eff a m r -> Eff b m r
 embed' = embed
 
-data Eff (es :: Rose Effect) m a where
-  EffEmpty :: m a -> Eff Empty m a
-  EffLeaf :: t m a -> Eff (Leaf t) m a
-  EffBranch :: Eff s1 (Eff s2 m) a -> Eff (Branch s1 s2) m a
+newtype Eff es m a = MkEff (EffF es m a)
+
+type family EffF (es :: Rose Effect) m where
+  EffF Empty m = m
+  EffF (Leaf t) m = t m
+  EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
+
+effLeaf :: t m a -> Eff (Leaf t) m a
+effLeaf = MkEff
+{-# INLINE effLeaf #-}
 
 runEffPure :: Eff Empty Identity a -> a
 runEffPure = \case
-  EffEmpty ma -> runIdentity ma
+  MkEff ma -> runIdentity ma
 {-# INLINE runEffPure #-}
 
 instance (SingI es, Monad m) => Functor (Eff es m) where
   fmap f = case sing @es of
-    SEmpty -> \(EffEmpty ma) -> EffEmpty (fmap f ma)
-    SBranch -> \(EffBranch ema) -> EffBranch (fmap f ema)
-    SLeaf -> \(EffLeaf tma) -> EffLeaf (fmap f tma)
+    SEmpty -> \(MkEff ma) -> MkEff (fmap f ma)
+    SBranch -> \(MkEff ema) -> MkEff (fmap f ema)
+    SLeaf -> \(MkEff tma) -> MkEff (fmap f tma)
   {-# INLINE fmap #-}
 
 instance (SingI es, Monad m) => Applicative (Eff es m) where
   pure = case sing @es of
-    SEmpty -> EffEmpty . pure
-    SLeaf -> EffLeaf . lift . pure
-    SBranch -> EffBranch . lift . pure
+    SEmpty -> MkEff . pure
+    SLeaf -> MkEff . lift . pure
+    SBranch -> MkEff . lift . pure
   {-# INLINE pure #-}
 
   (<*>) = case sing @es of
-    SEmpty -> \(EffEmpty f) (EffEmpty g) -> EffEmpty (f <*> g)
-    SLeaf -> \(EffLeaf f) (EffLeaf g) -> EffLeaf (f <*> g)
-    SBranch -> \(EffBranch f) (EffBranch g) -> EffBranch (f <*> g)
+    SEmpty -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
+    SLeaf -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
+    SBranch -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
   {-# INLINE (<*>) #-}
 
 instance (SingI es, Monad m) => Monad (Eff es m) where
   (>>=) = case sing @es of
-    SEmpty -> \(EffEmpty m) f -> EffEmpty $ do
+    SEmpty -> \(MkEff m) f -> MkEff $ do
       m' <- m
-      case f m' of EffEmpty m'' -> m''
-    SLeaf -> \(EffLeaf m) f -> EffLeaf $ do
+      case f m' of MkEff m'' -> m''
+    SLeaf -> \(MkEff m) f -> MkEff $ do
       m' <- m
-      case f m' of EffLeaf m'' -> m''
-    SBranch -> \(EffBranch m) f -> EffBranch $ do
+      case f m' of MkEff m'' -> m''
+    SBranch -> \(MkEff m) f -> MkEff $ do
       m' <- m
-      case f m' of EffBranch m'' -> m''
+      case f m' of MkEff m'' -> m''
   {-# INLINE (>>=) #-}
 
 instance (SingI es) => MonadTrans (Eff es) where
   lift = case sing @es of
-    SEmpty -> EffEmpty
-    SLeaf -> EffLeaf . lift
-    SBranch -> EffBranch . lift . lift
+    SEmpty -> MkEff
+    SLeaf -> MkEff . lift
+    SBranch -> MkEff . lift . lift
   {-# INLINE lift #-}
 
 instance (SingI es) => MFunctor (Eff es) where
   hoist f = case sing @es of
-    SEmpty -> \(EffEmpty m) -> EffEmpty (f m)
-    SLeaf -> \(EffLeaf m) -> EffLeaf (hoist f m)
-    SBranch -> \(EffBranch m) -> EffBranch (hoist (hoist f) m)
+    SEmpty -> \(MkEff m) -> MkEff (f m)
+    SLeaf -> \(MkEff m) -> MkEff (hoist f m)
+    SBranch -> \(MkEff m) -> MkEff (hoist (hoist f) m)
   {-# INLINE hoist #-}
 
 newtype Handle t where
@@ -157,8 +165,8 @@ data Error e err where
 handleError ::
   (forall err. (SingI err) => Error e err -> Eff (err :& effs) m a) ->
   Eff effs m (Either e a)
-handleError f = case f (MkError (MkHandle (embed . EffLeaf))) of
-  EffBranch (EffLeaf m) -> Except.runExceptT m
+handleError f = case f (MkError (MkHandle (embed . effLeaf))) of
+  MkEff (MkEff m) -> Except.runExceptT m
 {-# INLINE handleError #-}
 
 throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
@@ -178,8 +186,8 @@ runState ::
   s ->
   (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
   Eff effs m (a, s)
-runState s f = case f (MkState (MkHandle (embed . EffLeaf))) of
-  EffBranch (EffLeaf m) -> State.runStateT m s
+runState s f = case f (MkState (MkHandle (embed . effLeaf))) of
+  MkEff (MkEff m) -> State.runStateT m s
 {-# INLINE runState #-}
 
 read ::
