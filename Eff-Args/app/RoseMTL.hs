@@ -125,36 +125,31 @@ instance (SingI es) => MFunctor (Eff es) where
     SLeaf -> \(EffLeaf m) -> EffLeaf (hoist f m)
     SBranch -> \(EffBranch m) -> EffBranch (hoist (hoist f) m)
 
-data State s st where
-  MkState ::
+newtype Handle t where
+  MkHandle ::
     ( forall m a effs.
-      (Leaf (StateT s) :> effs) =>
+      (Leaf t :> effs) =>
       (SingI effs) =>
       (Monad m) =>
-      StateT s m a ->
+      t m a ->
       Eff effs m a
     ) ->
-    State s (Leaf (StateT s))
+    Handle t
+
+data State s st where
+  MkState :: Handle (StateT s) -> State s (Leaf (StateT s))
 
 data Error e err where
-  MkError ::
-    ( forall m a effs.
-      (Leaf (ExceptT e) :> effs) =>
-      (SingI effs) =>
-      (Monad m) =>
-      ExceptT e m a ->
-      Eff effs m a
-    ) ->
-    Error e (Leaf (ExceptT e))
+  MkError :: Handle (ExceptT e) -> Error e (Leaf (ExceptT e))
 
 handleError ::
   (forall err. (SingI err) => Error e err -> Eff (err :& effs) m a) ->
   Eff effs m (Either e a)
-handleError f = case f (MkError (embed . EffLeaf)) of
+handleError f = case f (MkError (MkHandle (embed . EffLeaf))) of
   EffBranch (EffLeaf m) -> Except.runExceptT m
 
 throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
-throw (MkError r) e = r (Except.throwE e)
+throw (MkError (MkHandle r)) e = r (Except.throwE e)
 
 handleState ::
   (SingI effs, Monad m) =>
@@ -168,15 +163,15 @@ runState ::
   s ->
   (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
   Eff effs m (a, s)
-runState s f = case f (MkState (embed . EffLeaf)) of
+runState s f = case f (MkState (MkHandle (embed . EffLeaf))) of
   EffBranch (EffLeaf m) -> State.runStateT m s
 
 read ::
   (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
-read (MkState r) = r State.get
+read (MkState (MkHandle r)) = r State.get
 
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
-write (MkState r) s = r (State.put s)
+write (MkState (MkHandle r)) s = r (State.put s)
 
 modify ::
   (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
