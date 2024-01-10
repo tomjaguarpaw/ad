@@ -149,8 +149,8 @@ write (State r) s = Eff (writeIORef r s)
 
 modify :: st :> effs => State s st -> (s -> s) -> Eff effs ()
 modify state f = do
-  !s <- read state
-  write state (f s)
+ s <- read state
+ write state $! f s
 
 handleState ::
   s ->
