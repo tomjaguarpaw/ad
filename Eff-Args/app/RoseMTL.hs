@@ -22,6 +22,7 @@
 
 module RoseMTL where
 
+import Control.Monad (when)
 import Control.Monad.Morph (MFunctor, hoist)
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
@@ -31,6 +32,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Kind (Type)
+import Data.Void (Void, absurd)
 import Prelude hiding (read)
 
 data Rose a = Branch (Rose a) (Rose a) | Leaf a | Empty
@@ -232,3 +234,38 @@ example7 = handleError example6
 
 example7a :: (SingI effs, Monad m) => Eff effs m (Either String (), Int)
 example7a = runState 10 example6a
+
+type EarlyReturn = Error
+
+newtype MustReturnEarly = MustReturnEarly Void
+
+returnedEarly :: MustReturnEarly -> a
+returnedEarly (MustReturnEarly v) = absurd v
+
+withEarlyReturn ::
+  (SingI effs, Monad m) =>
+  ( forall err.
+    (SingI err) =>
+    EarlyReturn r err ->
+    Eff (err :& effs) m MustReturnEarly
+  ) ->
+  Eff effs m r
+withEarlyReturn f =
+  fmap (either id returnedEarly) (handleError (fmap returnedEarly . f))
+
+earlyReturn ::
+  (err :> effs, SingI effs, Monad m) =>
+  EarlyReturn r err ->
+  r ->
+  Eff effs m a
+earlyReturn = throw
+
+(!??) :: [a] -> Int -> Maybe a
+xs !?? i = runEffPure $
+  withEarlyReturn $ \ret -> do
+    handleState 0 $ \s -> do
+      for_ xs $ \a -> do
+        i' <- read s
+        when (i == i') (earlyReturn ret (Just a))
+        write s (i' + 1)
+    earlyReturn ret Nothing
