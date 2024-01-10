@@ -125,12 +125,12 @@ instance (SingI es) => MFunctor (Eff es) where
 
 data State s st where
   MkState ::
-    ( forall m' a' effs.
+    ( forall m a effs.
       (Leaf (StateT s) :> effs) =>
       (SingI effs) =>
-      (Monad m') =>
-      StateT s m' a' ->
-      Eff effs m' a'
+      (Monad m) =>
+      StateT s m a ->
+      Eff effs m a
     ) ->
     State s (Leaf (StateT s))
 
