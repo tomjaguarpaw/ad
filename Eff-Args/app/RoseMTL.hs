@@ -167,6 +167,7 @@ exampleWrite =
   handleState 0 $ \st -> do
     handleState 100 $ \st2 -> do
       modify st (+ 1)
+      modify st2 (* 2)
       (,) <$> read st <*> read st2
 
 exampleParity :: (SingI effs, Monad m) => Eff effs m (Int, Int)
