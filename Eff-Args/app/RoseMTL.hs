@@ -63,9 +63,11 @@ class (a :: Rose Effect) :> (b :: Rose Effect) where
 
 instance {-# INCOHERENT #-} e :> e where
   embed = id
+  {-# INLINE embed #-}
 
 instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
   embed = EffBranch . lift . embed
+  {-# INLINE embed #-}
 
 -- Do we want this?
 -- instance {-# incoherent #-} (e :> es) => (e' :& e) :> (e' :> es)
@@ -73,6 +75,7 @@ instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
 -- This seems a bit wobbly
 instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
   embed = EffBranch . hoist lift
+  {-# INLINE embed #-}
 
 embed' :: forall a b m r. (a :> b, Monad m) => Eff a m r -> Eff b m r
 embed' = embed
@@ -85,23 +88,27 @@ data Eff (es :: Rose Effect) m a where
 runEffPure :: Eff Empty Identity a -> a
 runEffPure = \case
   EffEmpty ma -> runIdentity ma
+{-# INLINE runEffPure #-}
 
 instance (SingI es, Monad m) => Functor (Eff es m) where
   fmap f = case sing @es of
     SEmpty -> \(EffEmpty ma) -> EffEmpty (fmap f ma)
     SBranch -> \(EffBranch ema) -> EffBranch (fmap f ema)
     SLeaf -> \(EffLeaf tma) -> EffLeaf (fmap f tma)
+  {-# INLINE fmap #-}
 
 instance (SingI es, Monad m) => Applicative (Eff es m) where
   pure = case sing @es of
     SEmpty -> EffEmpty . pure
     SLeaf -> EffLeaf . lift . pure
     SBranch -> EffBranch . lift . pure
+  {-# INLINE pure #-}
 
   (<*>) = case sing @es of
     SEmpty -> \(EffEmpty f) (EffEmpty g) -> EffEmpty (f <*> g)
     SLeaf -> \(EffLeaf f) (EffLeaf g) -> EffLeaf (f <*> g)
     SBranch -> \(EffBranch f) (EffBranch g) -> EffBranch (f <*> g)
+  {-# INLINE (<*>) #-}
 
 instance (SingI es, Monad m) => Monad (Eff es m) where
   (>>=) = case sing @es of
@@ -114,18 +121,21 @@ instance (SingI es, Monad m) => Monad (Eff es m) where
     SBranch -> \(EffBranch m) f -> EffBranch $ do
       m' <- m
       case f m' of EffBranch m'' -> m''
+  {-# INLINE (>>=) #-}
 
 instance (SingI es) => MonadTrans (Eff es) where
   lift = case sing @es of
     SEmpty -> EffEmpty
     SLeaf -> EffLeaf . lift
     SBranch -> EffBranch . lift . lift
+  {-# INLINE lift #-}
 
 instance (SingI es) => MFunctor (Eff es) where
   hoist f = case sing @es of
     SEmpty -> \(EffEmpty m) -> EffEmpty (f m)
     SLeaf -> \(EffLeaf m) -> EffLeaf (hoist f m)
     SBranch -> \(EffBranch m) -> EffBranch (hoist (hoist f) m)
+  {-# INLINE hoist #-}
 
 newtype Handle t where
   MkHandle ::
@@ -149,9 +159,11 @@ handleError ::
   Eff effs m (Either e a)
 handleError f = case f (MkError (MkHandle (embed . EffLeaf))) of
   EffBranch (EffLeaf m) -> Except.runExceptT m
+{-# INLINE handleError #-}
 
 throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
 throw (MkError (MkHandle r)) e = r (Except.throwE e)
+{-# INLINE throw #-}
 
 handleState ::
   (SingI effs, Monad m) =>
@@ -159,6 +171,7 @@ handleState ::
   (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
   Eff effs m a
 handleState s f = fmap fst (runState s f)
+{-# INLINE handleState #-}
 
 runState ::
   (SingI effs, Monad m) =>
@@ -167,19 +180,23 @@ runState ::
   Eff effs m (a, s)
 runState s f = case f (MkState (MkHandle (embed . EffLeaf))) of
   EffBranch (EffLeaf m) -> State.runStateT m s
+{-# INLINE runState #-}
 
 read ::
   (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
 read (MkState (MkHandle r)) = r State.get
+{-# INLINE read #-}
 
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
 write (MkState (MkHandle r)) s = r (State.put s)
+{-# INLINE write #-}
 
 modify ::
   (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
 modify state f = do
   s <- read state
   write state $! f s
+{-# INLINE modify #-}
 
 examplePure :: (SingI effs, Monad m) => Eff effs m ()
 examplePure = pure ()
@@ -241,6 +258,7 @@ newtype MustReturnEarly = MustReturnEarly Void
 
 returnedEarly :: MustReturnEarly -> a
 returnedEarly (MustReturnEarly v) = absurd v
+{-# INLINE returnedEarly #-}
 
 withEarlyReturn ::
   (SingI effs, Monad m) =>
@@ -251,7 +269,8 @@ withEarlyReturn ::
   ) ->
   Eff effs m r
 withEarlyReturn f =
-  fmap (either id returnedEarly) (handleError (fmap returnedEarly . f))
+  fmap (either id returnedEarly) (handleError f)
+{-# INLINE withEarlyReturn #-}
 
 earlyReturn ::
   (err :> effs, SingI effs, Monad m) =>
@@ -259,6 +278,7 @@ earlyReturn ::
   r ->
   Eff effs m a
 earlyReturn = throw
+{-# INLINE earlyReturn #-}
 
 (!??) :: [a] -> Int -> Maybe a
 xs !?? i = runEffPure $
@@ -269,3 +289,12 @@ xs !?? i = runEffPure $
         when (i == i') (earlyReturn ret (Just a))
         write s (i' + 1)
     earlyReturn ret Nothing
+
+(!???) :: [a] -> Int -> Maybe a
+xs !??? i = either id id $ do
+    flip State.evalStateT 0 $ do
+      for_ xs $ \a -> do
+        i' <- State.get
+        when (i == i') (lift (Left (Just a)))
+        State.put (i' + 1)
+    Left Nothing
