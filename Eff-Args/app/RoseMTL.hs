@@ -152,8 +152,8 @@ write (MkState r) s = r (State.put s)
 modify ::
   (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
 modify state f = do
-  !s <- read state
-  write state (f s)
+  s <- read state
+  write state $! f s
 
 examplePure :: (SingI effs, Monad m) => Eff effs m ()
 examplePure = pure ()
