@@ -24,6 +24,8 @@ module RoseMTL where
 
 import Control.Monad.Morph (MFunctor, hoist)
 import Control.Monad.Trans (MonadTrans (lift))
+import Control.Monad.Trans.Except (ExceptT)
+import qualified Control.Monad.Trans.Except as Except
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
@@ -134,13 +136,40 @@ data State s st where
     ) ->
     State s (Leaf (StateT s))
 
+data Error e err where
+  MkError ::
+    ( forall m a effs.
+      (Leaf (ExceptT e) :> effs) =>
+      (SingI effs) =>
+      (Monad m) =>
+      ExceptT e m a ->
+      Eff effs m a
+    ) ->
+    Error e (Leaf (ExceptT e))
+
+handleError ::
+  (forall err. (SingI err) => Error e err -> Eff (err :& effs) m a) ->
+  Eff effs m (Either e a)
+handleError f = case f (MkError (embed . EffLeaf)) of
+  EffBranch (EffLeaf m) -> Except.runExceptT m
+
+throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
+throw (MkError r) e = r (Except.throwE e)
+
 handleState ::
   (SingI effs, Monad m) =>
   s ->
-  (forall st. SingI st => State s st -> Eff (st :& effs) m a) ->
+  (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
   Eff effs m a
-handleState s f = case f (MkState (embed . EffLeaf)) of
-  EffBranch (EffLeaf m) -> State.evalStateT m s
+handleState s f = fmap fst (runState s f)
+
+runState ::
+  (SingI effs, Monad m) =>
+  s ->
+  (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
+  Eff effs m (a, s)
+runState s f = case f (MkState (embed . EffLeaf)) of
+  EffBranch (EffLeaf m) -> State.runStateT m s
 
 read ::
   (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
@@ -185,3 +214,26 @@ exampleParity =
       o <- read odds
 
       pure (e, o)
+
+example5 ::
+  (st :> effs, err :> effs, SingI effs, Monad m) =>
+  Error String err ->
+  State Int st ->
+  Eff effs m ()
+example5 e s = do
+  foo <- read s
+  modify s (+ 1)
+  _ <- throw e ("Hello " ++ show foo)
+  modify s (+ 1)
+
+example6 :: (err :> effs, SingI effs, Monad m) => Error String err -> Eff effs m ((), Int)
+example6 = \e -> runState 10 (example5 e)
+
+example6a :: (st :> effs, SingI effs, Monad m) => State Int st -> Eff effs m (Either String ())
+example6a = \s -> handleError (\e -> example5 e s)
+
+example7 :: (SingI effs, Monad m) => Eff effs m (Either String ((), Int))
+example7 = handleError example6
+
+example7a :: (SingI effs, Monad m) => Eff effs m (Either String (), Int)
+example7a = runState 10 example6a
