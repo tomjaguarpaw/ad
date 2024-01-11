@@ -141,7 +141,7 @@ instance (SingI es) => MFunctor (Eff es) where
     SBranch -> \(MkEff m) -> MkEff (hoist (hoist f) m)
   {-# INLINE hoist #-}
 
-type Handle =
+type EmbedT =
   forall t m a effs.
   (Leaf t :> effs) =>
   (SingI effs) =>
@@ -150,19 +150,19 @@ type Handle =
   Eff effs m a
 
 data State s st where
-  MkState :: Handle -> State s (Leaf (StateT s))
+  MkState :: EmbedT -> State s (Leaf (StateT s))
 
 data Error e err where
-  MkError :: Handle -> Error e (Leaf (ExceptT e))
+  MkError :: EmbedT -> Error e (Leaf (ExceptT e))
 
 handle ::
-  (Leaf t :> effs, SingI effs, Monad m) => Handle -> t m a -> Eff effs m a
+  (Leaf t :> effs, SingI effs, Monad m) => EmbedT -> t m a -> Eff effs m a
 handle r = r
 
 handleAny ::
   -- I don't know why tt isn't required to be t, but it seems to work!
   (MonadTrans tt, MFunctor tt) =>
-  (Handle -> h (Leaf tt)) ->
+  (EmbedT -> h (Leaf tt)) ->
   (tt (Eff effs m) a -> Eff effs m r) ->
   (forall err. (SingI err) => h err -> Eff (err :& effs) m a) ->
   Eff effs m r
