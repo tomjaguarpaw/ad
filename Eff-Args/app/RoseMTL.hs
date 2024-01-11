@@ -159,6 +159,9 @@ handle ::
   (Leaf t :> effs, SingI effs, Monad m) => EmbedT -> t m a -> Eff effs m a
 handle r = r
 
+embedT :: (Monad m, Leaf t :> effs) => t m r -> Eff effs m r
+embedT = embed . effLeaf
+
 type Handler effs m h a r =
   (forall s. (SingI s) => h s -> Eff (s :& effs) m a) ->
   Eff effs m r
@@ -168,7 +171,7 @@ handleAny ::
   (EmbedT -> h (Leaf t)) ->
   (t (Eff effs m) a -> Eff effs m r) ->
   Handler effs m h a r
-handleAny mkAny handler f = case f (mkAny (embed . effLeaf)) of
+handleAny mkAny handler f = case f (mkAny embedT) of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
