@@ -311,9 +311,9 @@ xs !?? i = runEffPure $
 
 (!???) :: [a] -> Int -> Maybe a
 xs !??? i = either id id $ do
-    flip State.evalStateT 0 $ do
-      for_ xs $ \a -> do
-        i' <- State.get
-        when (i == i') (lift (Left (Just a)))
-        State.put (i' + 1)
-    Left Nothing
+  flip State.evalStateT 0 $ do
+    for_ xs $ \a -> do
+      i' <- State.get
+      when (i == i') (lift (Left (Just a)))
+      State.put (i' + 1)
+  Left Nothing
