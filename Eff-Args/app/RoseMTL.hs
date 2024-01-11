@@ -159,20 +159,20 @@ handle ::
   (Leaf t :> effs, SingI effs, Monad m) => EmbedT -> t m a -> Eff effs m a
 handle r = r
 
-handleAny ::
-  -- I don't know why tt isn't required to be t, but it seems to work!
-  (MonadTrans tt, MFunctor tt) =>
-  (EmbedT -> h (Leaf tt)) ->
-  (tt (Eff effs m) a -> Eff effs m r) ->
-  (forall err. (SingI err) => h err -> Eff (err :& effs) m a) ->
+type Handler effs m h a r =
+  (forall s. (SingI s) => h s -> Eff (s :& effs) m a) ->
   Eff effs m r
+
+handleAny ::
+  (MonadTrans t, MFunctor t) =>
+  (EmbedT -> h (Leaf t)) ->
+  (t (Eff effs m) a -> Eff effs m r) ->
+  Handler effs m h a r
 handleAny mkAny handler f = case f (mkAny (embed . effLeaf)) of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
-handleError ::
-  (forall err. (SingI err) => Error e err -> Eff (err :& effs) m a) ->
-  Eff effs m (Either e a)
+handleError :: Handler effs m (Error e) a (Either e a)
 handleError = handleAny MkError Except.runExceptT
 {-# INLINE handleError #-}
 
@@ -183,16 +183,14 @@ throw (MkError h) e = handle h (Except.throwE e)
 handleState ::
   (SingI effs, Monad m) =>
   s ->
-  (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
-  Eff effs m a
+  Handler effs m (State s) a a
 handleState s f = fmap fst (runState s f)
 {-# INLINE handleState #-}
 
 runState ::
   (SingI effs, Monad m) =>
   s ->
-  (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
-  Eff effs m (a, s)
+  Handler effs m (State s) a (a, s)
 runState s = handleAny MkState (flip State.runStateT s)
 {-# INLINE runState #-}
 
