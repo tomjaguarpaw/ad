@@ -78,9 +78,6 @@ instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
   embed = MkEff . hoist lift
   {-# INLINE embed #-}
 
-embed' :: forall a b m r. (a :> b, Monad m) => Eff a m r -> Eff b m r
-embed' = embed
-
 newtype Eff es m a = MkEff (EffF es m a)
 
 type family EffF (es :: Rose Effect) m where
