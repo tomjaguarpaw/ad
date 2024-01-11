@@ -152,6 +152,9 @@ newtype Handle t where
     ) ->
     Handle t
 
+mkHandle :: Handle t
+mkHandle = MkHandle (embed . effLeaf)
+
 data State s st where
   MkState :: Handle (StateT s) -> State s (Leaf (StateT s))
 
@@ -169,7 +172,7 @@ handleAny ::
   (tt (Eff effs m) a -> Eff effs m r) ->
   (forall err. (SingI err) => h err -> Eff (err :& effs) m a) ->
   Eff effs m r
-handleAny mkAny handler f = case f (mkAny (MkHandle (embed . effLeaf))) of
+handleAny mkAny handler f = case f (mkAny mkHandle) of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
