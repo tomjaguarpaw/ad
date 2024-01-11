@@ -16,10 +16,9 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UnliftedNewtypes #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module RoseMTL where
@@ -162,15 +161,28 @@ data State s st where
 data Error e err where
   MkError :: Handle (ExceptT e) -> Error e (Leaf (ExceptT e))
 
+handle :: ('Leaf t :> effs, SingI effs, Monad m) => Handle t -> t m a -> Eff effs m a
+handle (MkHandle r) = r
+
+handleAny ::
+  -- I don't know why tt isn't required to be t, but it seems to work!
+  (MonadTrans tt, MFunctor tt) =>
+  (Handle t -> h (Leaf tt)) ->
+  (tt (Eff effs m) a -> Eff effs m r) ->
+  (forall err. (SingI err) => h err -> Eff (err :& effs) m a) ->
+  Eff effs m r
+handleAny mkAny handler f = case f (mkAny (MkHandle (embed . effLeaf))) of
+  MkEff (MkEff m) -> handler m
+{-# INLINE handleAny #-}
+
 handleError ::
   (forall err. (SingI err) => Error e err -> Eff (err :& effs) m a) ->
   Eff effs m (Either e a)
-handleError f = case f (MkError (MkHandle (embed . effLeaf))) of
-  MkEff (MkEff m) -> Except.runExceptT m
+handleError = handleAny MkError Except.runExceptT
 {-# INLINE handleError #-}
 
 throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
-throw (MkError (MkHandle r)) e = r (Except.throwE e)
+throw (MkError h) e = handle h (Except.throwE e)
 {-# INLINE throw #-}
 
 handleState ::
@@ -186,17 +198,16 @@ runState ::
   s ->
   (forall st. (SingI st) => State s st -> Eff (st :& effs) m a) ->
   Eff effs m (a, s)
-runState s f = case f (MkState (MkHandle (embed . effLeaf))) of
-  MkEff (MkEff m) -> State.runStateT m s
+runState s = handleAny MkState (flip State.runStateT s)
 {-# INLINE runState #-}
 
 read ::
   (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
-read (MkState (MkHandle r)) = r State.get
+read (MkState h) = handle h State.get
 {-# INLINE read #-}
 
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
-write (MkState (MkHandle r)) s = r (State.put s)
+write (MkState h) s = handle h (State.put s)
 {-# INLINE write #-}
 
 modify ::
