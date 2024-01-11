@@ -158,7 +158,8 @@ data State s st where
 data Error e err where
   MkError :: Handle (ExceptT e) -> Error e (Leaf (ExceptT e))
 
-handle :: (Leaf t :> effs, SingI effs, Monad m) => Handle t -> t m a -> Eff effs m a
+handle ::
+  (Leaf t :> effs, SingI effs, Monad m) => Handle t -> t m a -> Eff effs m a
 handle (MkHandle r) = r
 
 handleAny ::
