@@ -141,19 +141,13 @@ instance (SingI es) => MFunctor (Eff es) where
     SBranch -> \(MkEff m) -> MkEff (hoist (hoist f) m)
   {-# INLINE hoist #-}
 
-data Handle where
-  MkHandle ::
-    ( forall t m a effs.
-      (Leaf t :> effs) =>
-      (SingI effs) =>
-      (Monad m) =>
-      t m a ->
-      Eff effs m a
-    ) ->
-    Handle
-
-mkHandle :: Handle
-mkHandle = MkHandle (embed . effLeaf)
+type Handle =
+  forall t m a effs.
+  (Leaf t :> effs) =>
+  (SingI effs) =>
+  (Monad m) =>
+  t m a ->
+  Eff effs m a
 
 data State s st where
   MkState :: Handle -> State s (Leaf (StateT s))
@@ -163,7 +157,7 @@ data Error e err where
 
 handle ::
   (Leaf t :> effs, SingI effs, Monad m) => Handle -> t m a -> Eff effs m a
-handle (MkHandle r) = r
+handle r = r
 
 handleAny ::
   -- I don't know why tt isn't required to be t, but it seems to work!
@@ -172,7 +166,7 @@ handleAny ::
   (tt (Eff effs m) a -> Eff effs m r) ->
   (forall err. (SingI err) => h err -> Eff (err :& effs) m a) ->
   Eff effs m r
-handleAny mkAny handler f = case f (mkAny mkHandle) of
+handleAny mkAny handler f = case f (mkAny (embed . effLeaf)) of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
