@@ -24,7 +24,6 @@
 module RoseMTL where
 
 import Control.Monad (when)
-import Control.Monad.Morph (MFunctor, hoist)
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
 import qualified Control.Monad.Trans.Except as Except
@@ -40,13 +39,13 @@ data Rose a = Branch (Rose a) (Rose a) | Leaf a | Empty
 
 data SRose i where
   SBranch :: (SingI i1, SingI i2) => SRose (Branch i1 i2)
-  SLeaf :: (MonadTrans t, MFunctor t) => SRose (Leaf t)
+  SLeaf :: (MonadTrans t) => SRose (Leaf t)
   SEmpty :: SRose Empty
 
 class SingI i where
   sing :: SRose i
 
-instance (MonadTrans t, MFunctor t) => SingI (Leaf t) where
+instance (MonadTrans t) => SingI (Leaf t) where
   sing = SLeaf
 
 instance (SingI t1, SingI t2) => SingI (Branch t1 t2) where
@@ -60,14 +59,14 @@ type (:&) = 'Branch
 type Effect = (Type -> Type) -> Type -> Type
 
 class (a :: Rose Effect) :> (b :: Rose Effect) where
-  embed :: (Monad m) => Eff a m r -> Eff b m r
+  embed :: (Monad m) => (forall m'. Monad m' => Eff a m' r) -> Eff b m r
 
 instance {-# INCOHERENT #-} e :> e where
   embed = id
   {-# INLINE embed #-}
 
 instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
-  embed = MkEff . lift . embed
+  embed x = MkEff (lift (embed x))
   {-# INLINE embed #-}
 
 -- Do we want this?
@@ -75,7 +74,7 @@ instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
 
 -- This seems a bit wobbly
 instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
-  embed = MkEff . hoist lift
+  embed = MkEff
   {-# INLINE embed #-}
 
 newtype Eff es m a = MkEff (EffF es m a)
@@ -85,7 +84,7 @@ type family EffF (es :: Rose Effect) m where
   EffF (Leaf t) m = t m
   EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
 
-effLeaf :: t m a -> Eff (Leaf t) m a
+effLeaf :: Monad m => (forall m'. Monad m' => t m' a) -> Eff (Leaf t) m a
 effLeaf = MkEff
 {-# INLINE effLeaf #-}
 
@@ -134,13 +133,6 @@ instance (SingI es) => MonadTrans (Eff es) where
     SBranch -> MkEff . lift . lift
   {-# INLINE lift #-}
 
-instance (SingI es) => MFunctor (Eff es) where
-  hoist f = case sing @es of
-    SEmpty -> \(MkEff m) -> MkEff (f m)
-    SLeaf -> \(MkEff m) -> MkEff (hoist f m)
-    SBranch -> \(MkEff m) -> MkEff (hoist (hoist f) m)
-  {-# INLINE hoist #-}
-
 type EmbedT =
   forall t m a effs.
   (Leaf t :> effs) =>
@@ -155,15 +147,16 @@ data State s st where
 data Error e err where
   MkError :: Error e (Leaf (ExceptT e))
 
-embedT :: (Monad m, Leaf t :> effs) => t m r -> Eff effs m r
-embedT = embed . effLeaf
+embedT ::
+  (Monad m, Leaf t :> effs) => (forall m'. Monad m' => t m' r) -> Eff effs m r
+embedT x = embed (effLeaf x)
 
 type Handler effs m h a r =
   (forall s. (SingI s) => h s -> Eff (s :& effs) m a) ->
   Eff effs m r
 
 handleAny ::
-  (MonadTrans t, MFunctor t) =>
+  (MonadTrans t) =>
   h (Leaf t) ->
   (t (Eff effs m) a -> Eff effs m r) ->
   Handler effs m h a r
