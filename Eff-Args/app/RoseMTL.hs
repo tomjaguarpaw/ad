@@ -150,14 +150,10 @@ type EmbedT =
   Eff effs m a
 
 data State s st where
-  MkState :: EmbedT -> State s (Leaf (StateT s))
+  MkState :: State s (Leaf (StateT s))
 
 data Error e err where
-  MkError :: EmbedT -> Error e (Leaf (ExceptT e))
-
-handle ::
-  (Leaf t :> effs, SingI effs, Monad m) => EmbedT -> t m a -> Eff effs m a
-handle r = r
+  MkError :: Error e (Leaf (ExceptT e))
 
 embedT :: (Monad m, Leaf t :> effs) => t m r -> Eff effs m r
 embedT = embed . effLeaf
@@ -168,10 +164,10 @@ type Handler effs m h a r =
 
 handleAny ::
   (MonadTrans t, MFunctor t) =>
-  (EmbedT -> h (Leaf t)) ->
+  h (Leaf t) ->
   (t (Eff effs m) a -> Eff effs m r) ->
   Handler effs m h a r
-handleAny mkAny handler f = case f (mkAny embedT) of
+handleAny mkAny handler f = case f mkAny of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
@@ -180,7 +176,7 @@ handleError = handleAny MkError Except.runExceptT
 {-# INLINE handleError #-}
 
 throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
-throw (MkError h) e = handle h (Except.throwE e)
+throw MkError e = embedT (Except.throwE e)
 {-# INLINE throw #-}
 
 handleState ::
@@ -199,11 +195,11 @@ runState s = handleAny MkState (flip State.runStateT s)
 
 read ::
   (SingI effs, st :> effs, Monad m) => State s st -> Eff effs m s
-read (MkState h) = handle h State.get
+read MkState = embedT State.get
 {-# INLINE read #-}
 
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
-write (MkState h) s = handle h (State.put s)
+write MkState s = embedT (State.put s)
 {-# INLINE write #-}
 
 modify ::
