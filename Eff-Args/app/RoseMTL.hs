@@ -28,6 +28,8 @@ import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
 import qualified Control.Monad.Trans.Except as Except
 import Control.Monad.Trans.State.Strict (StateT)
+import qualified Control.Monad.State.Strict as TransState
+import qualified Control.Monad.Except as TransExcept
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
@@ -284,8 +286,8 @@ earlyReturn ::
 earlyReturn = throw
 {-# INLINE earlyReturn #-}
 
-(!??) :: [a] -> Int -> Maybe a
-xs !?? i = runEffPure $
+lookupRose :: [a] -> Int -> Maybe a
+xs `lookupRose` i = runEffPure $
   withEarlyReturn $ \ret -> do
     handleState 0 $ \s -> do
       for_ xs $ \a -> do
@@ -302,3 +304,12 @@ xs !??? i = either id id $ do
       when (i == i') (lift (Left (Just a)))
       State.put (i' + 1)
   Left Nothing
+
+lookupMTL :: [a] -> Int -> Maybe a
+lookupMTL xs i = either id id $ runIdentity $ TransExcept.runExceptT $ do
+  flip TransState.evalStateT 0 $ do
+    for_ xs $ \a -> do
+      i' <- TransState.get
+      when (i == i') (lift (Except.throwE (Just a)))
+      State.put (i' + 1)
+  Except.throwE Nothing
