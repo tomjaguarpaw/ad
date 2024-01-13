@@ -24,12 +24,12 @@
 module RoseMTL where
 
 import Control.Monad (when)
+import qualified Control.Monad.Except as TransExcept
+import qualified Control.Monad.State.Strict as TransState
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
 import qualified Control.Monad.Trans.Except as Except
 import Control.Monad.Trans.State.Strict (StateT)
-import qualified Control.Monad.State.Strict as TransState
-import qualified Control.Monad.Except as TransExcept
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
@@ -61,7 +61,7 @@ type (:&) = 'Branch
 type Effect = (Type -> Type) -> Type -> Type
 
 class (a :: Rose Effect) :> (b :: Rose Effect) where
-  embed :: (Monad m) => (forall m'. Monad m' => Eff a m' r) -> Eff b m r
+  embed :: (Monad m) => (forall m'. (Monad m') => Eff a m' r) -> Eff b m r
 
 instance {-# INCOHERENT #-} e :> e where
   embed = id
@@ -86,9 +86,13 @@ type family EffF (es :: Rose Effect) m where
   EffF (Leaf t) m = t m
   EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
 
-effLeaf :: Monad m => (forall m'. Monad m' => t m' a) -> Eff (Leaf t) m a
+effLeaf :: (Monad m) => (forall m'. (Monad m') => t m' a) -> Eff (Leaf t) m a
 effLeaf = MkEff
 {-# INLINE effLeaf #-}
+
+effBranch ::
+  (Monad m) => (forall m'. (Monad m') => Eff t1 (Eff t2 m') a) -> Eff (t1 :& t2) m a
+effBranch = MkEff
 
 runEffPure :: Eff Empty Identity a -> a
 runEffPure = \case
@@ -147,11 +151,15 @@ data Error e err where
   MkError :: Error e (Leaf (ExceptT e))
 
 embedT ::
-  (Monad m, Leaf t :> effs) => (forall m'. Monad m' => t m' r) -> Eff effs m r
+  (Monad m, Leaf t :> effs) => (forall m'. (Monad m') => t m' r) -> Eff effs m r
 embedT x = embed (effLeaf x)
 
 type Handler effs m h a r =
   (forall s. (SingI s) => h s -> Eff (s :& effs) m a) ->
+  Eff effs m r
+
+type HandlerNoArgs s effs m h a r =
+  Eff (s :& effs) m a ->
   Eff effs m r
 
 handleAny ::
@@ -163,6 +171,13 @@ handleAny mkAny handler f = case f mkAny of
   MkEff (MkEff m) -> handler m
 {-# INLINE handleAny #-}
 
+handleAnyNoArgs ::
+  (MonadTrans t) =>
+  (t (Eff effs m) a -> Eff effs m r) ->
+  HandlerNoArgs (Leaf t) effs m h a r
+handleAnyNoArgs handler (MkEff (MkEff x)) = handler x
+{-# INLINE handleAnyNoArgs #-}
+
 handleError :: Handler effs m (Error e) a (Either e a)
 handleError = handleAny MkError Except.runExceptT
 {-# INLINE handleError #-}
@@ -171,12 +186,34 @@ throw :: (err :> effs, SingI effs, Monad m) => Error e err -> e -> Eff effs m a
 throw MkError e = embedT (Except.throwE e)
 {-# INLINE throw #-}
 
+throwNoArgs :: (Leaf (ExceptT e) :> effs, SingI effs, Monad m) => e -> Eff effs m a
+throwNoArgs e = embedT (Except.throwE e)
+{-# INLINE throwNoArgs #-}
+
 handleState ::
   (SingI effs, Monad m) =>
   s ->
   Handler effs m (State s) a a
 handleState s f = fmap fst (runState s f)
 {-# INLINE handleState #-}
+
+runStateNoArgs ::
+  (SingI effs, Monad m) =>
+  s ->
+  HandlerNoArgs (Leaf (StateT s)) effs m (State s) a (a, s)
+runStateNoArgs s = handleAnyNoArgs (flip State.runStateT s)
+{-# INLINE runStateNoArgs #-}
+
+handleStateNoArgs ::
+  (SingI effs, Monad m) =>
+  s ->
+  HandlerNoArgs (Leaf (StateT s)) effs m (State s) a a
+handleStateNoArgs s f = fmap fst (runStateNoArgs s f)
+{-# INLINE handleStateNoArgs #-}
+
+handleErrorNoArgs :: HandlerNoArgs (Leaf (ExceptT e)) effs m (Error e) a (Either e a)
+handleErrorNoArgs = handleAnyNoArgs Except.runExceptT
+{-# INLINE handleErrorNoArgs #-}
 
 runState ::
   (SingI effs, Monad m) =>
@@ -190,9 +227,18 @@ read ::
 read MkState = embedT State.get
 {-# INLINE read #-}
 
+readNoArgs ::
+  (SingI effs, Leaf (StateT s) :> effs, Monad m) => Eff effs m s
+readNoArgs = embedT State.get
+{-# INLINE readNoArgs #-}
+
 write :: (st :> effs, SingI effs, Monad m) => State s st -> s -> Eff effs m ()
 write MkState s = embedT (State.put s)
 {-# INLINE write #-}
+
+writeNoArgs :: (Leaf (StateT s) :> effs, SingI effs, Monad m) => s -> Eff effs m ()
+writeNoArgs s = embedT (State.put s)
+{-# INLINE writeNoArgs #-}
 
 modify ::
   (Monad m, SingI effs, st :> effs) => State s st -> (s -> s) -> Eff effs m ()
@@ -275,6 +321,13 @@ withEarlyReturn f =
   fmap (either id returnedEarly) (handleError f)
 {-# INLINE withEarlyReturn #-}
 
+withEarlyReturnNoArgs ::
+  (Monad m, SingI effs) =>
+  HandlerNoArgs (Leaf (ExceptT e)) effs m (Error e) MustReturnEarly e
+withEarlyReturnNoArgs f =
+  fmap (either id returnedEarly) (handleErrorNoArgs f)
+{-# INLINE withEarlyReturnNoArgs #-}
+
 earlyReturn ::
   (err :> effs, SingI effs, Monad m) =>
   EarlyReturn r err ->
@@ -291,6 +344,53 @@ xs `lookupRose` i = runEffPure $
         i' <- read s
         when (i == i') (earlyReturn ret (Just a))
         write s (i' + 1)
+    earlyReturn ret Nothing
+
+lookupRoseNoArgs ::
+  forall effs m a r.
+  (SingI effs, Monad m, Leaf (StateT Int) :> effs, 'Leaf (ExceptT (Maybe a)) :> effs) =>
+  [a] ->
+  Int ->
+  Eff effs m r
+xs `lookupRoseNoArgs` i = do
+  for_ xs $ \a -> do
+    i' <- readNoArgs
+    when (i == i') (throwNoArgs (Just a))
+    writeNoArgs (i' + 1)
+  throwNoArgs (Nothing :: Maybe a)
+
+-- Even though this is as as concrete as you could want, it still
+-- doesn't get specialized.
+lookupRoseNoArgs1 ::
+  forall a.
+  [a] ->
+  Int ->
+  Maybe a
+xs `lookupRoseNoArgs1` i = runEffPure $ do
+  withEarlyReturnNoArgs $ do
+    handleStateNoArgs 0 $ do
+      pure () :: Eff (Leaf (StateT Int) :& (Leaf (ExceptT (Maybe a)) :& Empty)) Identity ()
+      for_ xs $ \a -> do
+        i' <- readNoArgs
+        when (i == i') (throwNoArgs (Just a))
+        writeNoArgs (i' + 1)
+      throwNoArgs (Nothing :: Maybe a)
+
+lookupRoseInlined :: forall a. [a] -> Int -> Maybe a
+xs `lookupRoseInlined` i = runEffPure $
+  withEarlyReturn $ \ret -> do
+    fmap
+      fst
+      ( handleAny
+          MkState
+          (flip State.runStateT 0)
+          ( \s -> do
+              for_ xs $ \a -> do
+                i' <- (\MkState -> effBranch (MkEff State.get)) s
+                when (i == i') ((\MkError -> embed @(Leaf (ExceptT (Maybe a))) (MkEff (Except.throwE (Just a)))) ret)
+                write s (i' + 1)
+          )
+      )
     earlyReturn ret Nothing
 
 (!???) :: [a] -> Int -> Maybe a
