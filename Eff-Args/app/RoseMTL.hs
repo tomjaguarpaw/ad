@@ -339,6 +339,41 @@ earlyReturn ::
 earlyReturn = throw
 {-# INLINE earlyReturn #-}
 
+myPure :: Bool
+myPure = runEffPure (pure True)
+
+myEarlyReturn :: Bool
+myEarlyReturn =
+  runEffPure (withEarlyReturnNoArgs (throwNoArgs True))
+
+myState :: Int
+myState = runEffPure $ handleStateNoArgs 0 $ do
+  _ <- pure () :: Eff (Leaf (StateT Int) :& Empty) Identity ()
+  s <- readNoArgs
+  writeNoArgs $! (s + 1 :: Int)
+  readNoArgs
+
+myStateMTL :: Int
+myStateMTL = runIdentity $ flip State.evalStateT 0 $ do
+  s <- TransState.get
+  TransState.put $! (s + 1 :: Int)
+  TransState.get
+
+mySum :: Int
+mySum = runEffPure $ handleStateNoArgs 0 $ do
+  _ <- pure () :: Eff (Leaf (StateT Int) :& Empty) Identity ()
+  for_ [1::Int .. 10] $ \i -> do
+    s <- readNoArgs
+    writeNoArgs $! s + i
+  readNoArgs
+
+mySumMTL :: Int
+mySumMTL = runIdentity $ flip State.evalStateT 0 $ do
+  for_ [1::Int .. 10] $ \i -> do
+    s <- TransState.get
+    TransState.put $! s + i
+  TransState.get
+
 lookupRose :: [a] -> Int -> Maybe a
 xs `lookupRose` i = runEffPure $
   withEarlyReturn $ \ret -> do
