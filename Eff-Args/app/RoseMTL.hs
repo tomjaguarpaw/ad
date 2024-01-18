@@ -105,8 +105,8 @@ instance (SingI es, Monad m) => Functor (Eff es m) where
 instance (SingI es, Monad m) => Applicative (Eff es m) where
   pure = case sing @es of
     SEmpty -> MkEff . pure
-    SLeaf -> MkEff . lift . pure
-    SBranch -> MkEff . lift . pure
+    SLeaf -> MkEff . pure
+    SBranch -> MkEff . pure
   {-# INLINE pure #-}
 
   (<*>) = case sing @es of
