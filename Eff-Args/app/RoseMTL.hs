@@ -15,12 +15,12 @@
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 
 module RoseMTL where
 
@@ -34,19 +34,19 @@ import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
-import Data.Kind (Type, Constraint)
+import Data.Kind (Constraint, Type)
 import Data.Void (Void, absurd)
 import Prelude hiding (read)
 
-data Rose = Branch Rose Rose | Leaf ((Type -> Type) -> Type -> Type) | Empty
+data Effects = Branch Effects Effects | Leaf ((Type -> Type) -> Type -> Type) | Empty
 
-data SRose i where
-  SBranch :: (SingI i1, SingI i2) => SRose (Branch i1 i2)
-  SLeaf :: (MonadTrans t) => SRose (Leaf t)
-  SEmpty :: SRose Empty
+data SEffects i where
+  SBranch :: (SingI i1, SingI i2) => SEffects (Branch i1 i2)
+  SLeaf :: (MonadTrans t) => SEffects (Leaf t)
+  SEmpty :: SEffects Empty
 
 class SingI i where
-  sing :: SRose i
+  sing :: SEffects i
 
 instance (MonadTrans t) => SingI (Leaf t) where
   sing = SLeaf
@@ -59,7 +59,7 @@ instance SingI Empty where
 
 type (:&) = 'Branch
 
-type (:>) :: Rose -> Rose -> Constraint
+type (:>) :: Effects -> Effects -> Constraint
 class a :> b where
   embed :: (Monad m) => (forall m'. (Monad m') => Eff a m' r) -> Eff b m r
 
@@ -81,7 +81,7 @@ instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
 
 newtype Eff es m a = MkEff {unMkEff :: EffF es m a}
 
-type family EffF (es :: Rose) m where
+type family EffF (es :: Effects) m where
   EffF Empty m = m
   EffF (Leaf t) m = t m
   EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
@@ -359,20 +359,20 @@ myStateMTL = runIdentity $ flip State.evalStateT 0 $ do
 mySum :: Int
 mySum = runEffPure $ handleStateNoArgs 0 $ do
   _ <- pure () :: Eff (Leaf (StateT Int) :& Empty) Identity ()
-  for_ [1::Int .. 10] $ \i -> do
+  for_ [1 :: Int .. 10] $ \i -> do
     s <- readNoArgs
     writeNoArgs $! s + i
   readNoArgs
 
 mySumMTL :: Int
 mySumMTL = runIdentity $ flip State.evalStateT 0 $ do
-  for_ [1::Int .. 10] $ \i -> do
+  for_ [1 :: Int .. 10] $ \i -> do
     s <- TransState.get
     TransState.put $! s + i
   TransState.get
 
-lookupRose :: [a] -> Int -> Maybe a
-xs `lookupRose` i = runEffPure $
+lookupEffects :: [a] -> Int -> Maybe a
+xs `lookupEffects` i = runEffPure $
   withEarlyReturn $ \ret -> do
     handleState 0 $ \s -> do
       for_ xs $ \a -> do
@@ -381,13 +381,13 @@ xs `lookupRose` i = runEffPure $
         write s (i' + 1)
     earlyReturn ret Nothing
 
-lookupRoseNoArgs ::
+lookupEffectsNoArgs ::
   forall effs m a r.
   (SingI effs, Monad m, Leaf (StateT Int) :> effs, 'Leaf (ExceptT (Maybe a)) :> effs) =>
   [a] ->
   Int ->
   Eff effs m r
-xs `lookupRoseNoArgs` i = do
+xs `lookupEffectsNoArgs` i = do
   for_ xs $ \a -> do
     i' <- readNoArgs
     when (i == i') (throwNoArgs (Just a))
@@ -396,12 +396,12 @@ xs `lookupRoseNoArgs` i = do
 
 -- Even though this is as as concrete as you could want, it still
 -- doesn't get specialized.
-lookupRoseNoArgs1 ::
+lookupEffectsNoArgs1 ::
   forall a.
   [a] ->
   Int ->
   Maybe a
-xs `lookupRoseNoArgs1` i = runEffPure $ do
+xs `lookupEffectsNoArgs1` i = runEffPure $ do
   withEarlyReturnNoArgs $ do
     handleStateNoArgs 0 $ do
       pure () :: Eff (Leaf (StateT Int) :& (Leaf (ExceptT (Maybe a)) :& Empty)) Identity ()
@@ -411,8 +411,8 @@ xs `lookupRoseNoArgs1` i = runEffPure $ do
         writeNoArgs (i' + 1)
       throwNoArgs (Nothing :: Maybe a)
 
-lookupRoseInlined :: forall a. [a] -> Int -> Maybe a
-xs `lookupRoseInlined` i = runEffPure $
+lookupEffectsInlined :: forall a. [a] -> Int -> Maybe a
+xs `lookupEffectsInlined` i = runEffPure $
   withEarlyReturn $ \ret -> do
     fmap
       fst
