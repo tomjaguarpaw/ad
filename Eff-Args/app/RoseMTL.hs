@@ -35,7 +35,7 @@ import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
 import Data.Foldable (for_)
-import Data.Functor.Identity (Identity (runIdentity))
+import Data.Functor.Identity (Identity (Identity, runIdentity))
 import Data.Kind (Constraint, Type)
 import Data.Void (Void, absurd)
 import Prelude hiding (read)
@@ -101,8 +101,7 @@ effBranch ::
 effBranch = MkEff
 
 runEffPure :: Eff Empty Identity a -> a
-runEffPure = \case
-  MkEff ma -> runIdentity ma
+runEffPure = coerce
 {-# INLINE runEffPure #-}
 
 instance (SingI es, Monad m) => Functor (Eff es m) where
