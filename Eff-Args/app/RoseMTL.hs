@@ -88,8 +88,12 @@ type family EffF (es :: Effects) m where
   EffF (Leaf t) m = t m
   EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
 
-effLeaf :: (Monad m) => (forall m'. (Monad m') => t m' a) -> Eff (Leaf t) m a
-effLeaf = MkEff
+effLeaf ::
+  forall m t a.
+  (Monad m) =>
+  (forall m'. (Monad m') => t m' a) ->
+  Eff (Leaf t) m a
+effLeaf x = coerce (x @m)
 {-# INLINE effLeaf #-}
 
 effBranch ::
@@ -244,7 +248,7 @@ handleAnyNoArgs ::
   (MonadTrans t) =>
   (t (Eff effs m) a -> Eff effs m r) ->
   HandlerNoArgs (Leaf t) effs m h a r
-handleAnyNoArgs handler (MkEff (MkEff x)) = handler x
+handleAnyNoArgs = coerce
 {-# INLINE handleAnyNoArgs #-}
 
 handleError :: Handler effs m (Error e) a (Either e a)
