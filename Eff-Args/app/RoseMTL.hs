@@ -20,6 +20,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UnboxedTuples #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE StandaloneKindSignatures #-}
 
 module RoseMTL where
 
@@ -33,7 +34,7 @@ import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
-import Data.Kind (Type)
+import Data.Kind (Type, Constraint)
 import Data.Void (Void, absurd)
 import Prelude hiding (read)
 
@@ -58,7 +59,8 @@ instance SingI Empty where
 
 type (:&) = 'Branch
 
-class (a :: Rose) :> (b :: Rose) where
+type (:>) :: Rose -> Rose -> Constraint
+class a :> b where
   embed :: (Monad m) => (forall m'. (Monad m') => Eff a m' r) -> Eff b m r
 
 instance {-# INCOHERENT #-} e :> e where
