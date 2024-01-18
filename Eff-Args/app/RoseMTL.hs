@@ -11,7 +11,7 @@
 module RoseMTL where
 
 import qualified Control.Monad.State.Strict as TransState
-import Control.Monad.Trans (MonadTrans (lift))
+import Control.Monad.Trans (MonadTrans)
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
@@ -198,13 +198,6 @@ instance (SingI es, Monad m) => Monad (Eff es m) where
     SLeaf -> coerceBindLeaf
     SBranch -> coerceBindBranch
   {-# INLINE (>>=) #-}
-
-instance (SingI es) => MonadTrans (Eff es) where
-  lift = case sing @es of
-    SEmpty -> MkEff
-    SLeaf -> MkEff . lift
-    SBranch -> MkEff . lift . lift
-  {-# INLINE lift #-}
 
 type HandlerNoArgs s effs m a r =
   Eff (s :& effs) m a ->
