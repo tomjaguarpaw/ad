@@ -79,7 +79,7 @@ instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
   embed = MkEff
   {-# INLINE embed #-}
 
-newtype Eff es m a = MkEff (EffF es m a)
+newtype Eff es m a = MkEff {unMkEff :: EffF es m a}
 
 type family EffF (es :: Rose Effect) m where
   EffF Empty m = m
@@ -118,14 +118,11 @@ instance (SingI es, Monad m) => Applicative (Eff es m) where
 instance (SingI es, Monad m) => Monad (Eff es m) where
   (>>=) = case sing @es of
     SEmpty -> \(MkEff m) f -> MkEff $ do
-      m' <- m
-      case f m' of MkEff m'' -> m''
+      (unMkEff . f) =<< m
     SLeaf -> \(MkEff m) f -> MkEff $ do
-      m' <- m
-      case f m' of MkEff m'' -> m''
+      (unMkEff . f) =<< m
     SBranch -> \(MkEff m) f -> MkEff $ do
-      m' <- m
-      case f m' of MkEff m'' -> m''
+      (unMkEff . f) =<< m
   {-# INLINE (>>=) #-}
 
 instance (SingI es) => MonadTrans (Eff es) where
