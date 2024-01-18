@@ -30,8 +30,10 @@ import qualified Control.Monad.State.Strict as TransState
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
 import qualified Control.Monad.Trans.Except as Except
+import qualified Control.Monad.Trans.Identity as Identity
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
+import Data.Coerce (coerce)
 import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Kind (Constraint, Type)
@@ -106,27 +108,94 @@ instance (SingI es, Monad m) => Functor (Eff es m) where
     SLeaf -> \(MkEff tma) -> MkEff (fmap f tma)
   {-# INLINE fmap #-}
 
+coercePureEmpty :: forall a m. (Applicative m) => a -> Eff Empty m a
+coercePureEmpty = coerce (pure :: a -> m a)
+
+coercePureLeaf ::
+  forall a t m.
+  (MonadTrans t, Monad m) =>
+  a ->
+  Eff (Leaf t) m a
+coercePureLeaf = coerce (pure :: a -> t m a)
+
+coercePureBranch ::
+  forall a s1 s2 m.
+  (Monad m, SingI s1, SingI s2) =>
+  a ->
+  Eff (Branch s1 s2) m a
+coercePureBranch = coerce (pure :: a -> Eff s1 (Eff s2 m) a)
+
+coerceAndThenEmpty ::
+  forall m a b. (Applicative m) => Eff Empty m a -> Eff Empty m b -> Eff Empty m b
+coerceAndThenEmpty = coerce ((*>) :: m a -> m b -> m b)
+
+coerceAndThenLeaf ::
+  forall t m a b.
+  (MonadTrans t, Monad m) =>
+  Eff (Leaf t) m a ->
+  Eff (Leaf t) m b ->
+  Eff (Leaf t) m b
+coerceAndThenLeaf = coerce ((*>) :: t m a -> t m b -> t m b)
+
+coerceAndThenBranch ::
+  forall s1 s2 m a b.
+  (SingI s1, SingI s2, Monad m) =>
+  Eff (Branch s1 s2) m a ->
+  Eff (Branch s1 s2) m b ->
+  Eff (Branch s1 s2) m b
+coerceAndThenBranch =
+  coerce
+    ( (*>) ::
+        Eff s1 (Eff s2 m) a ->
+        Eff s1 (Eff s2 m) b ->
+        Eff s1 (Eff s2 m) b
+    )
+
+coerceBindEmpty ::
+  forall m a b. (Monad m) => Eff Empty m a -> (a -> Eff Empty m b) -> Eff Empty m b
+coerceBindEmpty = coerce ((>>=) @m @a @b)
+
+coerceBindLeaf ::
+  forall t m a b.
+  (MonadTrans t, Monad m) =>
+  Eff (Leaf t) m a ->
+  (a -> Eff (Leaf t) m b) ->
+  Eff (Leaf t) m b
+coerceBindLeaf = coerce ((>>=) @(t m) @a @b)
+
+coerceBindBranch ::
+  forall s1 s2 m a b.
+  (SingI s1, SingI s2, Monad m) =>
+  Eff (Branch s1 s2) m a ->
+  (a -> Eff (Branch s1 s2) m b) ->
+  Eff (Branch s1 s2) m b
+coerceBindBranch =
+  coerce ((>>=) @(Eff s1 (Eff s2 m)) @a @b)
+
 instance (SingI es, Monad m) => Applicative (Eff es m) where
   pure = case sing @es of
-    SEmpty -> MkEff . pure
-    SLeaf -> MkEff . pure
-    SBranch -> MkEff . pure
+    SEmpty -> coercePureEmpty
+    SLeaf -> coercePureLeaf
+    SBranch -> coercePureBranch
   {-# INLINE pure #-}
 
   (<*>) = case sing @es of
-    SEmpty -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
-    SLeaf -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
-    SBranch -> \(MkEff f) (MkEff g) -> MkEff (f <*> g)
+    SEmpty -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
+    SLeaf -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
+    SBranch -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
   {-# INLINE (<*>) #-}
+
+  (*>) = case sing @es of
+    SEmpty -> coerceAndThenEmpty
+    SLeaf -> coerceAndThenLeaf
+    SBranch -> coerceAndThenBranch
+  {-# INLINE (*>) #-}
 
 instance (SingI es, Monad m) => Monad (Eff es m) where
   (>>=) = case sing @es of
-    SEmpty -> \(MkEff m) f -> MkEff $ do
-      (unMkEff . f) =<< m
-    SLeaf -> \(MkEff m) f -> MkEff $ do
-      (unMkEff . f) =<< m
-    SBranch -> \(MkEff m) f -> MkEff $ do
-      (unMkEff . f) =<< m
+    SEmpty -> coerceBindEmpty
+    SLeaf -> coerceBindLeaf
+    SBranch -> coerceBindBranch
   {-# INLINE (>>=) #-}
 
 instance (SingI es) => MonadTrans (Eff es) where
