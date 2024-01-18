@@ -174,6 +174,32 @@ coerceAndThenBranch =
         Eff s1 (Eff s2 m) b
     )
 
+coerceBindAndThenEmpty ::
+  forall m a b. (Monad m) => Eff Empty m a -> Eff Empty m b -> Eff Empty m b
+coerceBindAndThenEmpty = coerce ((>>) :: m a -> m b -> m b)
+
+coerceBindAndThenLeaf ::
+  forall t m a b.
+  (MonadTrans t, Monad m) =>
+  Eff (Leaf t) m a ->
+  Eff (Leaf t) m b ->
+  Eff (Leaf t) m b
+coerceBindAndThenLeaf = coerce ((>>) :: t m a -> t m b -> t m b)
+
+coerceBindAndThenBranch ::
+  forall s1 s2 m a b.
+  (SingI s1, SingI s2, Monad m) =>
+  Eff (Branch s1 s2) m a ->
+  Eff (Branch s1 s2) m b ->
+  Eff (Branch s1 s2) m b
+coerceBindAndThenBranch =
+  coerce
+    ( (>>) ::
+        Eff s1 (Eff s2 m) a ->
+        Eff s1 (Eff s2 m) b ->
+        Eff s1 (Eff s2 m) b
+    )
+
 coerceBindEmpty ::
   forall m a b. (Monad m) => Eff Empty m a -> (a -> Eff Empty m b) -> Eff Empty m b
 coerceBindEmpty = coerce ((>>=) @m @a @b)
@@ -215,6 +241,11 @@ instance (SingI es, Monad m) => Applicative (Eff es m) where
   {-# INLINE (*>) #-}
 
 instance (SingI es, Monad m) => Monad (Eff es m) where
+  (>>) = case sing @es of
+    SEmpty -> coerceBindAndThenEmpty
+    SLeaf -> coerceBindAndThenLeaf
+    SBranch -> coerceBindAndThenBranch
+
   (>>=) = case sing @es of
     SEmpty -> coerceBindEmpty
     SLeaf -> coerceBindLeaf
