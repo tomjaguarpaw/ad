@@ -104,11 +104,31 @@ runEffPure :: Eff Empty Identity a -> a
 runEffPure = coerce
 {-# INLINE runEffPure #-}
 
+coerceFmapEmpty ::
+  forall a b m. (Functor m) => (a -> b) -> Eff Empty m a -> Eff Empty m b
+coerceFmapEmpty = coerce (fmap @m @a @b)
+
+coerceFmapLeaf ::
+  forall a b t m.
+  (MonadTrans t, Monad m) =>
+  (a -> b) ->
+  Eff (Leaf t) m a ->
+  Eff (Leaf t) m b
+coerceFmapLeaf = coerce (fmap @(t m) @a @b)
+
+coerceFmapBranch ::
+  forall a b s1 s2 m.
+  (SingI s1, SingI s2, Monad m) =>
+  (a -> b) ->
+  Eff (Branch s1 s2) m a ->
+  Eff (Branch s1 s2) m b
+coerceFmapBranch = coerce (fmap @(Eff s1 (Eff s2 m)) @a @b)
+
 instance (SingI es, Monad m) => Functor (Eff es m) where
-  fmap f = case sing @es of
-    SEmpty -> \(MkEff ma) -> MkEff (fmap f ma)
-    SBranch -> \(MkEff ema) -> MkEff (fmap f ema)
-    SLeaf -> \(MkEff tma) -> MkEff (fmap f tma)
+  fmap = case sing @es of
+    SEmpty -> coerceFmapEmpty
+    SBranch -> coerceFmapBranch
+    SLeaf -> coerceFmapLeaf
   {-# INLINE fmap #-}
 
 coercePureEmpty :: forall a m. (Applicative m) => a -> Eff Empty m a
