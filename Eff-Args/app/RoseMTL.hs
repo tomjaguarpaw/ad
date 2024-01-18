@@ -1,44 +1,23 @@
-{-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DerivingStrategies #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE MagicHash #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE StandaloneKindSignatures #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
-{-# LANGUAGE UnboxedTuples #-}
-{-# LANGUAGE UndecidableInstances #-}
 
 module RoseMTL where
 
-import Control.Monad (when)
-import qualified Control.Monad.Except as TransExcept
 import qualified Control.Monad.State.Strict as TransState
 import Control.Monad.Trans (MonadTrans (lift))
 import Control.Monad.Trans.Except (ExceptT)
-import qualified Control.Monad.Trans.Except as Except
-import qualified Control.Monad.Trans.Identity as Identity
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
-import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (Identity, runIdentity))
-import Data.Kind (Constraint, Type)
-import Data.Void (Void, absurd)
-import Unsafe.Coerce (unsafeCoerce)
+import Data.Kind (Type)
 import Prelude hiding (read)
 
 data Effects = Branch Effects Effects | Leaf ((Type -> Type) -> Type -> Type) | Empty
