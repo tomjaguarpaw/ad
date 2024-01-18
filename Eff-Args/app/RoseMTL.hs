@@ -37,7 +37,7 @@ import Data.Kind (Type)
 import Data.Void (Void, absurd)
 import Prelude hiding (read)
 
-data Rose a = Branch (Rose a) (Rose a) | Leaf a | Empty
+data Rose = Branch Rose Rose | Leaf ((Type -> Type) -> Type -> Type) | Empty
 
 data SRose i where
   SBranch :: (SingI i1, SingI i2) => SRose (Branch i1 i2)
@@ -58,9 +58,7 @@ instance SingI Empty where
 
 type (:&) = 'Branch
 
-type Effect = (Type -> Type) -> Type -> Type
-
-class (a :: Rose Effect) :> (b :: Rose Effect) where
+class (a :: Rose) :> (b :: Rose) where
   embed :: (Monad m) => (forall m'. (Monad m') => Eff a m' r) -> Eff b m r
 
 instance {-# INCOHERENT #-} e :> e where
@@ -81,7 +79,7 @@ instance {-# INCOHERENT #-} (SingI e, SingI es) => e :> (e :& es) where
 
 newtype Eff es m a = MkEff (EffF es m a)
 
-type family EffF (es :: Rose Effect) m where
+type family EffF (es :: Rose) m where
   EffF Empty m = m
   EffF (Leaf t) m = t m
   EffF (Branch s1 s2) m = Eff s1 (Eff s2 m)
