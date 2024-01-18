@@ -12,7 +12,6 @@ module RoseMTL where
 
 import qualified Control.Monad.State.Strict as TransState
 import Control.Monad.Trans (MonadTrans (lift))
-import Control.Monad.Trans.Except (ExceptT)
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
@@ -207,24 +206,14 @@ instance (SingI es) => MonadTrans (Eff es) where
     SBranch -> MkEff . lift . lift
   {-# INLINE lift #-}
 
-data State s st where
-  MkState :: State s (Leaf (StateT s))
-
-data Error e err where
-  MkError :: Error e (Leaf (ExceptT e))
-
-type Handler effs m h a r =
-  (forall s. (SingI s) => h s -> Eff (s :& effs) m a) ->
-  Eff effs m r
-
-type HandlerNoArgs s effs m h a r =
+type HandlerNoArgs s effs m a r =
   Eff (s :& effs) m a ->
   Eff effs m r
 
 handleAnyNoArgs ::
   (MonadTrans t) =>
   (t (Eff effs m) a -> Eff effs m r) ->
-  HandlerNoArgs (Leaf t) effs m h a r
+  HandlerNoArgs (Leaf t) effs m a r
 
 handleAnyNoArgs = coerce
 {-# INLINE handleAnyNoArgs #-}
@@ -232,14 +221,14 @@ handleAnyNoArgs = coerce
 runStateNoArgs ::
   (SingI effs, Monad m) =>
   s ->
-  HandlerNoArgs (Leaf (StateT s)) effs m (State s) a (a, s)
+  HandlerNoArgs (Leaf (StateT s)) effs m a (a, s)
 runStateNoArgs s = handleAnyNoArgs (flip State.runStateT s)
 {-# INLINE runStateNoArgs #-}
 
 handleStateNoArgs ::
   (SingI effs, Monad m) =>
   s ->
-  HandlerNoArgs (Leaf (StateT s)) effs m (State s) a a
+  HandlerNoArgs (Leaf (StateT s)) effs m a a
 handleStateNoArgs s f = fmap fst (runStateNoArgs s f)
 {-# INLINE handleStateNoArgs #-}
 
