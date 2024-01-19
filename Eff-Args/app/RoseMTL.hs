@@ -1,6 +1,8 @@
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -15,6 +17,7 @@ import Control.Monad.Trans (MonadTrans)
 import Control.Monad.Trans.State.Strict (StateT)
 import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
+import Data.Foldable (for_)
 import Data.Functor.Identity (Identity (Identity, runIdentity))
 import Data.Kind (Type)
 import Prelude hiding (read)
@@ -207,7 +210,6 @@ handleAnyNoArgs ::
   (MonadTrans t) =>
   (t (Eff effs m) a -> Eff effs m r) ->
   HandlerNoArgs (Leaf t) effs m a r
-
 handleAnyNoArgs = coerce
 {-# INLINE handleAnyNoArgs #-}
 
@@ -230,22 +232,46 @@ myfor 0 _ = pure ()
 myfor n b = b n *> myfor (n - 1) b
 
 mySum :: Int
-mySum = runEffPure $ handleStateNoArgs 0 $ do
-  --  _ <- pure () :: Eff (Leaf (StateT Int) :& Empty) Identity ()
-  MkEff $ do
-    --    _ <- pure () :: Eff ('Leaf (StateT Int)) (Eff 'Empty Identity) ()
+mySum = runEffPure
+  $ ( ( coerce ::
+          (StateT Int (Eff Empty Identity) Int -> Eff Empty Identity Int) ->
+          Eff (Leaf (StateT Int) :& Empty) Identity Int ->
+          Eff Empty Identity Int
+      )
+        (flip State.evalStateT (0 :: Int))
+    )
+  $ MkEff
+  $ do
     MkEff $ do
-      --      _ <- pure () :: StateT Int (Eff 'Empty Identity) ()
-      myfor 10 $ \i -> do
+      -- Getting rid of this "pure" leads to less good code!
+      pure ()
+      for_ [1 :: Int .. 10] $ \i -> do
         do
-          s <- TransState.get
-          TransState.put $! s + i
+          s <- State.get
+          State.put $! s + i
     MkEff $ do
-      TransState.get
+      State.get
 
 mySumMTL :: Int
 mySumMTL = runIdentity $ flip State.evalStateT 0 $ do
-  myfor 10 $ \i -> do
+  for_ [1 :: Int .. 10] $ \i -> do
     s <- TransState.get
     TransState.put $! s + i
   TransState.get
+
+newtype N m a = N {unN :: m a}
+  deriving newtype (Functor, Applicative, Monad)
+
+newtype M t m a = M {unM :: t m a}
+  deriving newtype (Functor, Applicative, Monad)
+
+mySumN :: Int
+mySumN = runIdentity $ flip State.evalStateT 0 $ unN $ unM $ do
+  M $ do
+    N $ do
+      for_ [1 :: Int .. 10] $ \i -> do
+        do
+          s <- TransState.get
+          TransState.put $! s + i
+    N $ do
+      TransState.get
