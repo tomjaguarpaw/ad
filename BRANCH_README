@@ -1,0 +1,2 @@
+On this branch I was paring down the RoseMTL example as much as
+possible to try to see why it wasn't optimizing like MTL.
