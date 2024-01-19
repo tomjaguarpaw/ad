@@ -266,17 +266,11 @@ mySum = runEffPure
       )
         (flip State.evalStateT (0 :: Int))
     )
-  $ MkEff
   $ do
-    MkEff $ do
-      -- Getting rid of this "pure" leads to less good code!
-      pure ()
-      for_ [1 :: Int .. 10] $ \i -> do
-        do
-          s <- State.get
-          State.put $! s + i
-    MkEff $ do
-      State.get
+    for_ [1 :: Int .. 10] $ \i -> do
+      s <- MkEff $ MkEff State.get
+      MkEff $ MkEff $ State.put $! s + i
+    MkEff $ MkEff State.get
 
 mySumMTL :: Int
 mySumMTL = runIdentity $ flip State.evalStateT 0 $ do
@@ -285,19 +279,27 @@ mySumMTL = runIdentity $ flip State.evalStateT 0 $ do
     TransState.put $! s + i
   TransState.get
 
-newtype N m a = N {unN :: m a}
+newtype L t m a = L {unL :: t m a}
   deriving newtype (Functor, Applicative, Monad)
 
-newtype M t m a = M {unM :: t m a}
+newtype E m a = E {unE :: m a}
+  deriving newtype (Functor, Applicative, Monad)
+
+newtype B t1 t2 m a = B {unM :: t1 (t2 m) a}
   deriving newtype (Functor, Applicative, Monad)
 
 mySumN :: Int
-mySumN = runIdentity $ flip State.evalStateT 0 $ unN $ unM $ do
-  M $ do
-    N $ do
-      for_ [1 :: Int .. 10] $ \i -> do
-        do
-          s <- TransState.get
-          TransState.put $! s + i
-    N $ do
-      TransState.get
+mySumN = runIdentity
+  $ unE
+  $ ( ( coerce ::
+          (StateT Int (E Identity) Int -> E Identity Int) ->
+          B (L (StateT Int)) E Identity Int ->
+          E Identity Int
+      )
+        (flip State.evalStateT 0)
+    )
+  $ do
+    for_ [1 :: Int .. 10] $ \i -> do
+      s <- B $ L TransState.get
+      B $ L $ TransState.put $! s + i
+    B $ L TransState.get
