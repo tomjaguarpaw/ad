@@ -74,13 +74,6 @@ coerceFmapBranch ::
   Eff (Branch s1 s2) m b
 coerceFmapBranch = coerce (fmap @(Eff s1 (Eff s2 m)) @a @b)
 
-instance (SingI es, Monad m) => Functor (Eff es m) where
-  fmap = case sing @es of
-    SEmpty -> coerceFmapEmpty
-    SBranch -> coerceFmapBranch
-    SLeaf -> coerceFmapLeaf
-  {-# INLINE fmap #-}
-
 coercePureEmpty :: forall a m. (Applicative m) => a -> Eff Empty m a
 coercePureEmpty = coerce (pure :: a -> m a)
 
@@ -121,6 +114,32 @@ coerceAndThenBranch =
     ( (*>) ::
         Eff s1 (Eff s2 m) a ->
         Eff s1 (Eff s2 m) b ->
+        Eff s1 (Eff s2 m) b
+    )
+
+coerceAppEmpty ::
+  forall m a b. (Applicative m) => Eff Empty m (a -> b) -> Eff Empty m a -> Eff Empty m b
+coerceAppEmpty = coerce ((<*>) :: m (a -> b) -> m a -> m b)
+
+coerceAppLeaf ::
+  forall t m a b.
+  (MonadTrans t, Monad m) =>
+  Eff (Leaf t) m (a -> b) ->
+  Eff (Leaf t) m a ->
+  Eff (Leaf t) m b
+coerceAppLeaf = coerce ((<*>) :: t m (a -> b) -> t m a -> t m b)
+
+coerceAppBranch ::
+  forall s1 s2 m a b.
+  (SingI s1, SingI s2, Monad m) =>
+  Eff (Branch s1 s2) m (a -> b) ->
+  Eff (Branch s1 s2) m a ->
+  Eff (Branch s1 s2) m b
+coerceAppBranch =
+  coerce
+    ( (<*>) ::
+        Eff s1 (Eff s2 m) (a -> b) ->
+        Eff s1 (Eff s2 m) a ->
         Eff s1 (Eff s2 m) b
     )
 
@@ -171,6 +190,13 @@ coerceBindBranch ::
 coerceBindBranch =
   coerce ((>>=) @(Eff s1 (Eff s2 m)) @a @b)
 
+instance (SingI es, Monad m) => Functor (Eff es m) where
+  fmap = case sing @es of
+    SEmpty -> coerceFmapEmpty
+    SBranch -> coerceFmapBranch
+    SLeaf -> coerceFmapLeaf
+  {-# INLINE fmap #-}
+
 instance (SingI es, Monad m) => Applicative (Eff es m) where
   pure = case sing @es of
     SEmpty -> coercePureEmpty
@@ -179,9 +205,9 @@ instance (SingI es, Monad m) => Applicative (Eff es m) where
   {-# INLINE pure #-}
 
   (<*>) = case sing @es of
-    SEmpty -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
-    SLeaf -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
-    SBranch -> \(MkEff f) (MkEff g) -> coerce (f <*> g)
+    SEmpty -> coerceAppEmpty
+    SLeaf -> coerceAppLeaf
+    SBranch -> coerceAppBranch
   {-# INLINE (<*>) #-}
 
   (*>) = case sing @es of
