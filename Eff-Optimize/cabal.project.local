@@ -1,0 +1,3 @@
+package eff-optimize
+  ghc-options: -O1 -ddump-simpl -dsuppress-all
+  --  -ddump-simpl-iterations
