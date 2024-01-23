@@ -17,6 +17,7 @@ import qualified Control.Monad.Trans.State.Strict as State
 import Data.Coerce (coerce)
 import Data.Functor.Identity (Identity (runIdentity))
 import Data.Kind (Type)
+import Data.Foldable (for_)
 
 -- These "myModify" functions all compile to the same code --
 -- *exactly* the same code, i.e. they share the implementation (which
@@ -58,18 +59,11 @@ myModifyEff =
 -- compiles to the same code, but it doesn't.  It compiles to an
 -- inefficient loop with allocation.
 
--- The choice of loop combinator is not particularly important.  It
--- just needs to be something that makes the below programs
--- non-trivial, so we can see how well the optimizer works.
-myfor :: (Applicative f) => Int -> (Int -> f a) -> f ()
-myfor 0 _ = pure ()
-myfor n b = b n *> myfor (n - 1) b
-
 mySumMTL :: Int
 mySumMTL =
   runIdentity $
     flip State.evalStateT 0 $ do
-      myfor 10 $ \i -> do
+      for_ [1 .. 10] $ \i -> do
         s <- State.get
         State.put $! s + i
       State.get
@@ -81,7 +75,7 @@ mySumNewtype =
       flip State.evalStateT 0 $
         unL $
           unB $ do
-            myfor 10 $ \i -> do
+            for_ [1.. 10] $ \i -> do
               s <- Bm $ Lm State.get
               Bm $ Lm $ State.put $! s + i
             Bm $ Lm State.get
@@ -94,7 +88,7 @@ mySumEff =
         unMkEff $
           unMkEff @(Branch (Leaf (StateT Int)) Empty) $
             do
-              myfor 10 $ \i -> do
+              for_ [1..10] $ \i -> do
                 s <- MkEff $ MkEff State.get
                 MkEff $ MkEff $ State.put $! s + i
               MkEff $ MkEff State.get
