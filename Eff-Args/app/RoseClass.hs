@@ -423,7 +423,7 @@ runC ::
 runC st f =
   evalState st $ \s -> do
     e <- handleError $ \e ->
-      weakenEff (assoc1 (# #)) (f (compound e s))
+      runC0 f e s
     s' <- read s
     pure (e, s')
 
