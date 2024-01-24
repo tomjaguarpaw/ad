@@ -411,6 +411,11 @@ getC c = withC2 c (\h -> read h)
 throwErrorC :: forall ss es e a s. ss :> es => Compound (Error e) s ss -> e -> Eff es a
 throwErrorC c e = withC1 c (\h -> throw h e)
 
+runC0 ::
+  (forall ss. Compound e1 e2 ss -> Eff (ss :& es) r) ->
+  (forall s1 s2. e1 s1 -> e2 s2 -> Eff (s1 :& (s2 :& es)) r)
+runC0 k e1 e2 = weakenEff (assoc1 (# #)) (k (compound e1 e2))
+
 runC ::
   Int ->
   (forall ss. Compound (Error e) (State Int) ss -> Eff (ss :& es) r) ->
