@@ -65,9 +65,10 @@ type (:>) :: Effects -> Effects -> Constraint
 class a :> b where
   embed :: (Monad m) => (forall m'. (Monad m') => Eff a m' r) -> Eff b m r
 
-instance {-# INCOHERENT #-} e :> e where
-  embed = id
-  {-# INLINE embed #-}
+-- I'm not sure we need this
+-- instance {-# INCOHERENT #-} e :> e where
+--  embed = id
+--  {-# INLINE embed #-}
 
 instance (SingI x, SingI es, (e :> es)) => e :> (x :& es) where
   embed x = MkEff (lift (embed x))
