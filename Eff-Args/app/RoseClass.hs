@@ -411,6 +411,7 @@ getC c = withC2 c (\h -> read h)
 throwErrorC :: forall ss es e a s. ss :> es => Compound (Error e) s ss -> e -> Eff es a
 throwErrorC c e = withC1 c (\h -> throw h e)
 
+-- TODO: Make this (s1 :> es, s2 :> es), like withC
 runC0 ::
   e1 s1 ->
   e2 s2 ->
