@@ -369,8 +369,22 @@ data Compound e1 e2 es where
     e2 st ->
     Compound e1 e2 (err :& st)
 
+compound :: e1 err -> e2 st -> Compound e1 e2 (err :& st)
+compound = Compound proxy# proxy#
+
 inComp :: forall a b c r. a :> b => b :> c => (a :> c => r) -> r
 inComp k = case have (cmp (has @a @b) (has @b @c)) of Dict -> k
+
+withC ::
+  forall e1 e2 ss es r.
+  (ss :> es) =>
+  Compound e1 e2 ss ->
+  (forall st st'. (st :> es, st' :> es) => e1 st -> e2 st' -> Eff es r) ->
+  Eff es r
+withC c f =
+  case c of
+    Compound (_ :: Proxy# st) (_ :: Proxy# st') h i ->
+      inComp @st @ss @es (inComp @st' @ss @es (f h i))
 
 withC1 ::
   forall e1 e2 ss es r.
@@ -378,8 +392,7 @@ withC1 ::
   Compound e1 e2 ss ->
   (forall st. st :> es => e1 st -> Eff es r) ->
   Eff es r
-withC1 c f =
-  case c of Compound (_ :: Proxy# st) _ h _ -> inComp @st @ss @es (f h)
+withC1 c f = withC c (\h _ -> f h)
 
 withC2 ::
   forall e1 e2 ss es r.
@@ -387,8 +400,7 @@ withC2 ::
   Compound e1 e2 ss ->
   (forall st. st :> es => e2 st -> Eff es r) ->
   Eff es r
-withC2 c f =
-  case c of Compound _ (_ :: Proxy# st) _ h -> inComp @st @ss @es (f h)
+withC2 c f = withC c (\_ i -> f i)
 
 putC :: forall ss es e. ss :> es => Compound e (State Int) ss -> Int -> Eff es ()
 putC c i = withC2 c (\h -> write h i)
@@ -406,8 +418,8 @@ runC ::
 runC st f =
   evalState st $ \s -> do
     e <- handleError $ \e ->
-      case have (assoc1 (##)) of
-        Dict -> weakenEff (assoc1 (##)) (f (Compound proxy# proxy# e s))
+      case have (assoc1 (# #)) of
+        Dict -> weakenEff (assoc1 (# #)) (f (compound e s))
     s' <- read s
     pure (e, s')
 
@@ -415,9 +427,7 @@ runC2 ::
   State Int st ->
   (forall ss. Compound (Error e) (State Int) (ss :& st) -> Eff (ss :& es) r) ->
   Eff es (Either e r)
-runC2 s f =
-  handleError $ \e ->
-    f (Compound proxy# proxy# e s)
+runC2 s f = handleError $ \e -> f (compound e s)
 
 runC' ::
   Int ->
