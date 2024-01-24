@@ -412,9 +412,11 @@ throwErrorC :: forall ss es e a s. ss :> es => Compound (Error e) s ss -> e -> E
 throwErrorC c e = withC1 c (\h -> throw h e)
 
 runC0 ::
+  e1 s1 ->
+  e2 s2 ->
   (forall ss. Compound e1 e2 ss -> Eff (ss :& es) r) ->
-  (forall s1 s2. e1 s1 -> e2 s2 -> Eff (s1 :& (s2 :& es)) r)
-runC0 k e1 e2 = weakenEff (assoc1 (# #)) (k (compound e1 e2))
+  Eff (s1 :& (s2 :& es)) r
+runC0 e1 e2 k = weakenEff (assoc1 (# #)) (k (compound e1 e2))
 
 runC2 ::
   State Int st ->
@@ -430,7 +432,7 @@ runC' st f = fmap fst $ do
   (e, s) <- do
     evalState st $ \s -> do
       e <- handleError $ \e ->
-        runC0 f e s
+        runC0 e s f
       s' <- read s
       pure (e, s')
   pure (either id id e, s)
