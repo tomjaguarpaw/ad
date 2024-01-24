@@ -416,17 +416,6 @@ runC0 ::
   (forall s1 s2. e1 s1 -> e2 s2 -> Eff (s1 :& (s2 :& es)) r)
 runC0 k e1 e2 = weakenEff (assoc1 (# #)) (k (compound e1 e2))
 
-runC ::
-  Int ->
-  (forall ss. Compound (Error e) (State Int) ss -> Eff (ss :& es) r) ->
-  Eff es (Either e r, Int)
-runC st f =
-  evalState st $ \s -> do
-    e <- handleError $ \e ->
-      runC0 f e s
-    s' <- read s
-    pure (e, s')
-
 runC2 ::
   State Int st ->
   (forall ss. Compound (Error e) (State Int) (ss :& st) -> Eff (ss :& es) r) ->
@@ -438,7 +427,12 @@ runC' ::
   (forall ss. Compound (Error r) (State Int) ss -> Eff (ss :& es) r) ->
   Eff es r
 runC' st f = fmap fst $ do
-  (e, s) <- runC st f
+  (e, s) <- do
+    evalState st $ \s -> do
+      e <- handleError $ \e ->
+        runC0 f e s
+      s' <- read s
+      pure (e, s')
   pure (either id id e, s)
 
 (!???) :: [a] -> Int -> Maybe a
