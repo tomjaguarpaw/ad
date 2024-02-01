@@ -844,3 +844,22 @@ oddsUntilFirstGreaterThan5 =
               yield y i
               when (i > 5) $
                 jumpTo break
+
+foo ::
+  (e1 :> effs, e2 :> effs, e2 :> effs', e3 :> effs') =>
+  Coroutine () (Either a b) e2 ->
+  Stream a e1 ->
+  Eff effs (b, Stream (Either a b) e3 -> Eff effs' r)
+foo c s = do
+  yieldCoroutine c () >>= \case
+    Left a -> do
+      yield s a
+      foo c s
+    Right b' ->
+      pure
+        ( b',
+          \s' -> fix $ \again -> do
+            eab <- yieldCoroutine c ()
+            yield s' eab
+            again
+        )
