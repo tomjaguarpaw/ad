@@ -200,7 +200,7 @@ nest3 = do
   threadDelay 1
   putStrLn "Finished"
 
--- To demonstrate what happnes when we read from an MVar that will not
+-- To demonstrate what happens when we read from an MVar that will not
 -- be written to
 blockedIndefinitely :: IO ()
 blockedIndefinitely = do
