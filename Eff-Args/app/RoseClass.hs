@@ -28,6 +28,7 @@ import Control.Monad.State.Strict (StateT, get, put, runStateT)
 import Control.Monad.Trans (lift)
 import Data.Data (Proxy (Proxy))
 import Data.Foldable (for_)
+import Data.Function (fix)
 import Data.IORef (IORef, newIORef, readIORef, writeIORef)
 import Data.Void (Void, absurd)
 import GHC.Base (Proxy#)
@@ -35,7 +36,7 @@ import GHC.Exts (proxy#)
 import GHC.IO.Unsafe (unsafePerformIO)
 import Main (withScopedException_)
 import Unsafe.Coerce (unsafeCoerce)
-import Prelude hiding (drop, read, return)
+import Prelude hiding (break, drop, read, return)
 
 data Rose a = Branch (Rose a) (Rose a)
 
@@ -60,7 +61,7 @@ newtype Error e (s :: Rose Effect) = Error (forall a. e -> IO a)
 
 newtype State s (e :: Rose Effect) = State (IORef s)
 
-newtype Coroutine a b s = Coroutine (a -> IO b)
+newtype Coroutine a b (s :: Rose Effect) = Coroutine (a -> IO b)
 
 type Stream a (s :: Rose Effect) = Coroutine a () s
 
@@ -811,3 +812,35 @@ insertAwakeSignals3 location stIn insnsIn windowsIn =
                 go
                   afterInsn1
                   (window : windows)
+
+type Jump = Error ()
+
+withJump ::
+  (forall e. Jump e -> Eff (e :& effs) ()) ->
+  -- | ͘
+  Eff effs ()
+withJump f = do
+  r <- handleError $ \e ->
+    f e
+  pure (either id id r)
+
+jumpTo ::
+  (err :> effs) =>
+  Jump err ->
+  -- | ͘
+  Eff effs a
+jumpTo tag = throw tag ()
+
+oddsUntilFirstGreaterThan5 :: [Int]
+oddsUntilFirstGreaterThan5 =
+  fst $
+    runEff $
+      yieldToList $ \y -> do
+        withJump $ \break -> do
+          for_ [1 .. 10] $ \i -> do
+            withJump $ \continue -> do
+              when (i `mod` 2 == 0) $
+                jumpTo continue
+              yield y i
+              when (i > 5) $
+                jumpTo break
