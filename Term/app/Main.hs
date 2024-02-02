@@ -78,15 +78,15 @@ import System.Process.Typed
 import Text.Read (readMaybe)
 import Prelude hiding (log)
 
-data In = PtyIn PtyParse | StdIn ByteString | WinchIn
+data In m = PtyIn (PtyParse m) | StdIn ByteString | WinchIn
 
-type PtyParse = (ByteString, UpdateCursor)
+type PtyParse m = (ByteString, UpdateCursor m)
 
-type UpdateCursor =
+type UpdateCursor m =
   Bool ->
   (Int, Int) ->
   (Int, Int) ->
-  IO (Bool, (Int, Int), Bool)
+  m (Bool, (Int, Int), Bool)
 
 barLines :: Int
 barLines = 3
@@ -412,7 +412,7 @@ makeLogger = do
 
   pure (writeChan q)
 
-ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse -> IO ()) -> IO a
+ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse IO -> IO ()) -> IO a
 ptyParses log pty yield = do
   unhandledPty <- newIORef mempty
 
@@ -433,7 +433,7 @@ ptyParses log pty yield = do
 parseUntilNeedMore ::
   (String -> IO ()) ->
   ByteString ->
-  (PtyParse -> IO ()) ->
+  (PtyParse IO -> IO ()) ->
   IO ByteString
 parseUntilNeedMore log bsInStart yield = do
   unhandledPty <- newIORef bsInStart
@@ -449,7 +449,7 @@ parseUntilNeedMore log bsInStart yield = do
 parseBS ::
   (String -> IO ()) ->
   ByteString ->
-  IO (Maybe ((ByteString, UpdateCursor), ByteString))
+  IO (Maybe ((ByteString, UpdateCursor IO), ByteString))
 parseBS log bsIn = do
   mResult <- parse log (C8.unpack bsIn)
   pure $ do
@@ -457,7 +457,7 @@ parseBS log bsIn = do
     let (bs, theLeftovers) = C8.splitAt seen bsIn
     Just ((bs, f), theLeftovers)
 
-parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor))
+parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor IO))
 parse log = \case
   [] ->
     needMore
