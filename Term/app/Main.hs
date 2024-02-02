@@ -457,7 +457,8 @@ parseBS log bsIn = do
     let (bs, theLeftovers) = C8.splitAt seen bsIn
     Just ((bs, f), theLeftovers)
 
-parse :: (String -> IO ()) -> String -> IO (Maybe (Int, UpdateCursor IO))
+parse ::
+  Applicative m => (String -> m ()) -> String -> m (Maybe (Int, UpdateCursor m))
 parse log = \case
   [] ->
     needMore
