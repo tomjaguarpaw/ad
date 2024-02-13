@@ -89,6 +89,8 @@ race jobs = do
   for_ tids killThread
   pure r
 
+-- It's not safe to call the continuation more than once.  We need to
+-- find a form of safe handler.
 uncons ::
   (H a () -> IO r) ->
   IO (Either r (a, H a () -> IO r))
