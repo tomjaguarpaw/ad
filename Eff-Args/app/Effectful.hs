@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -48,7 +49,7 @@ has f = f (Have# (##))
 {-# INLINE have #-}
 -- This is the only thing that's potentially unsafe
 have :: Has eff s -> Dict (eff ~ s)
-have _ = unsafeCoerce (Dict :: Dict (s ~ s))
+have !_ = unsafeCoerce (Dict :: Dict (s ~ s))
 
 thisDivergesFortunately :: ()
 thisDivergesFortunately = have undefined `seq` ()
