@@ -5,6 +5,9 @@
 
 module Main where
 
+import Bluefin.Eff (runEff)
+import Bluefin.IO (effIO)
+import Bluefin.State (evalState, get, put)
 import Control.Applicative (Const (Const), getConst)
 import qualified Data.Foldable
 import Data.Function (fix)
@@ -150,34 +153,39 @@ main = do
         Left word -> error word
         Right w -> w
 
-  flip fix words_ $ \loop possibles -> do
-    let leastBad_ = leastBad (==) words_
-        score_ = score (==) target
+  runEff $ \ioe ->
+    evalState words_ $ \possibles -> do
+      flip fix () $ \loop () -> do
+        let leastBad_ = leastBad (==) words_
+            score_ = score (==) target
 
-    let (bestGuess, subsequentPossibles) = case leastBad_ possibles of
-          Right r -> r
-          Left l -> (l, Data.Map.empty)
+        possibles_ <- get possibles
 
-    putStrLn (showWord bestGuess)
+        let (bestGuess, subsequentPossibles) = case leastBad_ possibles_ of
+              Right r -> r
+              Left l -> (l, Data.Map.empty)
 
-    {-
-        result <- fix $ \tryAgain -> do
-          (readResult <$> getLine) >>= \case
-            Nothing -> do
-              putStrLn "Couldn't understand htat"
-              tryAgain
-            Just r -> pure r
-    -}
+        effIO ioe (putStrLn (showWord bestGuess))
 
-    let result = score_ bestGuess
+        {-
+            result <- fix $ \tryAgain -> do
+              (readResult <$> getLine) >>= \case
+                Nothing -> do
+                  putStrLn "Couldn't understand htat"
+                  tryAgain
+                Just r -> pure r
+        -}
 
-    putStrLn (showResult result)
+        let result = score_ bestGuess
 
-    case result of
-      Word Green Green Green Green Green -> pure ()
-      _ -> do
-        let nextPossibles = case Data.Map.lookup result subsequentPossibles of
-              Nothing -> error "Not found"
-              Just n -> n
+        effIO ioe (putStrLn (showResult result))
 
-        loop nextPossibles
+        case result of
+          Word Green Green Green Green Green -> pure ()
+          _ -> do
+            let nextPossibles = case Data.Map.lookup result subsequentPossibles of
+                  Nothing -> error "Not found"
+                  Just n -> n
+
+            put possibles nextPossibles
+            loop ()
