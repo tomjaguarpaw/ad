@@ -8,8 +8,8 @@
 module Main where
 
 import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
-import Bluefin.Eff (Eff, runEff, runPureEff, type (:&))
-import Bluefin.IO (effIO)
+import Bluefin.Eff (Eff, runEff, runPureEff, (:>), type (:&))
+import Bluefin.IO (IOE, effIO)
 import Bluefin.State (evalState, get, put)
 import Control.Monad (forever)
 import qualified Data.Foldable
@@ -158,6 +158,15 @@ main = runEff $ \ioe -> do
         Left word -> error word
         Right w -> w
 
+  loopWords ioe words_ target
+
+loopWords ::
+  (e :> es) =>
+  IOE e ->
+  [Word Char] ->
+  Word Char ->
+  Eff es ()
+loopWords ioe words_ target =
   evalState words_ $ \possibles -> do
     until $ \done -> do
       let leastBad_ = leastBad (==) words_
