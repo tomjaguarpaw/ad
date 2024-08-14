@@ -143,12 +143,8 @@ leastBad (===) guesses possibles' =
           (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
        in Right (bestGuess, subsequentPossibles)
 
-main :: IO ()
-main = runEff $ \ioe -> do
-  let target_ = "boost"
-      target = fromJust (readWord target_)
-      score_ = score (==) target
-
+readFiveFile :: (e :> es) => IOE e -> Eff es [Word Char]
+readFiveFile ioe = do
   wordsString <- effIO ioe (readFile "/tmp/five")
   let words_ = case for
         (lines wordsString)
@@ -158,7 +154,15 @@ main = runEff $ \ioe -> do
         ) of
         Left word -> error word
         Right w -> w
+  pure words_
 
+main :: IO ()
+main = runEff $ \ioe -> do
+  let target_ = "boost"
+      target = fromJust (readWord target_)
+      score_ = score (==) target
+
+  words_ <- readFiveFile ioe
   loopWords ioe words_ (pure . score_)
 
 readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
