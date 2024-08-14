@@ -7,6 +7,7 @@
 
 module Main where
 
+import Bluefin.Coroutine (Coroutine, forEach, yieldCoroutine)
 import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
 import Bluefin.Eff (Eff, runEff, runPureEff, (:>), type (:&))
 import Bluefin.IO (IOE, effIO)
@@ -173,7 +174,8 @@ readFiveFile ioe = do
 main :: IO ()
 main = runEff $ \ioe -> do
   words_ <- readFiveFile ioe
-  loopWords ioe words_ (scoreBoost ioe)
+  forEach (loopWords ioe words_) $ \candidate ->
+    scoreBoost ioe candidate
 
 scoreBoost :: (e :> es) => IOE e -> Word Char -> Eff es (Word Scored)
 scoreBoost ioe candidate = do
@@ -193,10 +195,10 @@ readResultEff ioe candidate = until $ \gotResult -> do
     Just r -> returnEarly gotResult r
 
 loopWords ::
-  (e :> es, Ord b) =>
+  (e :> es, Ord b, e2 :> es) =>
   IOE e ->
   NEL.NonEmpty (Word b) ->
-  (forall e1 e2. Word b -> Eff (e1 :& e2 :& es) (Word Scored)) ->
+  Coroutine (Word b) (Word Scored) e2 ->
   Eff es ()
 loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
@@ -204,14 +206,14 @@ loopWords ioe words_ score_ =
       loopWordsWork ioe possibles done score_ (toList words_)
 
 loopWordsWork ::
-  (e1 :> es, e2 :> es, e3 :> es, Ord b) =>
+  (e1 :> es, e2 :> es, e3 :> es, Ord b, e4 :> es) =>
   IOE e3 ->
   -- | All possibilities for the hidden word
   State (NEL.NonEmpty (Word b)) e1 ->
   -- | Success
   EarlyReturn () e2 ->
   -- | Score this guess
-  (Word b -> Eff es (Word Scored)) ->
+  Coroutine (Word b) (Word Scored) e4 ->
   -- | All words in game
   [Word b] ->
   Eff es ()
@@ -222,7 +224,7 @@ loopWordsWork ioe possibles done score_ words_ = do
         Right r -> r
         Left l -> (l, Data.Map.empty)
 
-  result <- score_ bestGuess
+  result <- yieldCoroutine score_ bestGuess
 
   effIO ioe (putStrLn (showResult result))
 
