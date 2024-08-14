@@ -113,13 +113,21 @@ score (===) target candidate = runPureEff $ do
             pure Yellow
           else pure Grey
 
+groupBy ::
+  (Ord k) =>
+  (a -> k) ->
+  [a] ->
+  Data.Map.Map k [a]
+groupBy k as =
+  Data.Map.fromListWith (++) (map (\a -> (k a, [a])) as)
+
 badness ::
   (a -> b -> Bool) ->
   [Word a] ->
   Word b ->
   (Int, Data.Map.Map (Word Scored) [Word a])
 badness (===) possibles guess =
-  let groupedPossibles = Data.Map.fromListWith (++) (map (\possible -> (flip (score (===)) guess possible, [possible])) possibles)
+  let groupedPossibles = groupBy (flip (score (===)) guess) possibles
 
       minMax = Data.Foldable.maximum (Data.Map.map length groupedPossibles)
    in (minMax, groupedPossibles)
