@@ -155,7 +155,7 @@ main = do
 
   runEff $ \ioe ->
     evalState words_ $ \possibles -> do
-      flip fix () $ \loop () -> do
+      fix $ \loop -> do
         let leastBad_ = leastBad (==) words_
             score_ = score (==) target
 
@@ -188,4 +188,4 @@ main = do
                   Just n -> n
 
             put possibles nextPossibles
-            loop ()
+            loop
