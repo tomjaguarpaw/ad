@@ -151,8 +151,7 @@ main = runEff $ \ioe -> do
       target = fromJust (readWord target_)
 
   wordsString <- effIO ioe (readFile "/tmp/five")
-  let words_ = case flip
-        traverse
+  let words_ = case for
         (lines wordsString)
         ( \word -> case readWord word of
             Nothing -> Left word
