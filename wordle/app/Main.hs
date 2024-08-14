@@ -11,7 +11,7 @@ import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
 import Bluefin.Eff (Eff, runEff, runPureEff, (:>), type (:&))
 import Bluefin.IO (IOE, effIO)
 import Bluefin.State (State, evalState, get, put)
-import Control.Monad (forever)
+import Control.Monad (forever, when)
 import Data.Foldable (toList)
 import qualified Data.Foldable
 import Data.List (minimumBy)
@@ -82,6 +82,9 @@ removeBy _ _ [] = []
 removeBy (===) b (a : as) = case a === b of
   True -> as
   False -> a : removeBy (===) b as
+
+isWin :: Word Scored -> Bool
+isWin = all (\case Green -> True; _ -> False)
 
 score :: forall a b. (a -> b -> Bool) -> Word a -> Word b -> Word Scored
 score (===) target candidate = runPureEff $ do
@@ -219,11 +222,10 @@ loopWordsWork ioe possibles done score_ words_ = do
 
   effIO ioe (putStrLn (showResult result))
 
-  case result of
-    Word Green Green Green Green Green -> returnEarly done ()
-    _ -> do
-      let nextPossibles = case Data.Map.lookup result subsequentPossibles of
-            Nothing -> error "Not found"
-            Just n -> n
+  when (isWin result) (returnEarly done ())
 
-      put possibles nextPossibles
+  let nextPossibles = case Data.Map.lookup result subsequentPossibles of
+        Nothing -> error "Not found"
+        Just n -> n
+
+  put possibles nextPossibles
