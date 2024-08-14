@@ -27,7 +27,7 @@ until body =
   withEarlyReturn $ \early ->
     forever $ body early
 
-data Word a = Word a a a a a
+data Word a = Word !a !a !a !a !a
   deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 
 instance Applicative Word where
