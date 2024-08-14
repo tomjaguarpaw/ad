@@ -1,32 +1,31 @@
 {-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE LambdaCase #-}
-
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
 
-import Prelude hiding (Word)
-import Control.Applicative (Const(Const), getConst)
+import Control.Applicative (Const (Const), getConst)
 import qualified Data.Foldable
-import Data.Traversable (mapAccumL)
-import qualified Data.Map.Strict as Data.Map
-import Data.Ord (comparing)
-import Data.List (minimumBy)
 import Data.Function (fix)
+import Data.List (minimumBy)
+import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
+import Data.Ord (comparing)
+import Data.Traversable (mapAccumL)
+import Prelude hiding (Word)
 
 data Word a = Word a a a a a
   deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
 
 instance Applicative Word where
   pure x = Word x x x x x
-  Word f1 f2 f3 f4 f5 <*> Word x1 x2 x3 x4 x5
-    = Word (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5)
+  Word f1 f2 f3 f4 f5 <*> Word x1 x2 x3 x4 x5 =
+    Word (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5)
 
 readWord :: [a] -> Maybe (Word a)
 readWord = \case
-  [a,b,c,d,e] -> Just (Word a b c d e)
+  [a, b, c, d, e] -> Just (Word a b c d e)
   _ -> Nothing
 
 showWord :: Word a -> [a]
@@ -34,14 +33,18 @@ showWord = Data.Foldable.toList
 
 readResult :: String -> Maybe (Word Scored)
 readResult = \case
-  [a,b,c,d,e] -> traverse readScore (Word a b c d e)
+  [a, b, c, d, e] -> traverse readScore (Word a b c d e)
   _ -> Nothing
 
 showResult :: Word Scored -> String
-showResult = showWord . fmap (\case
-  Green  -> 'g'
-  Yellow -> 'y'
-  Grey   -> ' ')
+showResult =
+  showWord
+    . fmap
+      ( \case
+          Green -> 'g'
+          Yellow -> 'y'
+          Grey -> ' '
+      )
 
 readScore :: Char -> Maybe Scored
 readScore = \case
@@ -50,14 +53,17 @@ readScore = \case
   'x' -> Just Grey
   _ -> Nothing
 
-data Located a = CorrectLocation
-               | NotCorrectLocation a
-               deriving (Functor, Foldable, Traversable)
+data Located a
+  = CorrectLocation
+  | NotCorrectLocation a
+  deriving (Functor, Foldable, Traversable)
 
 data Scored = Green | Yellow | Grey deriving (Show, Eq, Ord)
 
-toList :: ((a -> Const [a] a) -> (s -> Const [a] s))
-          -> s -> [a]
+toList ::
+  ((a -> Const [a] a) -> (s -> Const [a] s)) ->
+  s ->
+  [a]
 toList f = getConst . f (Const . pure)
 
 elemBy :: (a -> b -> Bool) -> b -> [a] -> Bool
@@ -65,52 +71,60 @@ elemBy (===) b = any (=== b)
 
 removeBy :: (a -> b -> Bool) -> b -> [a] -> [a]
 removeBy _ _ [] = []
-removeBy (===) b (a:as) = case a === b of
+removeBy (===) b (a : as) = case a === b of
   True -> as
   False -> a : removeBy (===) b as
 
 score :: forall a b. (a -> b -> Bool) -> Word a -> Word b -> Word Scored
 score (===) target candidate =
   let locatedWithTarget =
-        (\targetChar candidateChar ->
+        ( \targetChar candidateChar ->
             if targetChar === candidateChar
-            then CorrectLocation
-            else NotCorrectLocation (targetChar, candidateChar))
-        <$> target <*> candidate
+              then CorrectLocation
+              else NotCorrectLocation (targetChar, candidateChar)
+        )
+          <$> target
+          <*> candidate
 
       located :: Word (Located b)
       located = (fmap . fmap) snd locatedWithTarget
 
-      remaining = toList (traverse . traverse) $
-                  (fmap . fmap) fst locatedWithTarget
+      remaining =
+        toList (traverse . traverse) $
+          (fmap . fmap) fst locatedWithTarget
+   in snd $
+        mapAccumL
+          ( \targets -> \case
+              CorrectLocation -> (targets, Green)
+              NotCorrectLocation a ->
+                if elemBy (===) a targets
+                  then (removeBy (===) a targets, Yellow)
+                  else (targets, Grey)
+          )
+          remaining
+          located
 
-  in snd $ mapAccumL (\targets -> \case
-                         CorrectLocation -> (targets, Green)
-                         NotCorrectLocation a ->
-                           if elemBy (===) a targets
-                           then (removeBy (===) a targets, Yellow)
-                           else (targets, Grey)
-                         ) remaining located
-
-badness :: (a -> b -> Bool)
-        -> [Word a]
-        -> Word b
-        -> (Int, Data.Map.Map (Word Scored) [Word a])
+badness ::
+  (a -> b -> Bool) ->
+  [Word a] ->
+  Word b ->
+  (Int, Data.Map.Map (Word Scored) [Word a])
 badness (===) possibles guess =
   let scoredPossibles = map (\possible -> (score (===) possible guess, [possible])) possibles
 
       groupedPossibles = Data.Map.fromListWith (++) scoredPossibles
 
       minMax = Data.Foldable.maximum (Data.Map.map length groupedPossibles)
+   in (minMax, groupedPossibles)
 
-  in (minMax, groupedPossibles)
-
-leastBad :: Ord a
-         => (a -> b -> Bool)
-         -> [Word b]
-         -> [Word a]
-         -> Either (Word a)
-                   (Word b, Data.Map.Map (Word Scored) [Word a])
+leastBad ::
+  (Ord a) =>
+  (a -> b -> Bool) ->
+  [Word b] ->
+  [Word a] ->
+  Either
+    (Word a)
+    (Word b, Data.Map.Map (Word Scored) [Word a])
 leastBad (===) guesses possibles' =
   case possibles' of
     [] -> error "No possibles"
@@ -118,8 +132,7 @@ leastBad (===) guesses possibles' =
     possibles ->
       let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
           (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
-
-      in Right (bestGuess, subsequentPossibles)
+       in Right (bestGuess, subsequentPossibles)
 
 main :: IO ()
 main = do
@@ -127,11 +140,15 @@ main = do
       target = fromJust (readWord target_)
 
   wordsString <- readFile "/tmp/five"
-  let words_ = case flip traverse (lines wordsString) (\word -> case readWord word of
-                                                          Nothing -> Left word
-                                                          Just w -> Right w) of
-                 Left word -> error word
-                 Right w -> w
+  let words_ = case flip
+        traverse
+        (lines wordsString)
+        ( \word -> case readWord word of
+            Nothing -> Left word
+            Just w -> Right w
+        ) of
+        Left word -> error word
+        Right w -> w
 
   flip fix words_ $ \loop possibles -> do
     let leastBad_ = leastBad (==) words_
@@ -143,14 +160,14 @@ main = do
 
     putStrLn (showWord bestGuess)
 
-{-
-    result <- fix $ \tryAgain -> do
-      (readResult <$> getLine) >>= \case
-        Nothing -> do
-          putStrLn "Couldn't understand htat"
-          tryAgain
-        Just r -> pure r
--}
+    {-
+        result <- fix $ \tryAgain -> do
+          (readResult <$> getLine) >>= \case
+            Nothing -> do
+              putStrLn "Couldn't understand htat"
+              tryAgain
+            Just r -> pure r
+    -}
 
     let result = score_ bestGuess
 
