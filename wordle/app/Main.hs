@@ -8,7 +8,7 @@
 module Main where
 
 import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
-import Bluefin.Eff (Eff, runEff, type (:&))
+import Bluefin.Eff (Eff, runEff, runPureEff, type (:&))
 import Bluefin.IO (effIO)
 import Bluefin.State (evalState, get, put)
 import Control.Applicative (Const (Const), getConst)
@@ -18,7 +18,7 @@ import Data.List (minimumBy)
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
-import Data.Traversable (mapAccumL)
+import Data.Traversable (for, mapAccumL)
 import Prelude hiding (Word, until)
 
 until :: (forall e. EarlyReturn r e -> Eff (e :& es) ()) -> Eff es r
@@ -103,17 +103,20 @@ score (===) target candidate =
       remaining =
         toList (traverse . traverse) $
           (fmap . fmap) fst locatedWithTarget
-   in snd $
-        mapAccumL
-          ( \targets -> \case
-              CorrectLocation -> (targets, Green)
-              NotCorrectLocation a ->
-                if elemBy (===) a targets
-                  then (removeBy (===) a targets, Yellow)
-                  else (targets, Grey)
-          )
-          remaining
-          located
+   in runPureEff $
+        evalState remaining $ \targets' -> do
+          for located $ \case
+            CorrectLocation ->
+              pure Green
+            NotCorrectLocation a -> do
+              -- FIXME: check why it still works even if I only get
+              -- targets before the loop starts!
+              targets <- get targets'
+              if elemBy (===) a targets
+                then do
+                  put targets' (removeBy (===) a targets)
+                  pure Yellow
+                else pure Grey
 
 badness ::
   (a -> b -> Bool) ->
