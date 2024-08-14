@@ -206,9 +206,13 @@ loopWords ioe words_ score_ =
 loopWordsWork ::
   (e1 :> es, e2 :> es, e3 :> es, Ord b) =>
   IOE e3 ->
+  -- | All possibilities for the hidden word
   State (NEL.NonEmpty (Word b)) e1 ->
+  -- | Success
   EarlyReturn () e2 ->
+  -- | Score this guess
   (Word b -> Eff es (Word Scored)) ->
+  -- | All words in game
   [Word b] ->
   Eff es ()
 loopWordsWork ioe possibles done score_ words_ = do
