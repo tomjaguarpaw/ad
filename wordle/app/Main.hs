@@ -147,6 +147,7 @@ main :: IO ()
 main = runEff $ \ioe -> do
   let target_ = "boost"
       target = fromJust (readWord target_)
+      score_ = score (==) target
 
   wordsString <- effIO ioe (readFile "/tmp/five")
   let words_ = case for
@@ -158,19 +159,18 @@ main = runEff $ \ioe -> do
         Left word -> error word
         Right w -> w
 
-  loopWords ioe words_ target
+  loopWords ioe words_ (pure . score_)
 
 loopWords ::
   (e :> es) =>
   IOE e ->
   [Word Char] ->
-  Word Char ->
+  (forall e1 e2. Word Char -> Eff (e1 :& e2 :& es) (Word Scored)) ->
   Eff es ()
-loopWords ioe words_ target =
+loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
     until $ \done -> do
       let leastBad_ = leastBad (==) words_
-          score_ = score (==) target
 
       possibles_ <- get possibles
 
@@ -188,7 +188,7 @@ loopWords ioe words_ target =
               Just r -> returnEarly gotResult r
       -}
 
-      let result = score_ bestGuess
+      result <- score_ bestGuess
 
       effIO ioe (putStrLn (showResult result))
 
