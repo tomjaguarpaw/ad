@@ -146,11 +146,11 @@ leastBad (===) guesses possibles' =
        in Right (bestGuess, subsequentPossibles)
 
 main :: IO ()
-main = do
+main = runEff $ \ioe -> do
   let target_ = "boost"
       target = fromJust (readWord target_)
 
-  wordsString <- readFile "/tmp/five"
+  wordsString <- effIO ioe (readFile "/tmp/five")
   let words_ = case flip
         traverse
         (lines wordsString)
@@ -161,38 +161,37 @@ main = do
         Left word -> error word
         Right w -> w
 
-  runEff $ \ioe ->
-    evalState words_ $ \possibles -> do
-      until $ \done -> do
-        let leastBad_ = leastBad (==) words_
-            score_ = score (==) target
+  evalState words_ $ \possibles -> do
+    until $ \done -> do
+      let leastBad_ = leastBad (==) words_
+          score_ = score (==) target
 
-        possibles_ <- get possibles
+      possibles_ <- get possibles
 
-        let (bestGuess, subsequentPossibles) = case leastBad_ possibles_ of
-              Right r -> r
-              Left l -> (l, Data.Map.empty)
+      let (bestGuess, subsequentPossibles) = case leastBad_ possibles_ of
+            Right r -> r
+            Left l -> (l, Data.Map.empty)
 
-        effIO ioe (putStrLn (showWord bestGuess))
+      effIO ioe (putStrLn (showWord bestGuess))
 
-        {-
-            result <- fix $ \tryAgain -> do
-              (readResult <$> getLine) >>= \case
-                Nothing -> do
-                  putStrLn "Couldn't understand htat"
-                  tryAgain
-                Just r -> pure r
-        -}
+      {-
+          result <- fix $ \tryAgain -> do
+            (readResult <$> getLine) >>= \case
+              Nothing -> do
+                putStrLn "Couldn't understand htat"
+                tryAgain
+              Just r -> pure r
+      -}
 
-        let result = score_ bestGuess
+      let result = score_ bestGuess
 
-        effIO ioe (putStrLn (showResult result))
+      effIO ioe (putStrLn (showResult result))
 
-        case result of
-          Word Green Green Green Green Green -> returnEarly done ()
-          _ -> do
-            let nextPossibles = case Data.Map.lookup result subsequentPossibles of
-                  Nothing -> error "Not found"
-                  Just n -> n
+      case result of
+        Word Green Green Green Green Green -> returnEarly done ()
+        _ -> do
+          let nextPossibles = case Data.Map.lookup result subsequentPossibles of
+                Nothing -> error "Not found"
+                Just n -> n
 
-            put possibles nextPossibles
+          put possibles nextPossibles
