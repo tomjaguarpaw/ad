@@ -196,11 +196,9 @@ loopWords ::
 loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
     until $ \done -> do
-      let leastBad_ = leastBad (==) words_
-
       possibles_ <- get possibles
 
-      let (bestGuess, subsequentPossibles) = case leastBad_ possibles_ of
+      let (bestGuess, subsequentPossibles) = case leastBad (==) words_ possibles_ of
             Right r -> r
             Left l -> (l, Data.Map.empty)
 
