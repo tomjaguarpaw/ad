@@ -165,7 +165,7 @@ readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
 readResultEff ioe = until $ \gotResult -> do
   (readResult <$> effIO ioe getLine) >>= \case
     Nothing -> do
-      effIO ioe (putStrLn "Couldn't understand htat")
+      effIO ioe (putStrLn "Couldn't understand that")
     Just r -> returnEarly gotResult r
 
 loopWords ::
