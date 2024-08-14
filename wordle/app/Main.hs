@@ -133,6 +133,7 @@ badness (===) possibles guess =
    in (minMax, groupedPossibles)
 
 leastBad ::
+  forall a b.
   (Ord a) =>
   (a -> b -> Bool) ->
   [Word b] ->
