@@ -82,7 +82,7 @@ removeBy (===) b (a : as) = case a === b of
   False -> a : removeBy (===) b as
 
 score :: forall a b. (a -> b -> Bool) -> Word a -> Word b -> Word Scored
-score (===) target candidate =
+score (===) target candidate = runPureEff $ do
   let locatedWithTarget :: Word (Located (a, b))
       locatedWithTarget =
         ( \targetChar candidateChar ->
@@ -98,20 +98,20 @@ score (===) target candidate =
 
       remaining :: [a]
       remaining = toListOf (traversed % traversed % _1) locatedWithTarget
-   in runPureEff $
-        evalState remaining $ \targets' -> do
-          for located $ \case
-            CorrectLocation ->
-              pure Green
-            NotCorrectLocation a -> do
-              -- FIXME: check why it still works even if I only get
-              -- targets before the loop starts!
-              targets <- get targets'
-              if elemBy (===) a targets
-                then do
-                  put targets' (removeBy (===) a targets)
-                  pure Yellow
-                else pure Grey
+
+  evalState remaining $ \targets' -> do
+    for located $ \case
+      CorrectLocation ->
+        pure Green
+      NotCorrectLocation a -> do
+        -- FIXME: check why it still works even if I only get
+        -- targets before the loop starts!
+        targets <- get targets'
+        if elemBy (===) a targets
+          then do
+            put targets' (removeBy (===) a targets)
+            pure Yellow
+          else pure Grey
 
 badness ::
   (a -> b -> Bool) ->
