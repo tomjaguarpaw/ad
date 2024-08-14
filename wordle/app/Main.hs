@@ -159,17 +159,19 @@ readFiveFile ioe = do
 main :: IO ()
 main = runEff $ \ioe -> do
   words_ <- readFiveFile ioe
-  loopWords ioe words_ scoreBoost
+  loopWords ioe words_ (scoreBoost ioe)
 
-scoreBoost :: Applicative f => Word Char -> f (Word Scored)
-scoreBoost candidate = do
+scoreBoost :: (e :> es) => IOE e -> Word Char -> Eff es (Word Scored)
+scoreBoost ioe candidate = do
   let target_ = "boost"
       target = fromJust (readWord target_)
       score_ = score (==) target
+  effIO ioe (putStrLn (showWord candidate))
   pure (score_ candidate)
 
-readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
-readResultEff ioe = until $ \gotResult -> do
+readResultEff :: (e :> es) => IOE e -> Word Char -> Eff es (Word Scored)
+readResultEff ioe candidate = until $ \gotResult -> do
+  effIO ioe (putStrLn (showWord candidate))
   line <- effIO ioe getLine
   case readResult line of
     Nothing -> do
@@ -192,8 +194,6 @@ loopWords ioe words_ score_ =
       let (bestGuess, subsequentPossibles) = case leastBad_ possibles_ of
             Right r -> r
             Left l -> (l, Data.Map.empty)
-
-      effIO ioe (putStrLn (showWord bestGuess))
 
       result <- score_ bestGuess
 
