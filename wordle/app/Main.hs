@@ -12,8 +12,10 @@ import Bluefin.Eff (Eff, runEff, runPureEff, (:>), type (:&))
 import Bluefin.IO (IOE, effIO)
 import Bluefin.State (State, evalState, get, put)
 import Control.Monad (forever)
+import Data.Foldable (toList)
 import qualified Data.Foldable
 import Data.List (minimumBy)
+import qualified Data.List.NonEmpty as NEL
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
@@ -117,15 +119,15 @@ groupBy ::
   (Ord k) =>
   (a -> k) ->
   [a] ->
-  Data.Map.Map k [a]
+  Data.Map.Map k (NEL.NonEmpty a)
 groupBy k as =
-  Data.Map.fromListWith (<>) (map (\a -> (k a, [a])) as)
+  Data.Map.fromListWith (<>) (map (\a -> (k a, NEL.singleton a)) as)
 
 badness ::
   (a -> b -> Bool) ->
   [Word a] ->
   Word b ->
-  Data.Map.Map (Word Scored) [Word a]
+  Data.Map.Map (Word Scored) (NEL.NonEmpty (Word a))
 badness (===) possibles guess =
   groupBy (\possible -> score (===) possible guess) possibles
 
@@ -137,13 +139,13 @@ leastBad ::
   [Word a] ->
   Either
     (Word a)
-    (Word b, Data.Map.Map (Word Scored) [Word a])
+    (Word b, Data.Map.Map (Word Scored) (NEL.NonEmpty (Word a)))
 leastBad (===) guesses possibles' =
   case possibles' of
     [] -> error "No possibles"
     [onlyPossible] -> Left onlyPossible
     possibles ->
-      let foo :: [(Word b, Data.Map.Map (Word Scored) [Word a])]
+      let foo :: [(Word b, Data.Map.Map (Word Scored) (NEL.NonEmpty (Word a)))]
           foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
           (bestGuess, subsequentPossibles) =
             minimumBy
@@ -223,4 +225,4 @@ loopWordsWork ioe possibles done score_ words_ = do
             Nothing -> error "Not found"
             Just n -> n
 
-      put possibles nextPossibles
+      put possibles (toList nextPossibles)
