@@ -148,7 +148,10 @@ leastBad (===) guesses possibles' =
     possibles ->
       let foo :: [(Word b, (Int, Data.Map.Map (Word Scored) [Word a]))]
           foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
-          (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
+          (bestGuess, (_, subsequentPossibles)) =
+            minimumBy
+              (comparing (fst . snd))
+              foo
        in Right (bestGuess, subsequentPossibles)
 
 readFiveFile :: (e :> es) => IOE e -> Eff es [Word Char]
