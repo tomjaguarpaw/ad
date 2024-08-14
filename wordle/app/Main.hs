@@ -119,7 +119,7 @@ groupBy ::
   [a] ->
   Data.Map.Map k [a]
 groupBy k as =
-  Data.Map.fromListWith (++) (map (\a -> (k a, [a])) as)
+  Data.Map.fromListWith (<>) (map (\a -> (k a, [a])) as)
 
 badness ::
   (a -> b -> Bool) ->
