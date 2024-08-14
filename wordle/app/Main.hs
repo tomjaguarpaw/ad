@@ -161,6 +161,13 @@ main = runEff $ \ioe -> do
 
   loopWords ioe words_ (pure . score_)
 
+readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
+readResultEff ioe = until $ \gotResult -> do
+  (readResult <$> effIO ioe getLine) >>= \case
+    Nothing -> do
+      effIO ioe (putStrLn "Couldn't understand htat")
+    Just r -> returnEarly gotResult r
+
 loopWords ::
   (e :> es) =>
   IOE e ->
@@ -179,14 +186,6 @@ loopWords ioe words_ score_ =
             Left l -> (l, Data.Map.empty)
 
       effIO ioe (putStrLn (showWord bestGuess))
-
-      {-
-          result <- until $ \gotResult -> do
-            (readResult <$> effIO ioe getLine) >>= \case
-              Nothing -> do
-                effIO ioe (putStrLn "Couldn't understand htat")
-              Just r -> returnEarly gotResult r
-      -}
 
       result <- score_ bestGuess
 
