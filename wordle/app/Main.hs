@@ -136,24 +136,23 @@ leastBad ::
   (Ord a) =>
   (a -> b -> Bool) ->
   [Word b] ->
-  [Word a] ->
+  NEL.NonEmpty (Word a) ->
   Either
     (Word a)
     (Word b, Data.Map.Map (Word Scored) (NEL.NonEmpty (Word a)))
 leastBad (===) guesses possibles' =
   case possibles' of
-    [] -> error "No possibles"
-    [onlyPossible] -> Left onlyPossible
+    onlyPossible NEL.:| [] -> Left onlyPossible
     possibles ->
       let foo :: [(Word b, Data.Map.Map (Word Scored) (NEL.NonEmpty (Word a)))]
-          foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
+          foo = map (\guess -> (guess, badness (===) (toList possibles) guess)) guesses
           (bestGuess, subsequentPossibles) =
             minimumBy
               (comparing (Data.Foldable.maximum . Data.Map.map length . snd))
               foo
        in Right (bestGuess, subsequentPossibles)
 
-readFiveFile :: (e :> es) => IOE e -> Eff es [Word Char]
+readFiveFile :: (e :> es) => IOE e -> Eff es (NEL.NonEmpty (Word Char))
 readFiveFile ioe = do
   wordsString <- effIO ioe (readFile "/tmp/five")
   let words_ = case for
@@ -164,7 +163,9 @@ readFiveFile ioe = do
         ) of
         Left word -> error word
         Right w -> w
-  pure words_
+  pure $ case NEL.nonEmpty words_ of
+    Just words' -> words'
+    Nothing -> error "No words"
 
 main :: IO ()
 main = runEff $ \ioe -> do
@@ -191,18 +192,18 @@ readResultEff ioe candidate = until $ \gotResult -> do
 loopWords ::
   (e :> es, Ord b) =>
   IOE e ->
-  [Word b] ->
+  NEL.NonEmpty (Word b) ->
   (forall e1 e2. Word b -> Eff (e1 :& e2 :& es) (Word Scored)) ->
   Eff es ()
 loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
     until $ \done -> do
-      loopWordsWork ioe possibles done score_ words_
+      loopWordsWork ioe possibles done score_ (toList words_)
 
 loopWordsWork ::
   (e1 :> es, e2 :> es, e3 :> es, Ord b) =>
   IOE e3 ->
-  State [Word b] e1 ->
+  State (NEL.NonEmpty (Word b)) e1 ->
   EarlyReturn () e2 ->
   (Word b -> Eff es (Word Scored)) ->
   [Word b] ->
@@ -225,4 +226,4 @@ loopWordsWork ioe possibles done score_ words_ = do
             Nothing -> error "Not found"
             Just n -> n
 
-      put possibles (toList nextPossibles)
+      put possibles nextPossibles
