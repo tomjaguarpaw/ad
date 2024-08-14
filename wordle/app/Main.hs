@@ -125,12 +125,10 @@ badness ::
   (a -> b -> Bool) ->
   [Word a] ->
   Word b ->
-  (Int, Data.Map.Map (Word Scored) [Word a])
+  Data.Map.Map (Word Scored) [Word a]
 badness (===) possibles guess =
   let groupedPossibles = groupBy (\possible -> score (===) possible guess) possibles
-
-      minMax = (Data.Foldable.maximum . Data.Map.map length) groupedPossibles
-   in (minMax, groupedPossibles)
+   in groupedPossibles
 
 leastBad ::
   forall a b.
@@ -146,11 +144,11 @@ leastBad (===) guesses possibles' =
     [] -> error "No possibles"
     [onlyPossible] -> Left onlyPossible
     possibles ->
-      let foo :: [(Word b, (Int, Data.Map.Map (Word Scored) [Word a]))]
+      let foo :: [(Word b, Data.Map.Map (Word Scored) [Word a])]
           foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
-          (bestGuess, (_, subsequentPossibles)) =
+          (bestGuess, subsequentPossibles) =
             minimumBy
-              (comparing (fst . snd))
+              (comparing (Data.Foldable.maximum . Data.Map.map length . snd))
               foo
        in Right (bestGuess, subsequentPossibles)
 
