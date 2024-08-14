@@ -18,7 +18,7 @@ import Data.List (minimumBy)
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
-import Data.Traversable (for, mapAccumL)
+import Data.Traversable (for)
 import Prelude hiding (Word, until)
 
 until :: (forall e. EarlyReturn r e -> Eff (e :& es) ()) -> Eff es r
@@ -88,7 +88,8 @@ removeBy (===) b (a : as) = case a === b of
 
 score :: forall a b. (a -> b -> Bool) -> Word a -> Word b -> Word Scored
 score (===) target candidate =
-  let locatedWithTarget =
+  let locatedWithTarget :: Word (Located (a, b))
+      locatedWithTarget =
         ( \targetChar candidateChar ->
             if targetChar === candidateChar
               then CorrectLocation
@@ -100,6 +101,7 @@ score (===) target candidate =
       located :: Word (Located b)
       located = (fmap . fmap) snd locatedWithTarget
 
+      remaining :: [a]
       remaining =
         toList (traverse . traverse) $
           (fmap . fmap) fst locatedWithTarget
