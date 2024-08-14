@@ -129,7 +129,7 @@ badness ::
 badness (===) possibles guess =
   let groupedPossibles = groupBy (\possible -> score (===) possible guess) possibles
 
-      minMax = Data.Foldable.maximum (Data.Map.map length groupedPossibles)
+      minMax = (Data.Foldable.maximum . Data.Map.map length) groupedPossibles
    in (minMax, groupedPossibles)
 
 leastBad ::
