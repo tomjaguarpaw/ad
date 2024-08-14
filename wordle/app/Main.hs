@@ -18,6 +18,7 @@ import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
 import Data.Traversable (for)
+import Data.Tuple.Optics (Field1 (_1))
 import Optics.Core (toListOf, traversed, (%))
 import Prelude hiding (Word, until)
 
@@ -97,8 +98,7 @@ score (===) target candidate =
 
       remaining :: [a]
       remaining =
-        toListOf (traversed % traversed) $
-          (fmap . fmap) fst locatedWithTarget
+        toListOf (traversed % traversed % _1) locatedWithTarget
    in runPureEff $
         evalState remaining $ \targets' -> do
           for located $ \case
