@@ -172,12 +172,11 @@ main = runEff $ \ioe -> do
       effIO ioe (putStrLn (showWord bestGuess))
 
       {-
-          result <- fix $ \tryAgain -> do
-            (readResult <$> getLine) >>= \case
+          result <- until $ \gotResult -> do
+            (readResult <$> effIO ioe getLine) >>= \case
               Nothing -> do
-                putStrLn "Couldn't understand htat"
-                tryAgain
-              Just r -> pure r
+                effIO ioe (putStrLn "Couldn't understand htat")
+              Just r -> returnEarly gotResult r
       -}
 
       let result = score_ bestGuess
