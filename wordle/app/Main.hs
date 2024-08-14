@@ -163,7 +163,7 @@ main = runEff $ \ioe -> do
       score_ = score (==) target
 
   words_ <- readFiveFile ioe
-  loopWords ioe words_ (pure . score_)
+  loopWords ioe words_ (\candidate -> pure (score_ candidate))
 
 readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
 readResultEff ioe = until $ \gotResult -> do
