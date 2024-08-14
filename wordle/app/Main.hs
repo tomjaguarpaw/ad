@@ -188,10 +188,10 @@ readResultEff ioe candidate = until $ \gotResult -> do
     Just r -> returnEarly gotResult r
 
 loopWords ::
-  (e :> es) =>
+  (e :> es, Ord b) =>
   IOE e ->
-  [Word Char] ->
-  (forall e1 e2. Word Char -> Eff (e1 :& e2 :& es) (Word Scored)) ->
+  [Word b] ->
+  (forall e1 e2. Word b -> Eff (e1 :& e2 :& es) (Word Scored)) ->
   Eff es ()
 loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
