@@ -158,12 +158,15 @@ readFiveFile ioe = do
 
 main :: IO ()
 main = runEff $ \ioe -> do
+  words_ <- readFiveFile ioe
+  loopWords ioe words_ scoreBoost
+
+scoreBoost :: Applicative f => Word Char -> f (Word Scored)
+scoreBoost candidate = do
   let target_ = "boost"
       target = fromJust (readWord target_)
       score_ = score (==) target
-
-  words_ <- readFiveFile ioe
-  loopWords ioe words_ (\candidate -> pure (score_ candidate))
+  pure (score_ candidate)
 
 readResultEff :: (e :> es) => IOE e -> Eff es (Word Scored)
 readResultEff ioe = until $ \gotResult -> do
