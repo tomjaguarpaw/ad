@@ -127,8 +127,7 @@ badness ::
   Word b ->
   Data.Map.Map (Word Scored) [Word a]
 badness (===) possibles guess =
-  let groupedPossibles = groupBy (\possible -> score (===) possible guess) possibles
-   in groupedPossibles
+  groupBy (\possible -> score (===) possible guess) possibles
 
 leastBad ::
   forall a b.
