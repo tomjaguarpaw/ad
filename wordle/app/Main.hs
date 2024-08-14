@@ -11,7 +11,6 @@ import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
 import Bluefin.Eff (Eff, runEff, runPureEff, type (:&))
 import Bluefin.IO (effIO)
 import Bluefin.State (evalState, get, put)
-import Control.Applicative (Const (Const), getConst)
 import Control.Monad (forever)
 import qualified Data.Foldable
 import Data.List (minimumBy)
@@ -19,6 +18,7 @@ import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
 import Data.Traversable (for)
+import Optics.Core (toListOf, traversed, (%))
 import Prelude hiding (Word, until)
 
 until :: (forall e. EarlyReturn r e -> Eff (e :& es) ()) -> Eff es r
@@ -71,12 +71,6 @@ data Located a
 
 data Scored = Green | Yellow | Grey deriving (Show, Eq, Ord)
 
-toList ::
-  ((a -> Const [a] a) -> (s -> Const [a] s)) ->
-  s ->
-  [a]
-toList f = getConst . f (Const . pure)
-
 elemBy :: (a -> b -> Bool) -> b -> [a] -> Bool
 elemBy (===) b = any (=== b)
 
@@ -103,7 +97,7 @@ score (===) target candidate =
 
       remaining :: [a]
       remaining =
-        toList (traverse . traverse) $
+        toListOf (traversed % traversed) $
           (fmap . fmap) fst locatedWithTarget
    in runPureEff $
         evalState remaining $ \targets' -> do
