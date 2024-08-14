@@ -1,22 +1,30 @@
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeOperators #-}
 {-# OPTIONS_GHC -Wall #-}
 
 module Main where
 
-import Bluefin.Eff (runEff)
+import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
+import Bluefin.Eff (Eff, runEff, type (:&))
 import Bluefin.IO (effIO)
 import Bluefin.State (evalState, get, put)
 import Control.Applicative (Const (Const), getConst)
+import Control.Monad (forever)
 import qualified Data.Foldable
-import Data.Function (fix)
 import Data.List (minimumBy)
 import qualified Data.Map.Strict as Data.Map
 import Data.Maybe (fromJust)
 import Data.Ord (comparing)
 import Data.Traversable (mapAccumL)
-import Prelude hiding (Word)
+import Prelude hiding (Word, until)
+
+until :: (forall e. EarlyReturn r e -> Eff (e :& es) ()) -> Eff es r
+until body =
+  withEarlyReturn $ \early ->
+    forever $ body early
 
 data Word a = Word a a a a a
   deriving (Functor, Foldable, Traversable, Show, Eq, Ord)
@@ -155,7 +163,7 @@ main = do
 
   runEff $ \ioe ->
     evalState words_ $ \possibles -> do
-      fix $ \loop -> do
+      until $ \done -> do
         let leastBad_ = leastBad (==) words_
             score_ = score (==) target
 
@@ -181,11 +189,10 @@ main = do
         effIO ioe (putStrLn (showResult result))
 
         case result of
-          Word Green Green Green Green Green -> pure ()
+          Word Green Green Green Green Green -> returnEarly done ()
           _ -> do
             let nextPossibles = case Data.Map.lookup result subsequentPossibles of
                   Nothing -> error "Not found"
                   Just n -> n
 
             put possibles nextPossibles
-            loop
