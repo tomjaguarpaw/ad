@@ -146,7 +146,8 @@ leastBad (===) guesses possibles' =
     [] -> error "No possibles"
     [onlyPossible] -> Left onlyPossible
     possibles ->
-      let foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
+      let foo :: [(Word b, (Int, Data.Map.Map (Word Scored) [Word a]))]
+          foo = map (\guess -> (guess, badness (===) possibles guess)) guesses
           (bestGuess, (_, subsequentPossibles)) = minimumBy (comparing (fst . snd)) foo
        in Right (bestGuess, subsequentPossibles)
 
