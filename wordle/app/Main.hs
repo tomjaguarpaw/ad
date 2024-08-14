@@ -10,7 +10,7 @@ module Main where
 import Bluefin.EarlyReturn (EarlyReturn, returnEarly, withEarlyReturn)
 import Bluefin.Eff (Eff, runEff, runPureEff, (:>), type (:&))
 import Bluefin.IO (IOE, effIO)
-import Bluefin.State (evalState, get, put)
+import Bluefin.State (State, evalState, get, put)
 import Control.Monad (forever)
 import qualified Data.Foldable
 import Data.List (minimumBy)
@@ -196,21 +196,32 @@ loopWords ::
 loopWords ioe words_ score_ =
   evalState words_ $ \possibles -> do
     until $ \done -> do
-      possibles_ <- get possibles
+      loopWordsWork ioe possibles done score_ words_
 
-      let (bestGuess, subsequentPossibles) = case leastBad (==) words_ possibles_ of
-            Right r -> r
-            Left l -> (l, Data.Map.empty)
+loopWordsWork ::
+  (e1 :> es, e2 :> es, e3 :> es, Ord b) =>
+  IOE e3 ->
+  State [Word b] e1 ->
+  EarlyReturn () e2 ->
+  (Word b -> Eff es (Word Scored)) ->
+  [Word b] ->
+  Eff es ()
+loopWordsWork ioe possibles done score_ words_ = do
+  possibles_ <- get possibles
 
-      result <- score_ bestGuess
+  let (bestGuess, subsequentPossibles) = case leastBad (==) words_ possibles_ of
+        Right r -> r
+        Left l -> (l, Data.Map.empty)
 
-      effIO ioe (putStrLn (showResult result))
+  result <- score_ bestGuess
 
-      case result of
-        Word Green Green Green Green Green -> returnEarly done ()
-        _ -> do
-          let nextPossibles = case Data.Map.lookup result subsequentPossibles of
-                Nothing -> error "Not found"
-                Just n -> n
+  effIO ioe (putStrLn (showResult result))
 
-          put possibles nextPossibles
+  case result of
+    Word Green Green Green Green Green -> returnEarly done ()
+    _ -> do
+      let nextPossibles = case Data.Map.lookup result subsequentPossibles of
+            Nothing -> error "Not found"
+            Just n -> n
+
+      put possibles nextPossibles
