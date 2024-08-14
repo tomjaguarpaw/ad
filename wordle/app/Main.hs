@@ -97,8 +97,7 @@ score (===) target candidate =
       located = (fmap . fmap) snd locatedWithTarget
 
       remaining :: [a]
-      remaining =
-        toListOf (traversed % traversed % _1) locatedWithTarget
+      remaining = toListOf (traversed % traversed % _1) locatedWithTarget
    in runPureEff $
         evalState remaining $ \targets' -> do
           for located $ \case
