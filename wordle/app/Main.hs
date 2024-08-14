@@ -119,7 +119,7 @@ badness ::
   Word b ->
   (Int, Data.Map.Map (Word Scored) [Word a])
 badness (===) possibles guess =
-  let groupedPossibles = Data.Map.fromListWith (++) (map (\possible -> (score (===) possible guess, [possible])) possibles)
+  let groupedPossibles = Data.Map.fromListWith (++) (map (\possible -> (flip (score (===)) guess possible, [possible])) possibles)
 
       minMax = Data.Foldable.maximum (Data.Map.map length groupedPossibles)
    in (minMax, groupedPossibles)
