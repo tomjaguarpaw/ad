@@ -151,6 +151,21 @@ uncons f = do
             pure (Left r)
       ]
 
+break1 ::
+  forall a b r.
+  H a () ->
+  (H (Either a b) () -> IO r) ->
+  IO (Either r (b, H (Either a b) () -> IO r))
+break1 h f = do
+  uncons f >>= \case
+    Left r -> pure (Left r)
+    Right (e, k) -> case e of
+      Left a -> do
+        readH h a
+        break1 h k
+      Right b -> pure (Right (b, k))
+
+-- This must be wrong. What if we terminate without a b?
 break ::
   forall a b r.
   H a () ->
