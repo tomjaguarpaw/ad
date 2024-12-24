@@ -458,7 +458,7 @@ parseBS log bsIn = do
     Just ((bs, f), theLeftovers)
 
 parse ::
-  Applicative m => (String -> m ()) -> String -> m (Maybe (Int, UpdateCursor m))
+  Monad m => (String -> m ()) -> String -> m (Maybe (Int, UpdateCursor m))
 parse log = \case
   [] ->
     needMore
