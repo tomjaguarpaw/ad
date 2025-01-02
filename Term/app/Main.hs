@@ -41,7 +41,6 @@ import System.IO
   )
 import System.Posix (getProcessID)
 import System.Posix.IO (stdInput)
-import System.Posix.IO.ByteString (fdRead)
 import System.Posix.Pty qualified as Pty
 import System.Posix.Signals
   ( Handler (Catch),
@@ -195,7 +194,7 @@ main = do
 
         yield <- sequentializeYield yield'
 
-        handleForever (fdRead stdInput 1000) (yield . StdIn)
+        handleForever (C8.hGetSome stdin 1000) (yield . StdIn)
           `race` ptyParses log (readPty pty) (yield . PtyIn)
           `race` mvarToLoop winchMVar (yield . const WinchIn)
 
@@ -209,7 +208,7 @@ main = do
         log "Requesting position\n"
 
         fix $ \again' -> do
-          b <- fdRead stdInput 1
+          b <- C8.hGet stdin 1
           when (b /= C8.pack "\ESC") $ do
             Pty.writePty pty b
             log ("StdIn whilst searching ESC: " ++ show b ++ "\n")
@@ -218,7 +217,7 @@ main = do
         log "Found ESC\n"
 
         sofar <- flip fix mempty $ \again' sofar -> do
-          b <- fdRead stdInput 1
+          b <- C8.hGet stdin 1
           if b == C8.pack "R"
             then pure sofar
             else again' (sofar <> b)
