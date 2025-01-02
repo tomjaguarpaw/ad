@@ -16,6 +16,7 @@ import Control.Concurrent
     threadDelay,
     tryPutMVar,
   )
+import Control.Concurrent.Async qualified as Async
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
 import Control.Exception (Exception, IOException, throwIO, try, tryJust)
 import Control.Monad (forever, when)
@@ -96,6 +97,9 @@ readPty pty = do
     Left (_ :: IOError) -> forever $ do
       threadDelay (1000 * 1000 * 1000)
     Right bs -> pure bs
+
+race :: IO a -> IO a -> IO a
+race m1 m2 = fmap (either id id) (Async.race m1 m2)
 
 main :: IO ()
 main = do
@@ -179,7 +183,7 @@ main = do
       pure ()
     pure winchMVar
 
-  let readLoop :: (In IO -> IO ()) -> IO ()
+  let readLoop :: (In IO -> IO ()) -> IO a
       readLoop yield' = do
         let sequentializeYield handler = do
               requesting <- newEmptyMVar
@@ -191,12 +195,9 @@ main = do
 
         yield <- sequentializeYield yield'
 
-        sequentialize $ do
-          pure
-            [ handleForever (fdRead stdInput 1000) (yield . StdIn),
-              ptyParses log (readPty pty) (yield . PtyIn),
-              mvarToLoop winchMVar (yield . const WinchIn)
-            ]
+        handleForever (fdRead stdInput 1000) (yield . StdIn)
+          `race` ptyParses log (readPty pty) (yield . PtyIn)
+          `race` mvarToLoop winchMVar (yield . const WinchIn)
 
   let putStdoutStr = hPut stdout . C8.pack
 
@@ -345,12 +346,6 @@ handleForever act yield = forever (yield =<< act)
 
 mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
 mvarToLoop v = handleForever (takeMVar v)
-
-sequentialize ::
-  IO [IO ()] -> IO ()
-sequentialize tasks = do
-  tasks' <- tasks
-  for_ tasks' forkIO
 
 warnIfTerminfoMissing :: String -> String -> IO ()
 warnIfTerminfoMissing terminfoName terminfoFilename = do
