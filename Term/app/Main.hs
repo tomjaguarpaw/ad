@@ -349,12 +349,13 @@ sequentialize tasks = do
       a <- takeMVar av
       b <- handler a
       putMVar bv b
-      takeMVar requesting
 
     pure $ \a -> do
       putMVar requesting ()
       putMVar av a
-      takeMVar bv
+      b <- takeMVar bv
+      takeMVar requesting
+      pure b
 
   for_ tasks' forkIO
 
