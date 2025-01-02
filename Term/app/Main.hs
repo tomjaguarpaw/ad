@@ -412,7 +412,11 @@ makeLogger = do
 
   pure (writeChan q)
 
-ptyParses :: (String -> IO ()) -> Pty.Pty -> (PtyParse IO -> IO ()) -> IO a
+ptyParses ::
+  (String -> IO ()) ->
+  Pty.Pty ->
+  (PtyParse IO -> IO ()) ->
+  IO a
 ptyParses log pty yield = do
   unhandledPty <- newIORef mempty
 
