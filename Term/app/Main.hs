@@ -339,9 +339,8 @@ mvarToLoop v = handleForever (takeMVar v)
 sequentialize ::
   ((forall a b. (a -> IO b) -> IO (a -> IO b)) -> IO [IO ()]) -> IO ()
 sequentialize tasks = do
-  requesting <- newEmptyMVar
-
   tasks' <- tasks $ \handler -> do
+    requesting <- newEmptyMVar
     pure $ \a -> do
       putMVar requesting ()
       b <- handler a
