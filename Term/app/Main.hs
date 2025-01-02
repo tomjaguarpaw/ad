@@ -10,11 +10,10 @@ import Control.Arrow (Arrow (second), first)
 import Control.Concurrent
   ( MVar,
     forkIO,
-    killThread,
-    myThreadId,
     newEmptyMVar,
     putMVar,
     takeMVar,
+    threadDelay,
     tryPutMVar,
   )
 import Control.Concurrent.Chan (newChan, readChan, writeChan)
@@ -94,7 +93,8 @@ barLines = 3
 readPty :: Pty.Pty -> IO (Either [Pty.PtyControlCode] ByteString)
 readPty pty = do
   try (Pty.tryReadPty pty) >>= \case
-    Left (_ :: IOError) -> (myThreadId >>= killThread) >> error "Impossible!"
+    Left (_ :: IOError) -> forever $ do
+      threadDelay (1000 * 1000 * 1000)
     Right bs -> pure bs
 
 main :: IO ()
