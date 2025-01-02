@@ -14,7 +14,7 @@ executable Term
     main-is:          Main.hs
     -- other-modules:
     -- other-extensions:
-    build-depends:    base >=4.14 && < 4.20,
+    build-depends:    base >=4.14 && < 4.22,
                       unix ^>= 2.8,
                       process,
                       bytestring,
