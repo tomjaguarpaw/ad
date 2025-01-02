@@ -179,8 +179,16 @@ main = do
       pure ()
     pure winchMVar
 
-  let readLoop yield' = sequentialize $ \sequentializer -> do
-        yield <- sequentializer yield'
+  let readLoop yield' = sequentialize $ do
+        let sequentializeYield handler = do
+              requesting <- newEmptyMVar
+              pure $ \a -> do
+                putMVar requesting ()
+                b <- handler a
+                takeMVar requesting
+                pure b
+
+        yield <- sequentializeYield yield'
 
         pure
           [ handleForever (fdRead stdInput 1000) (yield . StdIn),
@@ -337,18 +345,9 @@ mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
 mvarToLoop v = handleForever (takeMVar v)
 
 sequentialize ::
-  ((forall a b. (a -> IO b) -> IO (a -> IO b)) -> IO [IO ()]) -> IO ()
+  IO [IO ()] -> IO ()
 sequentialize tasks = do
-  let sequentializeYield handler = do
-         requesting <- newEmptyMVar
-         pure $ \a -> do
-           putMVar requesting ()
-           b <- handler a
-           takeMVar requesting
-           pure b
-
-  tasks' <- tasks sequentializeYield
-
+  tasks' <- tasks
   for_ tasks' forkIO
 
 warnIfTerminfoMissing :: String -> String -> IO ()
