@@ -179,7 +179,8 @@ main = do
       pure ()
     pure winchMVar
 
-  let readLoop yield' = do
+  let readLoop :: (In IO -> IO ()) -> IO ()
+      readLoop yield' = do
         let sequentializeYield handler = do
               requesting <- newEmptyMVar
               pure $ \a -> do
