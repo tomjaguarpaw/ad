@@ -184,7 +184,7 @@ main = do
 
         pure
           [ handleForever (fdRead stdInput 1000) (yield . StdIn),
-            ptyParses log pty (yield . PtyIn),
+            ptyParses log (readPty pty) (yield . PtyIn),
             mvarToLoop winchMVar (yield . const WinchIn)
           ]
 
@@ -414,13 +414,11 @@ makeLogger = do
 
 ptyParses ::
   (String -> IO ()) ->
-  Pty.Pty ->
+  IO (Either [Pty.PtyControlCode] ByteString) ->
   (PtyParse IO -> IO ()) ->
   IO a
-ptyParses log pty yield = do
+ptyParses log nextChunk yield = do
   unhandledPty <- newIORef mempty
-
-  let nextChunk = readPty pty
 
   handleForever nextChunk $ \case
     Left _ ->
