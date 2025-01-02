@@ -420,7 +420,9 @@ ptyParses ::
 ptyParses log pty yield = do
   unhandledPty <- newIORef mempty
 
-  handleForever (readPty pty) $ \case
+  let nextChunk = readPty pty
+
+  handleForever nextChunk $ \case
     Left _ ->
       -- I don't know what we should do with PtyControlCodes
       pure ()
