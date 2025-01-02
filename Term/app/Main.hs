@@ -257,89 +257,90 @@ main = do
         -- Go back to where we were
         putStdoutStr (cupXY0 (x, y))
 
-  _ <- forkIO $ do
-    pos <- do
-      pos <- requestPositionXY0
-      log ("pos: " ++ show pos ++ "\n")
-      newIORef pos
+  Async.withAsync
+    ( do
+        pos <- do
+          pos <- requestPositionXY0
+          log ("pos: " ++ show pos ++ "\n")
+          newIORef pos
 
-    let scrollIfNeeded (cols, rows) wasWrapnext (oldx, oldy) thePos@(_, y) bs = do
-          let virtualDims@(_, virtualRows) = (cols, rows - barLines)
-          let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
-          let returnTo =
-                if wasWrapnext
-                  then (0, oldy)
-                  else (oldx, oldy - 1)
+        let scrollIfNeeded (cols, rows) wasWrapnext (oldx, oldy) thePos@(_, y) bs = do
+              let virtualDims@(_, virtualRows) = (cols, rows - barLines)
+              let scrollLinesNeeded = if y == virtualRows then 1 else 0 :: Int
+              let returnTo =
+                    if wasWrapnext
+                      then (0, oldy)
+                      else (oldx, oldy - 1)
+              when (scrollLinesNeeded > 0) $ do
+                log
+                  ( "Overlap detected before "
+                      ++ show bs
+                      ++ ", going back to "
+                      ++ show returnTo
+                      ++ "/"
+                      ++ show virtualDims
+                      ++ "\n"
+                  )
+                putStdoutStr
+                  ( cupXY0 (0, virtualRows)
+                      ++ "\ESC[K"
+                      ++ cupXY0 (0, rows - 1)
+                      ++ "\n"
+                      ++ cupXY0 returnTo
+                  )
+              let dirty = scrollLinesNeeded > 0
+              pure (second (subtract scrollLinesNeeded) thePos, dirty)
+
+        do
+          (x, y) <- readIORef pos
+          (_, rows) <- readIORef theDims
+          let virtualRows = rows - barLines
+              scrollLinesNeeded = (y - virtualRows + 1) `max` 0
+          log ("scrollLinesNeeded: " ++ show scrollLinesNeeded ++ "\n")
           when (scrollLinesNeeded > 0) $ do
-            log
-              ( "Overlap detected before "
-                  ++ show bs
-                  ++ ", going back to "
-                  ++ show returnTo
-                  ++ "/"
-                  ++ show virtualDims
-                  ++ "\n"
-              )
             putStdoutStr
-              ( cupXY0 (0, virtualRows)
-                  ++ "\ESC[K"
-                  ++ cupXY0 (0, rows - 1)
-                  ++ "\n"
-                  ++ cupXY0 returnTo
+              ( cupXY0 (0, rows - 1)
+                  ++ replicate scrollLinesNeeded '\n'
+                  ++ cupXY0 (x, y - scrollLinesNeeded)
               )
-          let dirty = scrollLinesNeeded > 0
-          pure (second (subtract scrollLinesNeeded) thePos, dirty)
+            modifyIORef' pos (second (subtract scrollLinesNeeded))
 
-    do
-      (x, y) <- readIORef pos
-      (_, rows) <- readIORef theDims
-      let virtualRows = rows - barLines
-          scrollLinesNeeded = (y - virtualRows + 1) `max` 0
-      log ("scrollLinesNeeded: " ++ show scrollLinesNeeded ++ "\n")
-      when (scrollLinesNeeded > 0) $ do
-        putStdoutStr
-          ( cupXY0 (0, rows - 1)
-              ++ replicate scrollLinesNeeded '\n'
-              ++ cupXY0 (x, y - scrollLinesNeeded)
-          )
-        modifyIORef' pos (second (subtract scrollLinesNeeded))
+        -- Like CURSOR_WRAPNEXT from st
+        cursorWrapnext <- newIORef False
 
-    -- Like CURSOR_WRAPNEXT from st
-    cursorWrapnext <- newIORef False
+        let handlePtyF dims (bs, updateCursor) = do
+              oldWrapnext <- readIORef cursorWrapnext
+              oldPos <- readIORef pos
 
-    let handlePtyF dims (bs, updateCursor) = do
-          oldWrapnext <- readIORef cursorWrapnext
-          oldPos <- readIORef pos
+              (nextWrapnext, newPos, dirty1) <- updateCursor oldWrapnext dims oldPos
 
-          (nextWrapnext, newPos, dirty1) <- updateCursor oldWrapnext dims oldPos
+              writeIORef cursorWrapnext nextWrapnext
 
-          writeIORef cursorWrapnext nextWrapnext
+              (newerPos, dirty2) <- scrollIfNeeded dims oldWrapnext oldPos newPos bs
+              writeIORef pos newerPos
+              hPut stdout bs
 
-          (newerPos, dirty2) <- scrollIfNeeded dims oldWrapnext oldPos newPos bs
-          writeIORef pos newerPos
-          hPut stdout bs
+              when (dirty1 || dirty2) (drawBar dims =<< readIORef pos)
 
-          when (dirty1 || dirty2) (drawBar dims =<< readIORef pos)
-
-    readLoop $ \case
-      WinchIn -> do
-        dims@(cols, rows) <- Pty.ptyDimensions stdInPty
-        writeIORef theDims dims
-        Pty.resizePty pty (cols, rows - barLines)
-        getPid childHandle >>= \case
-          -- I guess this only happens if there is a race condition
-          -- between SIGWINCH and termination of the child process
-          Nothing -> pure ()
-          Just childPid -> signalProcess sigWINCH childPid
-        log ("WinchIn: " ++ show dims ++ "\n")
-      StdIn bs -> do
-        Pty.writePty pty bs
-        log ("StdIn: " ++ show bs ++ "\n")
-      PtyIn move -> do
-        dims <- readIORef theDims
-        handlePtyF dims move
-
-  exitWhenRequested
+        readLoop $ \case
+          WinchIn -> do
+            dims@(cols, rows) <- Pty.ptyDimensions stdInPty
+            writeIORef theDims dims
+            Pty.resizePty pty (cols, rows - barLines)
+            getPid childHandle >>= \case
+              -- I guess this only happens if there is a race condition
+              -- between SIGWINCH and termination of the child process
+              Nothing -> pure ()
+              Just childPid -> signalProcess sigWINCH childPid
+            log ("WinchIn: " ++ show dims ++ "\n")
+          StdIn bs -> do
+            Pty.writePty pty bs
+            log ("StdIn: " ++ show bs ++ "\n")
+          PtyIn move -> do
+            dims <- readIORef theDims
+            handlePtyF dims move
+    )
+    (\_async -> exitWhenRequested)
 
 handleForever :: IO a -> (a -> IO ()) -> IO r
 handleForever act yield = forever (yield =<< act)
