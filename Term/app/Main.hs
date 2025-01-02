@@ -179,7 +179,7 @@ main = do
       pure ()
     pure winchMVar
 
-  let readLoop yield' = sequentialize $ do
+  let readLoop yield' = do
         let sequentializeYield handler = do
               requesting <- newEmptyMVar
               pure $ \a -> do
@@ -190,11 +190,12 @@ main = do
 
         yield <- sequentializeYield yield'
 
-        pure
-          [ handleForever (fdRead stdInput 1000) (yield . StdIn),
-            ptyParses log (readPty pty) (yield . PtyIn),
-            mvarToLoop winchMVar (yield . const WinchIn)
-          ]
+        sequentialize $ do
+          pure
+            [ handleForever (fdRead stdInput 1000) (yield . StdIn),
+              ptyParses log (readPty pty) (yield . PtyIn),
+              mvarToLoop winchMVar (yield . const WinchIn)
+            ]
 
   let putStdoutStr = hPut stdout . C8.pack
 
