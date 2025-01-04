@@ -465,9 +465,25 @@ parse log = \case
   '\SI' : _ -> do
     noLocationChangeConsuming 1
   '\r' : _ -> do
-    pure (Just (1, MkUpdateCursor $ \_ _ _ thePos -> pure (False, first (const 0) thePos, False)))
+    pure
+      ( Just
+          ( 1,
+            MkUpdateCursor $ \_ _ _ thePos ->
+              pure (False, first (const 0) thePos, False)
+          )
+      )
   '\n' : _ -> do
-    pure (Just (1, MkUpdateCursor $ \_ _ (_, rows) thePos -> pure (False, second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
+    pure
+      ( Just
+          ( 1,
+            MkUpdateCursor $ \_ _ (_, rows) thePos ->
+              pure
+                ( False,
+                  second (\y -> (y + 1) `min` (rows - barLines)) thePos,
+                  False
+                )
+          )
+      )
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
@@ -597,7 +613,13 @@ parse log = \case
       | otherwise = read csi
 
     noLocationChangeConsuming n =
-      pure (Just (n, MkUpdateCursor $ \_ inWrapnext _ thePos -> pure (inWrapnext, thePos, False)))
+      pure
+        ( Just
+            ( n,
+              MkUpdateCursor $ \_ inWrapnext _ thePos ->
+                pure (inWrapnext, thePos, False)
+            )
+        )
 
     singleDisplayableCharacter n =
       pure $
