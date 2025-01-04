@@ -82,11 +82,13 @@ data In m = PtyIn (PtyParse m) | StdIn ByteString | WinchIn
 
 type PtyParse m = (ByteString, UpdateCursor m)
 
-type UpdateCursor m =
-  Bool ->
-  (Int, Int) ->
-  (Int, Int) ->
-  m (Bool, (Int, Int), Bool)
+newtype UpdateCursor m
+  = MkUpdateCursor
+      ( Bool ->
+        (Int, Int) ->
+        (Int, Int) ->
+        m (Bool, (Int, Int), Bool)
+      )
 
 barLines :: Int
 barLines = 3
@@ -308,7 +310,7 @@ main = do
     -- Like CURSOR_WRAPNEXT from st
     cursorWrapnext <- newIORef False
 
-    let handlePtyF dims (bs, updateCursor) = do
+    let handlePtyF dims (bs, MkUpdateCursor updateCursor) = do
           oldWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
 
@@ -460,31 +462,33 @@ parse log = \case
   '\SI' : _ -> do
     noLocationChangeConsuming 1
   '\r' : _ -> do
-    pure (Just (1, \_ _ thePos -> pure (False, first (const 0) thePos, False)))
+    pure (Just (1, MkUpdateCursor $ \_ _ thePos -> pure (False, first (const 0) thePos, False)))
   '\n' : _ -> do
-    pure (Just (1, \_ (_, rows) thePos -> pure (False, second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
+    pure (Just (1, MkUpdateCursor $ \_ (_, rows) thePos -> pure (False, second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
     pure
       ( Just
           ( 1,
-            \_ (cols, rows) thePos ->
-              let newPos =
-                    let (x, y) = thePos
-                        (yinc, x') = (x - 1) `divMod` cols
-                     in (x', (y + yinc) `min` rows)
-               in pure (False, newPos, False)
+            MkUpdateCursor $
+              \_ (cols, rows) thePos ->
+                let newPos =
+                      let (x, y) = thePos
+                          (yinc, x') = (x - 1) `divMod` cols
+                       in (x', (y + yinc) `min` rows)
+                 in pure (False, newPos, False)
           )
       )
   '\ESC' : 'M' : _ -> do
     pure
       ( Just
           ( 2,
-            \_ _ thePos ->
-              let (_, oldy) = thePos
-                  newPos = second (\y' -> (y' - 1) `max` 0) thePos
-               in pure (False, newPos, oldy == 0)
+            MkUpdateCursor $
+              \_ _ thePos ->
+                let (_, oldy) = thePos
+                    newPos = second (\y' -> (y' - 1) `max` 0) thePos
+                 in pure (False, newPos, oldy == 0)
           )
       )
   '\ESC' : '>' : _ -> do
@@ -549,13 +553,14 @@ parse log = \case
         pure
           ( Just
               ( 2 + length csi + 1,
-                \inWrapnext _ thePos ->
-                  let newPos = updatePos thePos
-                   in pure
-                        ( inWrapnext && (thePos == newPos),
-                          newPos,
-                          dirty
-                        )
+                MkUpdateCursor $
+                  \inWrapnext _ thePos ->
+                    let newPos = updatePos thePos
+                     in pure
+                          ( inWrapnext && (thePos == newPos),
+                            newPos,
+                            dirty
+                          )
               )
           )
   '\ESC' : [] ->
@@ -589,34 +594,35 @@ parse log = \case
       | otherwise = read csi
 
     noLocationChangeConsuming n =
-      pure (Just (n, \inWrapnext _ thePos -> pure (inWrapnext, thePos, False)))
+      pure (Just (n, MkUpdateCursor $ \inWrapnext _ thePos -> pure (inWrapnext, thePos, False)))
 
     singleDisplayableCharacter n =
       pure $
         Just
           ( n,
-            \inWrapnext (cols, _) thePos -> do
-              let (x, y) = thePos
+            MkUpdateCursor $
+              \inWrapnext (cols, _) thePos -> do
+                let (x, y) = thePos
 
-              (newPos, nextWrapnext) <-
-                case inWrapnext of
-                  True -> pure ((1, y + 1), False)
-                  False -> case x `compare` (cols - 1) of
-                    GT -> do
-                      log
-                        ( "Warning: overflow: x: "
-                            ++ show x
-                            ++ " cols: "
-                            ++ show cols
-                        )
-                      pure ((x, y), True)
-                    EQ ->
-                      pure ((x, y), True)
-                    LT ->
-                      pure ((x + 1, y), False)
-              -- It's not completely clear whether we should mark the bar
-              -- dirty here if we overwrite it, or only when we scroll.
-              pure (nextWrapnext, newPos, False)
+                (newPos, nextWrapnext) <-
+                  case inWrapnext of
+                    True -> pure ((1, y + 1), False)
+                    False -> case x `compare` (cols - 1) of
+                      GT -> do
+                        log
+                          ( "Warning: overflow: x: "
+                              ++ show x
+                              ++ " cols: "
+                              ++ show cols
+                          )
+                        pure ((x, y), True)
+                      EQ ->
+                        pure ((x, y), True)
+                      LT ->
+                        pure ((x + 1, y), False)
+                -- It's not completely clear whether we should mark the bar
+                -- dirty here if we overwrite it, or only when we scroll.
+                pure (nextWrapnext, newPos, False)
           )
     needMore = pure Nothing
 
