@@ -78,13 +78,16 @@ import System.Process.Typed
 import Text.Read (readMaybe)
 import Prelude hiding (log)
 
-data In m = PtyIn (PtyParse m) | StdIn ByteString | WinchIn
+data In = PtyIn PtyParse | StdIn ByteString | WinchIn
 
-type PtyParse m = (ByteString, UpdateCursor m)
+type PtyParse = (ByteString, UpdateCursor)
 
-newtype UpdateCursor m
+newtype UpdateCursor
   = MkUpdateCursor
-      ( Bool ->
+      ( forall m.
+        (Monad m) =>
+        (String -> m ()) ->
+        Bool ->
         (Int, Int) ->
         (Int, Int) ->
         m (Bool, (Int, Int), Bool)
@@ -185,7 +188,7 @@ main = do
       pure ()
     pure winchMVar
 
-  let readLoop :: (In IO -> IO ()) -> IO a
+  let readLoop :: (In -> IO ()) -> IO a
       readLoop yield' = do
         let sequentializeYield handler = do
               requesting <- newEmptyMVar
@@ -314,7 +317,7 @@ main = do
           oldWrapnext <- readIORef cursorWrapnext
           oldPos <- readIORef pos
 
-          (nextWrapnext, newPos, dirty1) <- updateCursor oldWrapnext dims oldPos
+          (nextWrapnext, newPos, dirty1) <- updateCursor log oldWrapnext dims oldPos
 
           writeIORef cursorWrapnext nextWrapnext
 
@@ -405,7 +408,7 @@ makeLogger = do
 ptyParses ::
   (String -> IO ()) ->
   IO (Either [Pty.PtyControlCode] ByteString) ->
-  (PtyParse IO -> IO ()) ->
+  (PtyParse -> IO ()) ->
   IO a
 ptyParses log nextChunk yield = do
   unhandledPty <- newIORef mempty
@@ -427,7 +430,7 @@ ptyParses log nextChunk yield = do
 parseUntilNeedMore ::
   (String -> IO ()) ->
   ByteString ->
-  (PtyParse IO -> IO ()) ->
+  (PtyParse -> IO ()) ->
   IO ByteString
 parseUntilNeedMore log bsInStart yield = do
   unhandledPty <- newIORef bsInStart
@@ -443,7 +446,7 @@ parseUntilNeedMore log bsInStart yield = do
 parseBS ::
   (String -> IO ()) ->
   ByteString ->
-  IO (Maybe ((ByteString, UpdateCursor IO), ByteString))
+  IO (Maybe ((ByteString, UpdateCursor), ByteString))
 parseBS log bsIn = do
   mResult <- parse log (C8.unpack bsIn)
   pure $ do
@@ -452,7 +455,7 @@ parseBS log bsIn = do
     Just ((bs, f), theLeftovers)
 
 parse ::
-  (Monad m) => (String -> m ()) -> String -> m (Maybe (Int, UpdateCursor m))
+  (Monad m) => (String -> m ()) -> String -> m (Maybe (Int, UpdateCursor))
 parse log = \case
   [] ->
     needMore
@@ -462,9 +465,9 @@ parse log = \case
   '\SI' : _ -> do
     noLocationChangeConsuming 1
   '\r' : _ -> do
-    pure (Just (1, MkUpdateCursor $ \_ _ thePos -> pure (False, first (const 0) thePos, False)))
+    pure (Just (1, MkUpdateCursor $ \_ _ _ thePos -> pure (False, first (const 0) thePos, False)))
   '\n' : _ -> do
-    pure (Just (1, MkUpdateCursor $ \_ (_, rows) thePos -> pure (False, second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
+    pure (Just (1, MkUpdateCursor $ \_ _ (_, rows) thePos -> pure (False, second (\y -> (y + 1) `min` (rows - barLines)) thePos, False)))
   '\a' : _ ->
     noLocationChangeConsuming 1
   '\b' : _ -> do
@@ -472,7 +475,7 @@ parse log = \case
       ( Just
           ( 1,
             MkUpdateCursor $
-              \_ (cols, rows) thePos ->
+              \_ _ (cols, rows) thePos ->
                 let newPos =
                       let (x, y) = thePos
                           (yinc, x') = (x - 1) `divMod` cols
@@ -485,7 +488,7 @@ parse log = \case
       ( Just
           ( 2,
             MkUpdateCursor $
-              \_ _ thePos ->
+              \_ _ _ thePos ->
                 let (_, oldy) = thePos
                     newPos = second (\y' -> (y' - 1) `max` 0) thePos
                  in pure (False, newPos, oldy == 0)
@@ -554,7 +557,7 @@ parse log = \case
           ( Just
               ( 2 + length csi + 1,
                 MkUpdateCursor $
-                  \inWrapnext _ thePos ->
+                  \_ inWrapnext _ thePos ->
                     let newPos = updatePos thePos
                      in pure
                           ( inWrapnext && (thePos == newPos),
@@ -594,14 +597,14 @@ parse log = \case
       | otherwise = read csi
 
     noLocationChangeConsuming n =
-      pure (Just (n, MkUpdateCursor $ \inWrapnext _ thePos -> pure (inWrapnext, thePos, False)))
+      pure (Just (n, MkUpdateCursor $ \_ inWrapnext _ thePos -> pure (inWrapnext, thePos, False)))
 
     singleDisplayableCharacter n =
       pure $
         Just
           ( n,
             MkUpdateCursor $
-              \inWrapnext (cols, _) thePos -> do
+              \log' inWrapnext (cols, _) thePos -> do
                 let (x, y) = thePos
 
                 (newPos, nextWrapnext) <-
@@ -609,7 +612,7 @@ parse log = \case
                     True -> pure ((1, y + 1), False)
                     False -> case x `compare` (cols - 1) of
                       GT -> do
-                        log
+                        log'
                           ( "Warning: overflow: x: "
                               ++ show x
                               ++ " cols: "
