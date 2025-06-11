@@ -433,16 +433,15 @@ ptyParses ::
 ptyParses log nextByteString yield = do
   unhandledPty <- newIORef mempty
 
-  handleForever nextByteString $ \case
-    bs -> do
-      log ("PtyIn: " ++ show bs ++ "\n")
+  handleForever nextByteString $ \bs -> do
+    log ("PtyIn: " ++ show bs ++ "\n")
 
-      neededMore <- readIORef unhandledPty
+    neededMore <- readIORef unhandledPty
 
-      remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
-        yield ptyParse
+    remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
+      yield ptyParse
 
-      writeIORef unhandledPty remainder
+    writeIORef unhandledPty remainder
 
 parseUntilNeedMore ::
   (String -> IO ()) ->
