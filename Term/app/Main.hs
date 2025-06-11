@@ -190,51 +190,6 @@ main = do
           `race` mvarToLoop winchMVar (yield . const WinchIn)
           `race` fmap absurd exitWhenRequested
 
-  let putStdoutStr = hPut stdout . C8.pack
-
-  let requestPosition :: IO (Int, Int)
-      requestPosition = do
-        -- Ask for the position
-        putStdoutStr "\ESC[6n"
-
-        log "Requesting position\n"
-
-        fix $ \again' -> do
-          b <- C8.hGet stdin 1
-          when (b /= C8.pack "\ESC") $ do
-            Pty.writePty pty b
-            log ("StdIn whilst searching ESC: " ++ show b ++ "\n")
-            again'
-
-        log "Found ESC\n"
-
-        sofar <- flip fix mempty $ \again' sofar -> do
-          b <- C8.hGet stdin 1
-          if b == C8.pack "R"
-            then pure sofar
-            else again' (sofar <> b)
-
-        log ("Handled ESC: " ++ show (C8.unpack sofar) ++ "\n")
-
-        -- Drop ;
-        let (x, Data.ByteString.drop 1 -> y) =
-              C8.break (== ';') (Data.ByteString.drop 1 sofar)
-
-        let mxy = do
-              x' <- readMaybe (C8.unpack x) :: Maybe Int
-              y' <- readMaybe (C8.unpack y) :: Maybe Int
-              pure (x', y')
-
-        case mxy of
-          Nothing -> do
-            log ("No read for " <> show sofar)
-            error ("No read for " <> show sofar)
-          Just xy -> pure xy
-
-  let requestPositionXY0 = do
-        (y, x) <- requestPosition
-        pure (x - 1, y - 1)
-
   let drawBar :: (Int, Int) -> (Int, Int) -> IO ()
       drawBar (cols, rows) (x, y) = do
         log ("Drawing bar and returning to " ++ show (x, y) ++ "\n")
@@ -250,7 +205,7 @@ main = do
 
   do
     pos <- do
-      pos <- requestPositionXY0
+      pos <- requestPositionXY0 pty log
       log ("pos: " ++ show pos ++ "\n")
       newIORef pos
 
@@ -329,6 +284,54 @@ main = do
       PtyIn move -> do
         dims <- readIORef theDims
         handlePtyF dims move
+
+putStdoutStr :: String -> IO ()
+putStdoutStr = hPut stdout . C8.pack
+
+requestPosition :: Pty.Pty -> (String -> IO ()) -> IO (Int, Int)
+requestPosition pty log = do
+  -- Ask for the position
+  putStdoutStr "\ESC[6n"
+
+  log "Requesting position\n"
+
+  fix $ \again' -> do
+    b <- C8.hGet stdin 1
+    when (b /= C8.pack "\ESC") $ do
+      Pty.writePty pty b
+      log ("StdIn whilst searching ESC: " ++ show b ++ "\n")
+      again'
+
+  log "Found ESC\n"
+
+  sofar <- flip fix mempty $ \again' sofar -> do
+    b <- C8.hGet stdin 1
+    if b == C8.pack "R"
+      then pure sofar
+      else again' (sofar <> b)
+
+  log ("Handled ESC: " ++ show (C8.unpack sofar) ++ "\n")
+
+  -- Drop ;
+  let (x, Data.ByteString.drop 1 -> y) =
+        C8.break (== ';') (Data.ByteString.drop 1 sofar)
+
+  let mxy = do
+        x' <- readMaybe (C8.unpack x) :: Maybe Int
+        y' <- readMaybe (C8.unpack y) :: Maybe Int
+        pure (x', y')
+
+  case mxy of
+    Nothing -> do
+      log ("No read for " <> show sofar)
+      error ("No read for " <> show sofar)
+    Just xy -> pure xy
+
+requestPositionXY0 :: Pty.Pty -> (String -> IO ()) -> IO (Int, Int)
+requestPositionXY0 pty log = do
+  (y, x) <- requestPosition pty log
+  pure (x - 1, y - 1)
+
 
 mvarToLoop :: MVar a -> (a -> IO ()) -> IO r
 mvarToLoop v = handleForever (takeMVar v)
