@@ -12,7 +12,7 @@ common warnings
 executable Term
     import:           warnings
     main-is:          Main.hs
-    -- other-modules:
+    other-modules:    Exception
     -- other-extensions:
     build-depends:    async,
                       base >=4.14 && < 4.22,
