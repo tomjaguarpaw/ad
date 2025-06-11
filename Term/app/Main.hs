@@ -403,27 +403,38 @@ makeLogger = do
 
   pure (writeChan q)
 
+consumeRights ::
+  IO (Either a b) ->
+  (IO b -> IO r) ->
+  IO r
+consumeRights await k = do
+  let go = do
+        await >>= \case
+          Left _ -> go
+          Right r -> pure r
+
+  k go
+
 ptyParsesIncludingControlCode ::
   (String -> IO ()) ->
   IO (Either [Pty.PtyControlCode] ByteString) ->
   (PtyParse -> IO ()) ->
   IO a
 ptyParsesIncludingControlCode log nextChunk yield = do
-  unhandledPty <- newIORef mempty
+  -- I don't know what we should do with PtyControlCodes
+  consumeRights nextChunk $ \nextByteString -> do
+    unhandledPty <- newIORef mempty
 
-  handleForever nextChunk $ \case
-    Left _ ->
-      -- I don't know what we should do with PtyControlCodes
-      pure ()
-    Right bs -> do
-      log ("PtyIn: " ++ show bs ++ "\n")
+    handleForever nextByteString $ \case
+      bs -> do
+        log ("PtyIn: " ++ show bs ++ "\n")
 
-      neededMore <- readIORef unhandledPty
+        neededMore <- readIORef unhandledPty
 
-      remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
-        yield ptyParse
+        remainder <- parseUntilNeedMore log (neededMore <> bs) $ \ptyParse -> do
+          yield ptyParse
 
-      writeIORef unhandledPty remainder
+        writeIORef unhandledPty remainder
 
 parseUntilNeedMore ::
   (String -> IO ()) ->
