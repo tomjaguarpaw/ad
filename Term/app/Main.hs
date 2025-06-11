@@ -199,7 +199,7 @@ main = do
         yield <- sequentializeYield yield'
 
         handleForever (C8.hGetSome stdin 1000) (yield . StdIn)
-          `race` ptyParses log (readPty pty) (yield . PtyIn)
+          `race` ptyParsesIncludingControlCode log (readPty pty) (yield . PtyIn)
           `race` mvarToLoop winchMVar (yield . const WinchIn)
           `race` fmap absurd exitWhenRequested
 
@@ -403,12 +403,12 @@ makeLogger = do
 
   pure (writeChan q)
 
-ptyParses ::
+ptyParsesIncludingControlCode ::
   (String -> IO ()) ->
   IO (Either [Pty.PtyControlCode] ByteString) ->
   (PtyParse -> IO ()) ->
   IO a
-ptyParses log nextChunk yield = do
+ptyParsesIncludingControlCode log nextChunk yield = do
   unhandledPty <- newIORef mempty
 
   handleForever nextChunk $ \case
