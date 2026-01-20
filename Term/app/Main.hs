@@ -119,6 +119,8 @@ main = do
   -- We might want to copy the settings from abduco:
   --
   -- https://github.com/martanne/abduco/blob/8c32909a159aaa9484c82b71f05b7a73321eb491/client.c#L35C20-L56
+  --
+  -- In fact, the settings of 'stty raw' are probably a good idea.
   let newTermSettings =
         ( flip withoutMode ProcessInput
             . flip withoutMode ProcessOutput
