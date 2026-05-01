@@ -8,12 +8,12 @@ build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, contain
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
+{-# OPTIONS_GHC -Wall #-}
 
 import Bluefin.Compound hiding (Handle)
 import Bluefin.Compound qualified as Bf
 import Bluefin.Consume
 import Bluefin.DslBuilder
-import Bluefin.DslBuilderEff
 import Bluefin.Eff
 import Bluefin.IO
 import Bluefin.Internal qualified as BI
@@ -27,12 +27,10 @@ import Control.Monad
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
 import Data.Conduit.Binary qualified as CB
-import Data.Conduit.Combinators
 import Data.Conduit.List
 import Data.Conduit.Tar (FileInfo)
 import Data.Conduit.Tar qualified
 import Data.Conduit.Tar qualified as CTar
-import Data.IORef
 import Data.Map qualified as M
 import Data.Map qualified as Map
 import Data.Serialize.Get
