@@ -2,7 +2,7 @@
 --
 -- https://mailman.haskell.org/archives/list/haskell-cafe@haskell.org/thread/MTUTVVTFZMQ6U5JNNTD46J3WXUY2QWBY/
 {- cabal:
-build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, containers, tar-conduit, bluefin-internal
+build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, containers, tar-conduit, bluefin-internal, conduit-extra
 -}
 {-# LANGUAGE GHC2021 #-}
 {-# LANGUAGE DerivingStrategies #-}
@@ -26,9 +26,9 @@ import Conduit qualified as C
 import Control.Monad
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
+import Data.Conduit.Binary qualified as CB
 import Data.Conduit.Combinators
 import Data.Conduit.List
-import Data.Conduit.List qualified as CB
 import Data.Conduit.Tar (FileInfo)
 import Data.Conduit.Tar qualified
 import Data.Conduit.Tar qualified as CTar
