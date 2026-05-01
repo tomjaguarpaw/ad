@@ -1,7 +1,6 @@
 -- Following up on
 --
 -- https://mailman.haskell.org/archives/list/haskell-cafe@haskell.org/thread/MTUTVVTFZMQ6U5JNNTD46J3WXUY2QWBY/
-
 {- cabal:
 build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, containers, tar-conduit, bluefin-internal
 -}
@@ -127,7 +126,6 @@ sourceEntryHandle h EntryDescription {..} d = do
           error msg
         Right gap -> do
           hSeek h RelativeSeek gap
-          return h
     decompress =
       if d
         then decompressingPipe edCompression
