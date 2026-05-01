@@ -2,13 +2,15 @@
 --
 -- https://mailman.haskell.org/archives/list/haskell-cafe@haskell.org/thread/MTUTVVTFZMQ6U5JNNTD46J3WXUY2QWBY/
 {- cabal:
-build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, containers, tar-conduit, bluefin-internal, conduit-extra
+build-depends: conduit, base, bytestring, zip, cereal, bluefin>=0.5.1.0, containers, tar-conduit, bluefin-internal, time, conduit-extra
 -}
 {-# LANGUAGE GHC2021 #-}
 {-# LANGUAGE DerivingStrategies #-}
 {-# LANGUAGE DerivingVia #-}
 {-# LANGUAGE RecordWildCards #-}
 {-# OPTIONS_GHC -Wall #-}
+
+module Main where
 
 import Bluefin.Compound hiding (Handle)
 import Bluefin.Compound qualified as Bf
@@ -21,11 +23,14 @@ import Bluefin.Stream
 import Codec.Archive.Zip hiding (getEntrySource)
 import Codec.Archive.Zip qualified as Zip
 import Codec.Archive.Zip.Internal
+import Codec.Archive.Zip.Unix qualified as ZipUnix
 import Conduit hiding (await, yield)
 import Conduit qualified as C
 import Control.Monad
+import Data.Bits
 import Data.ByteString (ByteString)
 import Data.ByteString qualified as B
+import Data.ByteString.Char8 qualified as BC
 import Data.Conduit.Binary qualified as CB
 import Data.Conduit.List
 import Data.Conduit.Tar (FileInfo)
@@ -34,8 +39,17 @@ import Data.Conduit.Tar qualified as CTar
 import Data.Map qualified as M
 import Data.Map qualified as Map
 import Data.Serialize.Get
+import Data.Time.Clock.POSIX qualified as PosixTime
 import Data.Traversable (for)
+import Data.Word
+import System.Environment
 import System.IO
+import System.Posix.Types (FileMode)
+
+main :: IO ()
+main = do
+  [filename] <- getArgs
+  convertZipToTar (fileInfoFromZipEntry mempty 0 mempty 0 AttributeUNIX) filename
 
 convertZipToTar ::
   (Zip.EntrySelector -> Zip.EntryDescription -> CTar.FileInfo) ->
@@ -166,3 +180,54 @@ tarYieldAwait a y = do
       forever (liftIO a >>= C.yield)
       .| void Data.Conduit.Tar.tar
       .| Data.Conduit.List.mapM_ y
+
+fileInfoFromZipEntry ::
+  BC.ByteString ->
+  CTar.UserID ->
+  BC.ByteString ->
+  CTar.GroupID ->
+  AttributeSource ->
+  Zip.EntrySelector ->
+  Zip.EntryDescription ->
+  CTar.FileInfo
+fileInfoFromZipEntry userName userId groupName groupId attrSrc sel descr =
+  CTar.FileInfo
+    { CTar.filePath = BC.pack $ Zip.unEntrySelector sel,
+      CTar.fileUserId = userId,
+      CTar.fileUserName = userName,
+      CTar.fileGroupId = groupId,
+      CTar.fileGroupName = groupName,
+      CTar.fileMode =
+        ( case attrSrc of
+            AttributeWindows -> unixPermFromWindowsAttr
+            AttributeUNIX -> ZipUnix.toFileMode
+        )
+          $ Zip.edExternalFileAttrs descr,
+      CTar.fileSize = fromIntegral $ Zip.edUncompressedSize descr,
+      CTar.fileType = CTar.FTNormal,
+      CTar.fileModTime =
+        fromInteger $
+          round $
+            ( realToFrac $ PosixTime.utcTimeToPOSIXSeconds $ Zip.edModTime descr ::
+                Rational
+            )
+    }
+
+data AttributeSource = AttributeWindows | AttributeUNIX
+  deriving (Eq, Ord)
+
+unixPermFromWindowsAttr :: Word32 -> FileMode
+unixPermFromWindowsAttr attrs =
+  unixUserReadable
+    .|. if attrs .&. windowsReadonlyAttr == 0
+      then unixUserWriteable
+      else 0
+
+windowsReadonlyAttr :: Word32
+windowsReadonlyAttr = 1
+
+unixUserReadable :: FileMode
+unixUserReadable = 0o400
+
+unixUserWriteable :: FileMode
+unixUserWriteable = 0o200
