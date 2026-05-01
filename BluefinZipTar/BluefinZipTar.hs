@@ -174,11 +174,19 @@ tarYieldAwait ::
   IO (Either FileInfo ByteString) ->
   (ByteString -> IO ()) ->
   IO ()
-tarYieldAwait a y = do
+tarYieldAwait = fromConduit Data.Conduit.Tar.tar
+
+fromConduit ::
+  Monad m =>
+  ConduitT b1 b2 m a ->
+  m b1 ->
+  (b2 -> m ()) ->
+  m ()
+fromConduit c a y = do
   runConduit $
     do
-      forever (liftIO a >>= C.yield)
-      .| void Data.Conduit.Tar.tar
+      forever (lift a >>= C.yield)
+      .| void c
       .| Data.Conduit.List.mapM_ y
 
 fileInfoFromZipEntry ::
