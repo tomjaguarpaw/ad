@@ -8,8 +8,17 @@ launch_ghcid() {
   ghcid --ignore-loaded --reload="$trigger" --outputfile="$output" --no-height-limit "$@"
 }
 
-rebuild() {
-  date +%s >"$trigger"
+wait_for_output() {
+  trigger_time=$(stat -c %Y "$trigger" 2>/dev/null || stat -f %m "$trigger")
+  while :; do
+    if [ -f "$output" ]; then
+      output_time=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output")
+      if [ "$output_time" -ge "$trigger_time" ]; then
+        break
+      fi
+    fi
+    sleep 0.1
+  done
 }
 
 print_output() {
@@ -25,17 +34,14 @@ status_from_errors() {
   return 0
 }
 
-wait_for_output() {
-  trigger_time=$(stat -c %Y "$trigger" 2>/dev/null || stat -f %m "$trigger")
-  while :; do
-    if [ -f "$output" ]; then
-      output_time=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output")
-      if [ "$output_time" -ge "$trigger_time" ]; then
-        break
-      fi
-    fi
-    sleep 0.1
-  done
+rebuild() {
+  date +%s >"$trigger"
+  wait_for_output
+  print_output
+  if status_from_errors; then
+    return 0
+  fi
+  return 1
 }
 
 case "${1:-}" in
@@ -45,12 +51,6 @@ case "${1:-}" in
     ;;
   --rebuild)
     rebuild
-    wait_for_output
-    print_output
-    if status_from_errors; then
-      exit 0
-    fi
-    exit 1
     ;;
   *)
     printf 'usage: %s --launch <ghcid args...> | --rebuild\n' "$0" >&2
