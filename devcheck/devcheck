@@ -32,7 +32,7 @@ trigger_and_wait_for_output() {
   if [[ -f "$output" ]]; then
     before_output_s=$(mtime_s "$output")
   else
-    before_output_s=0
+    before_output_s=$(date '+%s')
   fi
 
   # Wait for the current time in seconds to be greater than the
