@@ -1,9 +1,9 @@
-#!/usr/bin/env sh
+#!/usr/bin/env bash
 set -eu
 
 trigger=".ghcid-trigger"
 output=".ghcid-output"
-timout_seconds=60
+timeout_s=60
 
 launch() {
   ghcid \
@@ -40,8 +40,8 @@ trigger_and_wait_for_output() {
   # than the timestamp of the output file
   trigger_s=$(mtime_s "$trigger")
 
-  deadline=$((SECONDS + timeout_seconds))
-  while (( SECONDS < deadline )) do
+  deadline=$((SECONDS + timeout_s))
+  while (( SECONDS < deadline )); do
     if [ -f "$output" ]; then
       output_s=$(mtime_s "$output")
       # When the output file has changed in response to our trigger
