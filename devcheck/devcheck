@@ -6,7 +6,9 @@ output=".ghcid-output"
 timeout_s=60
 
 launch() {
-  ghcid \
+  # --ignore-loaded because otherwise ghcid dies if a file it was
+  # --watching is deleted
+  exec ghcid \
     --ignore-loaded \
     --reload="$trigger" \
     --outputfile="$output" \
@@ -54,7 +56,7 @@ trigger_and_wait_for_output() {
     sleep 0.1
   done
 
-  echo "devcheck: timed out waiting for $trigger; is ghcid running?\n" >&2
+  echo "devcheck: timed out waiting for $trigger; is ghcid running?" >&2
   exit 2
 }
 
@@ -65,9 +67,14 @@ print_output() {
 }
 
 status_from_errors() {
-  if [ -f "$output" ] && grep -q 'error:' "$output"; then
+  if [[ ! -f "$output" ]]; then
+    return 2;
+  fi
+	
+  if grep -q 'error:' "$output"; then
     return 1
   fi
+
   return 0
 }
 
