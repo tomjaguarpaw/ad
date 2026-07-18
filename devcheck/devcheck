@@ -34,7 +34,7 @@ status_from_errors() {
   return 0
 }
 
-rebuild() {
+reload() {
   date +%s >"$trigger"
   wait_for_output
   print_output
@@ -49,11 +49,11 @@ case "${1:-}" in
     shift
     launch "$@"
     ;;
-  --rebuild)
-    rebuild
+  --reload)
+    reload
     ;;
   *)
-    printf 'usage: %s --launch <ghcid args...> | --rebuild\n' "$0" >&2
+    printf 'usage: %s --launch <ghcid args...> | --reload\n' "$0" >&2
     exit 2
     ;;
 esac
