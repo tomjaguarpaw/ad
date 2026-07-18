@@ -29,7 +29,11 @@ trigger_and_wait_for_output() {
   # There is nonetheless a race condition should two devchecks be run
   # concurrently.
 
-  before_output_s=$(mtime_s "$output")
+  if [[ -f "$output" ]]; then
+    before_output_s=$(mtime_s "$output")
+  else
+    before_output_s=0
+  fi
 
   # Wait for the current time in seconds to be greater than the
   # current timestamp of the output file.
