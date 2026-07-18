@@ -5,7 +5,13 @@ trigger=".ghcid-trigger"
 output=".ghcid-output"
 
 launch() {
-  ghcid --ignore-loaded --reload="$trigger" --outputfile="$output" --no-height-limit "$@"
+  ghcid \
+    --ignore-loaded \
+    --reload="$trigger" \
+    --outputfile="$output" \
+    --no-height-limit \
+    --reverse-errors \
+    "$@"
 }
 
 wait_for_output() {
