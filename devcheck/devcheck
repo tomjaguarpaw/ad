@@ -7,7 +7,7 @@ timeout_s=60
 
 launch() {
   # --ignore-loaded because otherwise ghcid dies if a file it was
-  # --watching is deleted
+  # watching is deleted
   exec ghcid \
     --ignore-loaded \
     --reload="$trigger" \
@@ -68,7 +68,7 @@ print_output() {
 
 status_from_errors() {
   if [[ ! -f "$output" ]]; then
-    return 2;
+    return 2
   fi
 	
   if grep -q 'error:' "$output"; then
