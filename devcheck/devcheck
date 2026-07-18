@@ -4,7 +4,7 @@ set -eu
 trigger=".ghcid-trigger"
 output=".ghcid-output"
 
-launch_ghcid() {
+launch() {
   ghcid --ignore-loaded --reload="$trigger" --outputfile="$output" --no-height-limit "$@"
 }
 
@@ -47,7 +47,7 @@ rebuild() {
 case "${1:-}" in
   --launch)
     shift
-    launch_ghcid "$@"
+    launch "$@"
     ;;
   --rebuild)
     rebuild
