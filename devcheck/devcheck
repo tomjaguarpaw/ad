@@ -74,7 +74,7 @@ status_from_errors() {
   if [[ ! -f "$output" ]]; then
     return 2
   fi
-	
+
   if grep -q 'error:' "$output"; then
     return 1
   fi
