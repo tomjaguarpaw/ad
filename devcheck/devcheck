@@ -81,10 +81,7 @@ status_from_errors() {
 reload() {
   trigger_and_wait_for_output
   print_output
-  if status_from_errors; then
-    return 0
-  fi
-  return 1
+  status_from_errors
 }
 
 case "${1:-}" in
