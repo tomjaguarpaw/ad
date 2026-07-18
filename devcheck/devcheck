@@ -3,6 +3,7 @@ set -eu
 
 trigger=".ghcid-trigger"
 output=".ghcid-output"
+timout_seconds=60
 
 launch() {
   ghcid \
@@ -14,17 +15,47 @@ launch() {
     "$@"
 }
 
-wait_for_output() {
-  trigger_time=$(stat -c %Y "$trigger" 2>/dev/null || stat -f %m "$trigger")
-  while :; do
+mtime_s () {
+  stat -c %Y "$1" 2>/dev/null || stat -f %m "$1"
+}
+
+trigger_and_wait_for_output() {
+  # ghcid does not allow sequentializing reload requests, so to
+  # determine when the output file has been rewritten we track its
+  # modification time.
+  #
+  # There is nonetheless a race condition should two devchecks be run
+  # concurrently.
+
+  before_output_s=$(mtime_s "$output")
+
+  # Wait for the current time in seconds to be greater than the
+  # current timestamp of the output file.
+  while (( $(date '+%s') <= before_output_s )); do
+    sleep 0.1
+  done
+
+  date +%s >"$trigger"
+  # The timestamp of the trigger file is therefore strictly greater
+  # than the timestamp of the output file
+  trigger_s=$(mtime_s "$trigger")
+
+  deadline=$((SECONDS + timeout_seconds))
+  while (( SECONDS < deadline )) do
     if [ -f "$output" ]; then
-      output_time=$(stat -c %Y "$output" 2>/dev/null || stat -f %m "$output")
-      if [ "$output_time" -ge "$trigger_time" ]; then
-        break
+      output_s=$(mtime_s "$output")
+      # When the output file has changed in response to our trigger
+      # its timestamp will be at least the timestamp of the trigger
+      # file
+      if [ "$output_s" -ge "$trigger_s" ]; then
+        return
       fi
     fi
     sleep 0.1
   done
+
+  echo "devcheck: timed out waiting for $trigger; is ghcid running?\n" >&2
+  exit 2
 }
 
 print_output() {
@@ -41,8 +72,7 @@ status_from_errors() {
 }
 
 reload() {
-  date +%s >"$trigger"
-  wait_for_output
+  trigger_and_wait_for_output
   print_output
   if status_from_errors; then
     return 0
